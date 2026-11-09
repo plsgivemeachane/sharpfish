@@ -21,7 +21,13 @@
 <main class="layout">
   <section class="board-wrap" aria-label="Chess board">
     <div class="player-tag" id="tag-top"></div>
-    <div id="board" class="board" role="grid"></div>
+    <div class="board-row">
+      <div id="evalbar" class="evalbar" title="Stock Stockfish evaluation">
+        <div class="evalbar-white"></div>
+        <span id="eval-label" class="evalbar-label"></span>
+      </div>
+      <div id="board" class="board" role="grid"></div>
+    </div>
     <div class="player-tag" id="tag-bottom"></div>
   </section>
 
@@ -68,6 +74,11 @@
           <option value="1320">Elo 1320 (lowest)</option>
         </select>
       </label>
+      <label class="field">Eval bar (stock Stockfish)
+        <input type="checkbox" id="chk-eval" checked>
+      </label>
+      <div class="hint">Right-click a square to circle it, right-drag to draw an arrow.
+        Hold Shift (red), Alt (blue) or both (yellow) to change color. Left-click clears.</div>
     </div>
   </aside>
 </main>

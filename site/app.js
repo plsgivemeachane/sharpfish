@@ -181,9 +181,69 @@ function engineMove() {
   });
 }
 
+// ---------------------------------------------------------------- Eval bar
+// Driven by the stock Stockfish build in site/stock-engine/, not your variant,
+// so it shows how plain Stockfish rates the game. Your variant may only remove
+// moves, so every position it reaches is a normal chess position stock
+// Stockfish can judge (it just does not know about your rule changes).
+var EVAL_DEPTH = 16;
+var evalEngine = null;
+var evalKey = null;     // position being analysed
+var evalRunning = false;
+
+function winShare(cp) { // centipawns (White's view) -> White's share of the bar, 0..1
+  return 1 / (1 + Math.exp(-0.00368208 * cp)); // same curve as Lichess
+}
+
+function setEvalBar(share, text, title) {
+  var bar = $("evalbar");
+  bar.style.setProperty("--white", (share * 100).toFixed(1) + "%");
+  bar.classList.toggle("white-better", share >= 0.5);
+  bar.title = title;
+  $("eval-label").textContent = text;
+}
+
+function analyse() {
+  if (!evalEngine || !pos || pos.pending || !$("chk-eval").checked) return;
+  var key = positionCmd();
+  if (key === evalKey) return;
+  evalKey = key;
+  if (evalRunning) evalEngine.stop(); // a new position: drop the old search
+  evalRunning = true;
+  var turn = pos.turn;
+  evalEngine.request([key, "go depth " + EVAL_DEPTH],
+    function (l) { return l.indexOf("bestmove") === 0; },
+    function (l) {
+      if (evalKey !== key || l.indexOf("info depth") !== 0) return;
+      var m = l.match(/score (cp|mate) (-?\d+)/);
+      if (!m) return;
+      var depth = (l.match(/ depth (\d+)/) || [])[1];
+      var n = Number(m[2]);
+      var title = "Stock Stockfish · depth " + depth;
+      if (m[1] === "mate") {
+        // "mate 0" = the side to move is already mated
+        var whiteWins = n === 0 ? turn === "b" : (n > 0) === (turn === "w");
+        setEvalBar(whiteWins ? 1 : 0, n === 0 ? "#" : "M" + Math.abs(n), title);
+      } else {
+        var cp = turn === "w" ? n : -n;
+        setEvalBar(winShare(cp), (Math.abs(cp) / 100).toFixed(1), title + " · " + formatScore(l, turn));
+      }
+    }
+  ).then(function () { if (evalKey === key) evalRunning = false; });
+}
+
+function toggleEval() {
+  var on = $("chk-eval").checked;
+  $("evalbar").classList.toggle("off", !on);
+  if (!on && evalRunning) evalEngine.stop();
+  evalKey = null; // re-analyse when switched back on
+  analyse();
+}
+
 // ---------------------------------------------------------------- Game flow
 function playMove(uci) {
   var token = game.token;
+  if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
   game.san.push(toSan(pos, uci));
   game.moves.push(uci);
   selected = null;
@@ -311,7 +371,9 @@ function showPromotion(options, anchorEl) {
 
 document.addEventListener("pointerdown", function (e) {
   var box = $("promo");
-  if (!box.hidden && !box.contains(e.target)) { box.hidden = true; selected = null; render(); }
+  if (!box.hidden && !box.contains(e.target)) {
+    box.hidden = true; selected = null; noAnimSq = null; render();
+  }
 });
 
 function squareAt(x, y) {
@@ -322,6 +384,82 @@ function squareAt(x, y) {
 
 var drag = null;
 
+// ---- Annotations: right-click a square for a circle, right-drag for an arrow.
+// Shift = red, Alt/Ctrl = blue, Shift+Alt = yellow. Left click clears them.
+var shapes = [];      // { from, to, color }; from === to is a circle
+var drawing = null;   // the shape being drawn right now
+var SHAPE_COLORS = { green: "#15781B", red: "#882020", blue: "#003088", yellow: "#e68f00" };
+
+function shapeColor(e) {
+  var alt = e.altKey || e.ctrlKey || e.metaKey;
+  return e.shiftKey && alt ? "yellow" : e.shiftKey ? "red" : alt ? "blue" : "green";
+}
+
+boardEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+boardEl.addEventListener("pointerdown", function (e) {
+  if (e.button === 2 && !drag) {
+    var sqEl = e.target.closest(".sq");
+    if (!sqEl) return;
+    drawing = { from: sqEl.dataset.sq, to: sqEl.dataset.sq, color: shapeColor(e) };
+    try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    drawShapes();
+  } else if (e.button === 0 && shapes.length) {
+    shapes = [];
+    drawShapes();
+  }
+});
+
+boardEl.addEventListener("pointermove", function (e) {
+  if (!drawing) return;
+  var t = squareAt(e.clientX, e.clientY);
+  if (t && t.dataset.sq !== drawing.to) { drawing.to = t.dataset.sq; drawShapes(); }
+});
+
+boardEl.addEventListener("pointerup", function (e) {
+  if (!drawing || e.button !== 2) return;
+  var s = drawing;
+  drawing = null;
+  var i = shapes.findIndex(function (x) { return x.from === s.from && x.to === s.to; });
+  if (i < 0) shapes.push(s);
+  else if (shapes[i].color === s.color) shapes.splice(i, 1); // same shape again = erase
+  else shapes[i] = s;                                       // other color = recolor
+  drawShapes();
+});
+
+function drawShapes() {
+  var svg = $("shapes");
+  if (!svg) return;
+  var list = drawing ? shapes.concat(Object.assign({ preview: true }, drawing)) : shapes;
+  svg.innerHTML = list.map(shapeSvg).join("");
+}
+
+function shapeSvg(s) { // board is an 8x8 viewBox, one unit per square
+  var a = sqXY(s.from), b = sqXY(s.to);
+  var ax = a.x + 0.5, ay = a.y + 0.5, bx = b.x + 0.5, by = b.y + 0.5;
+  var color = SHAPE_COLORS[s.color];
+  var g = '<g opacity="' + (s.preview ? 0.55 : 0.8) + '">';
+  if (s.from === s.to) {
+    return g + '<circle cx="' + ax + '" cy="' + ay + '" r="0.46" fill="none" stroke="' + color +
+      '" stroke-width="0.07"/></g>';
+  }
+  var pts = [[ax, ay]];
+  var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+  if (dx * dy === 2) pts.push(dy > dx ? [ax, by] : [bx, ay]); // knight jump: draw an L
+  var last = pts[pts.length - 1];
+  var ux = bx - last[0], uy = by - last[1], len = Math.hypot(ux, uy);
+  ux /= len; uy /= len;
+  var HEAD = 0.42, HALF = 0.26;
+  var baseX = bx - ux * HEAD, baseY = by - uy * HEAD;
+  pts.push([baseX + ux * 0.02, baseY + uy * 0.02]);
+  var head = [[bx, by], [baseX - uy * HALF, baseY + ux * HALF], [baseX + uy * HALF, baseY - ux * HALF]];
+  var str = function (p) { return p.map(function (q) { return q[0].toFixed(3) + "," + q[1].toFixed(3); }).join(" "); };
+  return g + '<polyline points="' + str(pts) + '" fill="none" stroke="' + color +
+    '" stroke-width="0.16" stroke-linejoin="round"/>' +
+    '<polygon points="' + str(head) + '" fill="' + color + '"/></g>';
+}
+
+// ---- Moving pieces with the left button (drag or click-click).
 boardEl.addEventListener("pointerdown", function (e) {
   var sqEl = e.target.closest(".sq");
   if (!sqEl || !canMove() || e.button > 0) return;
@@ -341,7 +479,7 @@ boardEl.addEventListener("pointerdown", function (e) {
     ghost.className = "ghost";
     ghost.style.width = ghost.style.height = size + "px";
     drag = { from: sq, img: img, ghost: ghost, x: e.clientX, y: e.clientY, moved: false, wasSelected: wasSelected };
-    boardEl.setPointerCapture(e.pointerId);
+    try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
     e.preventDefault();
   } else {
     selected = null;
@@ -355,26 +493,131 @@ boardEl.addEventListener("pointermove", function (e) {
   if (!drag.moved) {
     drag.moved = true;
     document.body.appendChild(drag.ghost);
+    document.body.classList.add("grabbing");
     drag.img.classList.add("dragging");
+    // "Lift" the piece: grow it from its square up to the cursor.
+    if (!reduceMotion) {
+      var r = drag.img.getBoundingClientRect();
+      var ox = r.left + r.width / 2 - e.clientX, oy = r.top + r.height / 2 - e.clientY;
+      drag.ghost.animate([
+        { transform: "translate(calc(-50% + " + ox + "px), calc(-50% + " + oy + "px)) scale(1)" },
+        { transform: "translate(-50%, -50%) scale(1.15)" }
+      ], { duration: 120, easing: "ease-out" });
+    }
   }
   drag.ghost.style.left = e.clientX + "px";
   drag.ghost.style.top = e.clientY + "px";
+  var over = squareAt(e.clientX, e.clientY);
+  if (over !== drag.over) {
+    if (drag.over) drag.over.classList.remove("drag-over");
+    if (over) over.classList.add("drag-over");
+    drag.over = over;
+  }
 });
 
 boardEl.addEventListener("pointerup", function (e) {
-  if (!drag) return;
+  if (!drag || e.button !== 0) return;
   var d = drag;
   drag = null;
   d.ghost.remove();
+  document.body.classList.remove("grabbing");
   d.img.classList.remove("dragging");
+  if (d.over) d.over.classList.remove("drag-over");
   if (d.moved) {
     var target = squareAt(e.clientX, e.clientY);
-    if (!(target && target.dataset.sq !== d.from && tryMove(d.from, target.dataset.sq, target))) render();
+    noAnimSq = target && target.dataset.sq; // dropped pieces land in place, no slide
+    if (!(target && target.dataset.sq !== d.from && tryMove(d.from, target.dataset.sq, target))) {
+      // Illegal drop: let the piece fly back home from where it was let go.
+      noAnimSq = null;
+      var r = d.img.getBoundingClientRect();
+      anims.push({ type: "snap", to: d.from, start: performance.now(),
+        dx: e.clientX - (r.left + r.width / 2), dy: e.clientY - (r.top + r.height / 2) });
+      render();
+    }
   } else if (d.wasSelected) {
     selected = null; // second click on the same piece deselects it
     render();
   }
 });
+
+// ---------------------------------------------------------------- Animation
+// Every redraw compares the new board with the one on screen and slides the
+// pieces that moved. That covers your moves, engine moves, castling, take
+// backs and new games with one mechanism. Animations in progress survive a
+// redraw: they are re-created at the point they had reached.
+var ANIM_MS = 220;
+var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+var shownBoard = null;  // board as last drawn
+var anims = [];         // { type: "slide"|"fade"|"snap", ... , start }
+var noAnimSq = null;    // where a dragged piece was dropped: it should not slide
+
+function sqXY(sq) { // square name -> column/row on screen, 0..7
+  var f = FILES.indexOf(sq[0]), r = Number(sq[1]);
+  return game.flipped ? { x: 7 - f, y: r - 1 } : { x: f, y: 8 - r };
+}
+
+function squareEl(sq) { return boardEl.querySelector('.sq[data-sq="' + sq + '"]'); }
+
+function diffAnims(before, after) {
+  if (!before || reduceMotion) return;
+  var gone = Object.keys(before).filter(function (s) { return before[s] !== after[s]; });
+  var came = Object.keys(after).filter(function (s) { return before[s] !== after[s]; });
+  if (!gone.length && !came.length) return;
+
+  var now = performance.now(), used = {};
+  function dist(a, b) { var p = sqXY(a), q = sqXY(b); return Math.hypot(p.x - q.x, p.y - q.y); }
+  function nearest(to, match) {
+    var best = null;
+    gone.forEach(function (s) {
+      if (!used[s] && match(before[s], s) && (!best || dist(s, to) < dist(best, to))) best = s;
+    });
+    return best;
+  }
+  came.forEach(function (to) {
+    var p = after[to], pawn = isWhite(p) ? "P" : "p";
+    var from = nearest(to, function (q) { return q === p; }) ||
+      // promotion: the new piece comes from a pawn next to it
+      nearest(to, function (q, s) { return p !== pawn && q === pawn && dist(s, to) < 1.5; });
+    if (!from) return;
+    used[from] = true;
+    if (to !== noAnimSq) anims.push({ type: "slide", from: from, to: to, start: now });
+  });
+  // Pieces that vanished were captured: fade them out.
+  gone.forEach(function (s) {
+    if (!used[s] && s !== noAnimSq) anims.push({ type: "fade", sq: s, piece: before[s], start: now });
+  });
+  noAnimSq = null;
+}
+
+function applyAnims() {
+  var now = performance.now(), size = boardEl.clientWidth / 8;
+  anims = anims.filter(function (a) { return now - a.start < ANIM_MS; });
+  anims.forEach(function (a) {
+    var opts = { duration: ANIM_MS, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" };
+    var el, anim;
+    if (a.type === "fade") {
+      el = document.createElement("img");
+      el.className = "piece captured";
+      el.src = pieceImg(a.piece);
+      el.alt = "";
+      squareEl(a.sq).appendChild(el);
+      anim = el.animate([{ opacity: 1 }, { opacity: 0 }], opts);
+      anim.onfinish = function () { el.remove(); };
+    } else {
+      el = squareEl(a.to).querySelector(".piece:not(.captured)");
+      if (!el) return;
+      var dx = a.dx, dy = a.dy;
+      if (a.type === "slide") {
+        var p = sqXY(a.from), q = sqXY(a.to);
+        dx = (p.x - q.x) * size; dy = (p.y - q.y) * size;
+      }
+      el.classList.add("moving");
+      anim = el.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], opts);
+      anim.onfinish = function () { el.classList.remove("moving"); };
+    }
+    anim.currentTime = now - a.start;
+  });
+}
 
 // ---------------------------------------------------------------- Render
 function render() {
@@ -393,8 +636,15 @@ function render() {
   if (pos.pending && pos.lastMove) {
     board = Object.assign({}, board);
     var m = pos.lastMove, from = m.slice(0, 2), to = m.slice(2, 4), p = board[from];
+    var df = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
     delete board[from];
     board[to] = m[4] ? (isWhite(p) ? m[4].toUpperCase() : m[4]) : p;
+    if (p.toUpperCase() === "K" && Math.abs(df) === 2) { // castling: move the rook too
+      var rFrom = (df > 0 ? "h" : "a") + to[1], rTo = (df > 0 ? "f" : "d") + to[1];
+      board[rTo] = board[rFrom];
+      delete board[rFrom];
+    }
+    if (p.toUpperCase() === "P" && df !== 0 && !pos.board[to]) delete board[to[0] + from[1]]; // en passant
   }
 
   var html = "";
@@ -419,7 +669,12 @@ function render() {
       html += "</div>";
     }
   }
+  html += '<svg id="shapes" class="shapes" viewBox="0 0 8 8" aria-hidden="true"></svg>';
+  diffAnims(shownBoard, board);
+  shownBoard = board;
   boardEl.innerHTML = html;
+  applyAnims();
+  drawShapes();
 
   var engineName = $("engine-name").textContent;
   var youTop = game.playerColor === (flipped ? "w" : "b");
@@ -436,6 +691,8 @@ function render() {
 
   renderMoves();
   $("btn-undo").disabled = !game.moves.length;
+  $("evalbar").classList.toggle("flipped", flipped);
+  analyse();
 }
 
 function renderMoves() {
@@ -478,6 +735,7 @@ $("btn-copy").onclick = function () {
   });
 };
 $("sel-elo").onchange = setStrength;
+$("chk-eval").onchange = toggleEval;
 
 (function start() {
   if (!window.ENGINE_FILE) {
@@ -485,6 +743,13 @@ $("sel-elo").onchange = setStrength;
     return;
   }
   engine = new Engine(window.ENGINE_FILE);
+  if (window.STOCK_ENGINE_FILE) {
+    evalEngine = new Engine(window.STOCK_ENGINE_FILE);
+    evalEngine.worker.onerror = function () { $("evalbar").classList.add("off"); evalEngine = null; };
+    evalEngine.request(["uci"], function (l) { return l === "uciok"; });
+  } else {
+    $("evalbar").classList.add("off");
+  }
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };

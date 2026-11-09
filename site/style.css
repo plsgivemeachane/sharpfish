@@ -63,8 +63,40 @@ a { color: var(--accent); }
 
 /* ---------- Board ---------- */
 .board-wrap { width: min(92vw, calc(100vh - 170px), 640px); min-width: 280px; }
+.board-row { display: flex; gap: 8px; align-items: stretch; }
+
+/* Eval bar: white share grows from White's side of the board */
+.evalbar {
+  --white: 50%;
+  position: relative; flex: 0 0 18px;
+  background: #403d39; border-radius: 3px; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.evalbar.off { display: none; }
+.evalbar-white {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--white);
+  background: #f2f2f2;
+  transition: height 0.5s ease;
+}
+.evalbar.flipped .evalbar-white { bottom: auto; top: 0; }
+.evalbar::after { /* the 0.0 line */
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+  margin-top: -1px; background: rgba(214, 79, 0, 0.6);
+}
+.evalbar-label {
+  position: absolute; left: 0; right: 0; text-align: center;
+  font-size: 9px; font-weight: 700; letter-spacing: -0.3px; z-index: 1;
+}
+/* The number sits at the end of the side that is better. */
+.evalbar.white-better .evalbar-label { bottom: 3px; color: #403d39; }
+.evalbar:not(.white-better) .evalbar-label { top: 3px; color: #f2f2f2; }
+.evalbar.flipped.white-better .evalbar-label { bottom: auto; top: 3px; }
+.evalbar.flipped:not(.white-better) .evalbar-label { top: auto; bottom: 3px; }
+
 .board {
   position: relative;
+  flex: 1;
+  min-width: 0;
   width: 100%;
   aspect-ratio: 1;
   display: grid;
@@ -103,10 +135,27 @@ a { color: var(--accent); }
   -webkit-user-drag: none;
 }
 .piece.dragging { opacity: 0.35; }
+.piece.moving { z-index: 3; }
+.piece.captured { z-index: 1; pointer-events: none; }
 .ghost {
   position: fixed; pointer-events: none; z-index: 50;
-  transform: translate(-50%, -50%) scale(1.1);
+  transform: translate(-50%, -50%) scale(1.15);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.35));
+  will-change: transform, left, top;
 }
+body.grabbing, body.grabbing * { cursor: grabbing !important; }
+.sq.drag-over::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.65);
+}
+.sq.dest.drag-over::after { background: rgba(20, 85, 30, 0.3); box-shadow: none; }
+
+/* Arrows and circles drawn with the right mouse button */
+.shapes {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 4;
+}
+.hint { color: var(--muted); font-size: 12px; }
 
 .coord {
   position: absolute; font-size: 11px; font-weight: 600; pointer-events: none; z-index: 1;
@@ -159,6 +208,7 @@ a { color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .field { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.field input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 .field select {
   font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);

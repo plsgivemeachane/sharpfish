@@ -4,6 +4,9 @@
 #   ./make-web.sh          build the lite single-threaded engine into site/engine/
 #   ./make-web.sh test     build, then check that the engine answers (needs node)
 #   ./make-web.sh serve    build, then serve site/ on http://localhost:8080
+#   ./make-web.sh stock    rebuild the stock eval-bar engine (site/stock-engine/)
+#                          and then your variant. Normally never needed: the
+#                          stock engine is committed and reused as is.
 #
 # Extra flags after the command go to build.js, e.g. ./make-web.sh -- --no-minify
 set -euo pipefail
@@ -13,7 +16,7 @@ cd "$ROOT"
 
 CMD="build"
 case "${1:-}" in
-    test|serve|build) CMD="$1"; shift ;;
+    test|serve|build|stock) CMD="$1"; shift ;;
 esac
 [ "${1:-}" = "--" ] && shift
 
@@ -34,16 +37,31 @@ fi
 [ -d node_modules/terser ] || npm install --no-audit --no-fund
 
 # 3. Build. -f makes sure header-only changes (src/variant/*.h) are picked up.
-echo ">> Building lite single-threaded engine..."
+#    The stock engine behind the eval bar is built once (all variant settings
+#    off via -DVARIANT_STOCK) and committed in site/stock-engine/.
+STOCK_DIR=site/stock-engine
+if [ "$CMD" = "stock" ] || [ ! -f "$STOCK_DIR/stockfish-stock.wasm" ]; then
+    echo ">> Building stock reference engine (eval bar)..."
+    EXTRACXXFLAGS="-DVARIANT_STOCK" node build.js --single-threaded --lite -f -s \
+        --basename=stockfish-stock "$@"
+    mkdir -p "$STOCK_DIR"
+    cp src/stockfish-stock.js src/stockfish-stock.wasm "$STOCK_DIR/"
+fi
+
+mkdir -p site/engine
+rm -f site/engine/*.js site/engine/*.wasm
+
+echo ">> Building your variant engine..."
 node build.js --single-threaded --lite -f -s "$@"
 
 # 4. Copy into the site
 ENGINE_JS="$(basename "$(readlink -f src/stockfish.js)")"
 ENGINE_WASM="${ENGINE_JS%.js}.wasm"
-mkdir -p site/engine
-rm -f site/engine/*.js site/engine/*.wasm
 cp "src/$ENGINE_JS" "src/$ENGINE_WASM" site/engine/
-echo "window.ENGINE_FILE = \"engine/$ENGINE_JS\";" > site/engine-file.js
+cat > site/engine-file.js <<EOF2
+window.ENGINE_FILE = "engine/$ENGINE_JS";
+window.STOCK_ENGINE_FILE = "stock-engine/stockfish-stock.js";
+EOF2
 echo ">> Engine copied to site/engine/$ENGINE_JS (+ .wasm, $(du -h "site/engine/$ENGINE_WASM" | cut -f1))"
 
 # 5. Optional extras

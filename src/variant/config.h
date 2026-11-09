@@ -20,6 +20,13 @@
 #ifndef VARIANT_CONFIG_H_INCLUDED
 #define VARIANT_CONFIG_H_INCLUDED
 
+// make-web.sh also builds an unmodified engine for the site's eval bar by
+// compiling with -DVARIANT_STOCK, which swaps this file for stock_config.h.
+// If you add a new setting here, add its stock value there too.
+#ifdef VARIANT_STOCK
+    #include "stock_config.h"
+#else
+
 namespace Stockfish::Variant {
 
 // Name shown by "uci" as "id name ...". Give your fork its own name.
@@ -83,4 +90,5 @@ constexpr bool EnableNullMove = true;
 
 }  // namespace Stockfish::Variant
 
+#endif  // VARIANT_STOCK
 #endif  // #ifndef VARIANT_CONFIG_H_INCLUDED

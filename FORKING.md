@@ -19,6 +19,7 @@ The first run installs the pinned Emscripten version (about 1 GB, one time) into
 | `./make-web.sh` | Build the lite single-threaded engine into `site/engine/` |
 | `./make-web.sh test` | Build, then check the engine starts, counts legal moves and finds a move |
 | `./make-web.sh serve` | Build, then serve the playable site on port 8080 |
+| `./make-web.sh stock` | Also rebuild the stock engine used by the eval bar (rarely needed) |
 
 ## Where to make changes
 
@@ -56,6 +57,16 @@ out, so an unchanged fork plays exactly like Stockfish.
 - Rules here can only **remove** moves. New pieces, new win conditions (e.g.
   king of the hill) or drops need real changes to `movegen.cpp`,
   `position.cpp` and `search.cpp`.
+- **The eval bar** next to the board is run by a second, unmodified Stockfish
+  in `site/stock-engine/`, so you can see how a neutral engine judges the
+  games your variant plays. It is built once (with `-DVARIANT_STOCK`, which
+  swaps `config.h` for `src/variant/stock_config.h`) and committed, so normal
+  builds skip it. If you add a setting to `config.h`, add its stock value to
+  `stock_config.h` too. Because variant rules only remove moves, every
+  position your engine reaches is a normal chess position the stock engine
+  can evaluate.
+- **On the board:** drag or click to move, right-click a square to circle it,
+  right-drag to draw an arrow (Shift = red, Alt = blue, both = yellow).
 
 ### Check that your change did something
 
