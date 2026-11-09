@@ -26,6 +26,7 @@ constexpr bool AllowEnPassant       = true;
 constexpr bool AllowUnderpromotion  = true;
 constexpr bool AllowPawnDoubleStep  = true;
 constexpr bool EnableCustomRules    = false;
+constexpr int  AlternateSquareColors = 0;
 constexpr bool EnableNullMove       = true;
 
 }  // namespace Stockfish::Variant

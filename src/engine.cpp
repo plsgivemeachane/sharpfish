@@ -160,6 +160,11 @@ std::variant<u64, PositionSetError>
 Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
     verify_network();
 
+    // Same FEN as the current game: keep its alternating-colors state
+    if (fen == pos.fen())
+        return Benchmark::perft(fen, depth, isChess960, pos.need_color(WHITE),
+                                pos.need_color(BLACK));
+
     return Benchmark::perft(fen, depth, isChess960);
 }
 

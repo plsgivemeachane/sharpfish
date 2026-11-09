@@ -54,6 +54,9 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    // Alternating-colors variant: square color each side's next move must land
+    // on (0 = any, 1 = dark, 2 = light). See src/variant/config.h.
+    int8_t needColor[COLOR_NB];
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -106,6 +109,8 @@ class Position {
     Piece                               piece_on(Square s) const;
     const std::array<Piece, SQUARE_NB>& piece_array() const;
     Square                              ep_square() const;
+    int                                 need_color(Color c) const;
+    void                                set_need_color(Color c, int need);
     bool                                empty(Square s) const;
     template<PieceType Pt>
     int count(Color c) const;
@@ -277,6 +282,8 @@ inline Square Position::square(Color c) const {
 }
 
 inline Square Position::ep_square() const { return st->epSquare; }
+
+inline int Position::need_color(Color c) const { return st->needColor[c]; }
 
 inline bool Position::can_castle(CastlingRights cr) const { return st->castlingRights & cr; }
 

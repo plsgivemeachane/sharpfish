@@ -106,7 +106,11 @@ constexpr bool HasPieceTweak = PieceValueTweakCp[0] || PieceValueTweakCp[1] || P
                             || PieceValueTweakCp[3] || PieceValueTweakCp[4];
 
 constexpr bool HasRuleFilter = !AllowCastling || !AllowEnPassant || !AllowUnderpromotion
-                            || !AllowPawnDoubleStep || EnableCustomRules;
+                            || !AllowPawnDoubleStep || EnableCustomRules
+                            || AlternateSquareColors != 0;
+
+// a1 is dark, so a square is light when file + rank is odd.
+constexpr bool is_light(Square s) { return (int(file_of(s)) + int(rank_of(s))) & 1; }
 
 // Total eval adjustment in internal units, side-to-move point of view.
 inline int eval_adjust(const Position& pos) {
@@ -161,6 +165,17 @@ inline bool move_allowed(const Position& pos, Move m) {
         if (type_of(pos.moved_piece(m)) == PAWN
             && std::abs(int(rank_of(m.to_sq())) - int(rank_of(m.from_sq()))) == 2)
             return false;
+
+    if constexpr (AlternateSquareColors != 0)
+        if (int need = pos.need_color(pos.side_to_move()))
+        {
+            Square to = m.type_of() == CASTLING
+                        ? relative_square(pos.side_to_move(),
+                                          m.to_sq() > m.from_sq() ? SQ_G1 : SQ_C1)
+                        : m.to_sq();
+            if (is_light(to) != (need == 2))
+                return false;
+        }
 
     if constexpr (EnableCustomRules)
         return move_allowed_custom(pos, m);

@@ -52,6 +52,7 @@ Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
 Key side, noPawns;
+Key needColor[COLOR_NB][3];  // [c][0] = 0 so "any" keeps stock keys
 
 }
 
@@ -82,7 +83,16 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 
     os << "   a   b   c   d   e   f   g   h\n"
        << "\nFen: " << pos.fen() << "\nKey: " << std::hex << std::uppercase << std::setfill('0')
-       << std::setw(16) << pos.key() << std::setfill(' ') << std::dec << "\nCheckers: ";
+       << std::setw(16) << pos.key() << std::setfill(' ') << std::dec;
+
+    if constexpr (Variant::AlternateSquareColors != 0)
+    {
+        constexpr const char* names[] = {"any", "dark", "light"};
+        os << "\nMust land on: white " << names[pos.need_color(WHITE)] << ", black "
+           << names[pos.need_color(BLACK)];
+    }
+
+    os << "\nCheckers: ";
 
     for (Bitboard b = pos.checkers(); b;)
         os << UCIEngine::square(pop_lsb(b)) << " ";
@@ -139,6 +149,14 @@ void Position::init() {
 
     Zobrist::side    = rng.rand<Key>();
     Zobrist::noPawns = rng.rand<Key>();
+
+    // Drawn after the stock keys so those (and the cuckoo tables) stay unchanged
+    for (Color c : {WHITE, BLACK})
+    {
+        Zobrist::needColor[c][0] = 0;
+        Zobrist::needColor[c][1] = rng.rand<Key>();
+        Zobrist::needColor[c][2] = rng.rand<Key>();
+    }
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -487,6 +505,12 @@ void Position::set_check_info() const {
 // Computes the hash keys of the position, and other
 // data that once computed is updated incrementally as moves are made.
 // The function is only used when a new position is set up
+// Alternating-colors variant: restores the color rule, which a FEN can't hold
+void Position::set_need_color(Color c, int need) {
+    st->key ^= Zobrist::needColor[c][st->needColor[c]] ^ Zobrist::needColor[c][need];
+    st->needColor[c] = int8_t(need);
+}
+
 void Position::set_state() const {
 
     st->key               = 0;
@@ -528,6 +552,8 @@ void Position::set_state() const {
         st->key ^= Zobrist::side;
 
     st->key ^= Zobrist::castling[st->castlingRights];
+    st->key ^= Zobrist::needColor[WHITE][st->needColor[WHITE]]
+             ^ Zobrist::needColor[BLACK][st->needColor[BLACK]];
     st->materialKey = compute_material_key();
 }
 
@@ -1010,6 +1036,19 @@ void Position::do_move(Move                      m,
 
         if (type_of(pc) <= BISHOP)
             st->minorPieceKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
+    }
+
+    // Alternating-colors variant: the next move must land on the other color.
+    // For castling, `to` is the king's destination here.
+    if constexpr (Variant::AlternateSquareColors != 0)
+    {
+        int next = Variant::is_light(to) ? 1 : 2;
+        for (Color c : {WHITE, BLACK})
+            if (Variant::AlternateSquareColors == 2 || c == us)
+            {
+                k ^= Zobrist::needColor[c][st->needColor[c]] ^ Zobrist::needColor[c][next];
+                st->needColor[c] = int8_t(next);
+            }
     }
 
     if (tt)

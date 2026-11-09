@@ -57,12 +57,16 @@ u64 perft(Position& pos, Depth depth) {
 }
 
 inline std::variant<u64, PositionSetError>
-perft(const std::string& fen, Depth depth, bool isChess960) {
+perft(const std::string& fen, Depth depth, bool isChess960, int needWhite = 0, int needBlack = 0) {
     StateInfo st;
     Position  p;
 
     if (auto err = p.set(fen, isChess960, &st))
         return {*err};
+
+    // FEN has no move history, so carry over the alternating-colors rule
+    p.set_need_color(WHITE, needWhite);
+    p.set_need_color(BLACK, needBlack);
 
     return perft<true>(p, depth);
 }

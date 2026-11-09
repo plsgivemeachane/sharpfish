@@ -30,7 +30,7 @@
 namespace Stockfish::Variant {
 
 // Name shown by "uci" as "id name ...". Give your fork its own name.
-constexpr const char* EngineName = "";  // "" keeps the default Stockfish name
+constexpr const char* EngineName = "Alternating Stockfish";  // "" keeps the default Stockfish name
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
@@ -81,12 +81,23 @@ constexpr bool AllowPawnDoubleStep = true;
 // Turn on Variant::move_allowed_custom() in hooks.h for your own rules.
 constexpr bool EnableCustomRules = false;
 
+// Alternating square colors: a move must land on the opposite color to the
+// previous move's destination (castling counts the king's square).
+//   0 = off (normal chess)
+//   1 = each side alternates its own moves (white: light, dark, light, ...)
+//   2 = every move alternates, shared by both sides
+// A side with no move on the required color is checkmated if in check,
+// otherwise stalemated (draw). The first move of a game may land anywhere.
+constexpr int AlternateSquareColors = 1;
+
 // -----------------------------------------------------------------------------
 //  5. SEARCH
 // -----------------------------------------------------------------------------
 // Null-move pruning is a big speed-up, but it is unsound in some variants
 // (e.g. when passing would be good). Turn it off if your rules need that.
-constexpr bool EnableNullMove = true;
+// Off for the alternating-colors rule: being forced onto one color makes
+// zugzwang common, which null-move pruning assumes away.
+constexpr bool EnableNullMove = AlternateSquareColors == 0;
 
 }  // namespace Stockfish::Variant
 
