@@ -87,8 +87,10 @@ constexpr bool EnableCustomRules = false;
 //   0 = off (normal chess)
 //   1 = opposite of the engine's own previous move (light, dark, light, ...)
 //   2 = opposite of the previous move by either side (i.e. the opponent's)
-// If the engine has no move on the required color it is checkmated when in
-// check, otherwise stalemated (draw). Its first move may land anywhere.
+// In check the rule is lifted and any legal move is allowed (the move still
+// counts as the previous move for the next one). If the engine is not in
+// check and has no move on the required color, it is stalemated (draw).
+// Its first move may land anywhere.
 constexpr int AlternateSquareColors = 1;
 
 // -----------------------------------------------------------------------------

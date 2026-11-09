@@ -172,7 +172,9 @@ inline bool move_allowed(const Position& pos, Move m) {
             return false;
 
     if constexpr (AlternateSquareColors != 0)
-        if (int need = pos.side_to_move() == EngineSide ? pos.need_color(EngineSide) : 0)
+        // Free in check: any legal move may answer a check.
+        if (int need = pos.side_to_move() == EngineSide && !pos.checkers()
+                       ? pos.need_color(EngineSide) : 0)
         {
             Square to = m.type_of() == CASTLING
                         ? relative_square(pos.side_to_move(),
