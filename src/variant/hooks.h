@@ -109,6 +109,11 @@ constexpr bool HasRuleFilter = !AllowCastling || !AllowEnPassant || !AllowUnderp
                             || !AllowPawnDoubleStep || EnableCustomRules
                             || AlternateSquareColors != 0;
 
+// The color the engine plays, set on every "go" (COLOR_NB = not known yet).
+// The alternating-colors rule only binds this side; the opponent plays normal
+// chess. During a search it is the side to move at the root.
+inline Color EngineSide = COLOR_NB;
+
 // a1 is dark, so a square is light when file + rank is odd.
 constexpr bool is_light(Square s) { return (int(file_of(s)) + int(rank_of(s))) & 1; }
 
@@ -167,7 +172,7 @@ inline bool move_allowed(const Position& pos, Move m) {
             return false;
 
     if constexpr (AlternateSquareColors != 0)
-        if (int need = pos.need_color(pos.side_to_move()))
+        if (int need = pos.side_to_move() == EngineSide ? pos.need_color(EngineSide) : 0)
         {
             Square to = m.type_of() == CASTLING
                         ? relative_square(pos.side_to_move(),

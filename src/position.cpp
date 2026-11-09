@@ -88,8 +88,10 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
     if constexpr (Variant::AlternateSquareColors != 0)
     {
         constexpr const char* names[] = {"any", "dark", "light"};
-        os << "\nMust land on: white " << names[pos.need_color(WHITE)] << ", black "
-           << names[pos.need_color(BLACK)];
+        Color e = Variant::EngineSide;
+        if (e != COLOR_NB)
+            os << "\nEngine (" << (e == WHITE ? "white" : "black") << ") must land on: "
+               << names[pos.need_color(e)];
     }
 
     os << "\nCheckers: ";

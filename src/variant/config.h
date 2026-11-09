@@ -81,13 +81,14 @@ constexpr bool AllowPawnDoubleStep = true;
 // Turn on Variant::move_allowed_custom() in hooks.h for your own rules.
 constexpr bool EnableCustomRules = false;
 
-// Alternating square colors: a move must land on the opposite color to the
-// previous move's destination (castling counts the king's square).
+// Alternating square colors, for the ENGINE only (the opponent plays normal
+// chess): each engine move must land on the opposite color to the previous
+// move's destination (castling counts the king's square).
 //   0 = off (normal chess)
-//   1 = each side alternates its own moves (white: light, dark, light, ...)
-//   2 = every move alternates, shared by both sides
-// A side with no move on the required color is checkmated if in check,
-// otherwise stalemated (draw). The first move of a game may land anywhere.
+//   1 = opposite of the engine's own previous move (light, dark, light, ...)
+//   2 = opposite of the previous move by either side (i.e. the opponent's)
+// If the engine has no move on the required color it is checkmated when in
+// check, otherwise stalemated (draw). Its first move may land anywhere.
 constexpr int AlternateSquareColors = 1;
 
 // -----------------------------------------------------------------------------

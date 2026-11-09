@@ -43,6 +43,7 @@
 #include "types.h"
 #include "uci.h"
 #include "ucioption.h"
+#include "variant/hooks.h"
 
 namespace Stockfish {
 
@@ -171,6 +172,10 @@ Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
 void Engine::go(Search::LimitsType& limits) {
     assert(limits.perft == 0);
     verify_network();
+
+    // Alternating-colors variant: the side asked to move is the engine's side
+    if constexpr (Variant::AlternateSquareColors != 0)
+        Variant::EngineSide = pos.side_to_move();
 
     threads.start_thinking(options, pos, states, limits);
 }
