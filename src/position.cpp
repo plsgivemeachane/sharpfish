@@ -38,6 +38,7 @@
 #include "syzygy/tbprobe.h"
 #include "tt.h"
 #include "uci.h"
+#include "variant/hooks.h"
 
 using std::string;
 
@@ -671,6 +672,11 @@ bool Position::legal(Move m) const {
 
     assert(color_of(moved_piece(m)) == us);
     assert(piece_on(square<KING>(us)) == make_piece(us, KING));
+
+    // Fork rules (src/variant/config.h)
+    if constexpr (Variant::HasRuleFilter)
+        if (!Variant::move_allowed(*this, m))
+            return false;
 
     // Castling moves generation does not check if the castling path is clear of
     // enemy attacks, it is delayed at a later time: now!

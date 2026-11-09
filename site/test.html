@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine test</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; background: #fff; color: #222; }
+  pre  { background: #f4f4f4; padding: 12px; max-height: 60vh; overflow: auto; white-space: pre-wrap; }
+  #result { font-size: 20px; font-weight: 600; }
+</style>
+<script src="engine-file.js"></script>
+</head>
+<body>
+<h1>Engine test: one move</h1>
+<p>Loads the engine in a Web Worker, sends <code>go movetime 1000</code> from the start position, and prints the reply.</p>
+<p id="result">Loading…</p>
+<pre id="log"></pre>
+<script>
+  var log = document.getElementById("log");
+  var result = document.getElementById("result");
+  var t0 = performance.now();
+  var engine = new Worker(window.ENGINE_FILE);
+
+  engine.onmessage = function (e) {
+    var line = String(e.data);
+    log.textContent += line + "\n";
+    if (line === "readyok") {
+      result.textContent = "Engine ready in " + Math.round(performance.now() - t0) + " ms, thinking…";
+      t0 = performance.now();
+      engine.postMessage("position startpos");
+      engine.postMessage("go movetime 1000");
+    }
+    var m = line.match(/^bestmove (\S+)/);
+    if (m) {
+      result.textContent = "Best move: " + m[1] + " (" + Math.round(performance.now() - t0) + " ms)";
+      document.title = "bestmove " + m[1];
+    }
+  };
+  engine.onerror = function (e) { result.textContent = "Error: " + e.message; };
+
+  engine.postMessage("uci");
+  engine.postMessage("isready");
+</script>
+</body>
+</html>

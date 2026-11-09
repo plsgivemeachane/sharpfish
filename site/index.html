@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Play the Engine</title>
+<meta name="description" content="Play chess in your browser against a custom Stockfish build.">
+<link rel="icon" href="pieces/wN.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<!-- Written by make-web.sh: sets window.ENGINE_FILE to the built engine -->
+<script src="engine-file.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="pieces/wN.svg" alt="" width="28" height="28">
+    <span id="engine-name">Loading engine…</span>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="board-wrap" aria-label="Chess board">
+    <div class="player-tag" id="tag-top"></div>
+    <div id="board" class="board" role="grid"></div>
+    <div class="player-tag" id="tag-bottom"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="card status-card">
+      <div id="status" class="status">Starting…</div>
+      <div id="engine-line" class="engine-line">&nbsp;</div>
+    </div>
+
+    <div class="card moves-card">
+      <table class="moves" aria-label="Moves">
+        <thead><tr><th>#</th><th>White</th><th>Black</th></tr></thead>
+        <tbody id="moves"></tbody>
+      </table>
+      <div id="moves-empty" class="moves-empty">No moves yet. You play White — make the first move.</div>
+    </div>
+
+    <div class="card controls">
+      <div class="row">
+        <button id="btn-new-white" class="btn primary">New game as White</button>
+        <button id="btn-new-black" class="btn">as Black</button>
+      </div>
+      <div class="row">
+        <button id="btn-undo" class="btn">Take back</button>
+        <button id="btn-flip" class="btn">Flip board</button>
+        <button id="btn-copy" class="btn" title="Copy the moves in PGN format">Copy PGN</button>
+      </div>
+      <label class="field">Think time
+        <select id="sel-time">
+          <option value="300">0.3 s</option>
+          <option value="1000" selected>1 s</option>
+          <option value="2000">2 s</option>
+          <option value="3000">3 s</option>
+          <option value="5000">5 s</option>
+        </select>
+      </label>
+      <label class="field">Strength
+        <select id="sel-elo">
+          <option value="0" selected>Full strength</option>
+          <option value="2800">Elo 2800</option>
+          <option value="2400">Elo 2400</option>
+          <option value="2000">Elo 2000</option>
+          <option value="1700">Elo 1700</option>
+          <option value="1320">Elo 1320 (lowest)</option>
+        </select>
+      </label>
+    </div>
+  </aside>
+</main>
+
+<footer class="foot">
+  Engine: <a href="https://github.com/official-stockfish/Stockfish">Stockfish</a>
+  via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, GPLv3.
+  Pieces: cburnett (GPLv2+). <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a>
+</footer>
+
+<div id="promo" class="promo" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

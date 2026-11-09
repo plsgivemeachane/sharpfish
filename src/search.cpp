@@ -48,6 +48,7 @@
 #include "tt.h"
 #include "types.h"
 #include "uci.h"
+#include "variant/hooks.h"
 #include "ucioption.h"
 
 #ifdef __EMSCRIPTEN_SINGLE_THREADED__
@@ -1024,7 +1025,7 @@ Value Search::Worker::search(
     }
 
     // Step 10. Null move search with verification search
-    if (cutNode && ss->staticEval >= beta - 13 * depth - 47 * improving + 365 && !excludedMove
+    if (Variant::EnableNullMove && cutNode && ss->staticEval >= beta - 13 * depth - 47 * improving + 365 && !excludedMove
         && pos.non_pawn_material(us) && ss->ply >= nmpMinPly && beta >= -2000)
     {
         assert((ss - 1)->currentMove != Move::null());
@@ -1449,6 +1450,12 @@ moves_loop:  // When in check, search starts here
         // principal variation or transposition table.
         if (threads.stop.load(std::memory_order_relaxed))
             return VALUE_ZERO;
+
+        // Fork move rating: nudge root move scores (src/variant/hooks.h)
+        if constexpr (Variant::EnableMoveBias)
+            if (rootNode && !is_decisive(value))
+                value = std::clamp(Value(value + Variant::root_bias(pos, move)),
+                                   VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 
         if (rootNode)
         {

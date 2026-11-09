@@ -34,6 +34,7 @@
 #include "types.h"
 #include "uci.h"
 #include "nnue/nnue_accumulator.h"
+#include "variant/hooks.h"
 
 namespace Stockfish {
 
@@ -51,6 +52,13 @@ Value Eval::evaluate(const Eval::NNUE::Network&     network,
 
     Value nnue = psqt + positional;
 
+    if constexpr (Variant::NnueScalePercent != 100)
+    {
+        psqt       = psqt * Variant::NnueScalePercent / 100;
+        positional = positional * Variant::NnueScalePercent / 100;
+        nnue       = psqt + positional;
+    }
+
     // Blend optimism and eval with nnue complexity
     int nnueComplexity = std::abs(psqt - positional);
     optimism += optimism * i64(nnueComplexity) / 476;
@@ -58,6 +66,10 @@ Value Eval::evaluate(const Eval::NNUE::Network&     network,
 
     int material = 534 * pos.count<PAWN>() + pos.non_pawn_material();
     int v        = nnue + (nnue * i64(material) + optimism * i64(7675)) / 91000;
+
+    // Fork tuning: piece value tweaks and custom eval terms (src/variant/)
+    if constexpr (Variant::HasPieceTweak || Variant::EnableEvalHook)
+        v += Variant::eval_adjust(pos);
 
     // Damp down the evaluation linearly when shuffling
     v -= v * pos.rule50_count() / 199;

@@ -1,0 +1,60 @@
+# Builds the engine and publishes site/ to GitHub Pages on every push.
+# Every fork gets its own playable site: enable Pages once in the fork's
+# Settings -> Pages -> Source: "GitHub Actions".
+name: Build engine and site
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read pinned Emscripten version
+        id: em
+        run: echo "version=$(grep -oP 'expectedEmscripten\s*=\s*"\K[0-9.]+' build.js)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache emsdk
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ steps.em.outputs.version }}
+
+      - name: Build engine and run smoke test
+        run: ./make-web.sh test
+
+      - name: Upload site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    # Only the default branch is published; other branches just build + test.
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

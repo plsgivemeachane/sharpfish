@@ -24,6 +24,7 @@
 #include "attacks.h"
 #include "bitboard.h"
 #include "position.h"
+#include "variant/hooks.h"
 
 #if defined(USE_AVX512ICL)
     #include <array>
@@ -279,8 +280,9 @@ Move* generate<LEGAL>(const Position& pos, Move* moveList) {
     moveList =
       pos.checkers() ? generate<EVASIONS>(pos, moveList) : generate<NON_EVASIONS>(pos, moveList);
     while (cur != moveList)
-        if (((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT)
-            && !pos.legal(*cur))
+        if ((((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT)
+             && !pos.legal(*cur))
+            || (Variant::HasRuleFilter && !Variant::move_allowed(pos, *cur)))
             *cur = *(--moveList);
         else
             ++cur;

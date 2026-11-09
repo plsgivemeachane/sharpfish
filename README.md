@@ -1,5 +1,9 @@
 # Stockfish.js
 
+> **This fork** is set up for making engine variants: edit `src/variant/config.h`
+> (piece values, move rating, rules), run `./make-web.sh serve`, and play your
+> engine in the browser from `site/`. See **[FORKING.md](FORKING.md)**.
+
 [Stockfish.js](https://github.com/nmrugg/stockfish.js) is a WASM implementation by Nathan Rugg of the [Stockfish](https://github.com/official-stockfish/Stockfish) chess engine. It is written for [Chess.com's](https://www.chess.com/analysis) in-browser engine and is maintained as a general purpose project.
 
 Stockfish.js is currently updated to Stockfish 19.

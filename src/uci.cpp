@@ -43,6 +43,7 @@
 #include "search.h"
 #include "types.h"
 #include "ucioption.h"
+#include "variant/config.h"
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
@@ -131,7 +132,17 @@ std::string UCIEngine::process_cmd(const std::string& cmd) {
 
     else if (token == "uci")
     {
-        sync_cout << "id name " << engine_info(true) << "\n"
+        // Forks can rename the engine in src/variant/config.h. The author line
+        // that credits the Stockfish developers is always kept.
+        std::string id = engine_info(true);
+        if (*Variant::EngineName)
+        {
+            auto nl = id.find('\n');
+            id = std::string(Variant::EngineName) + " (based on " + id.substr(0, nl) + ")"
+               + id.substr(nl);
+        }
+
+        sync_cout << "id name " << id << "\n"
                   << engine.get_options() << sync_endl;
 
         sync_cout << "uciok" << sync_endl;
