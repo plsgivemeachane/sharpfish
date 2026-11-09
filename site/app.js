@@ -470,43 +470,62 @@ boardEl.addEventListener("pointerdown", function (e) {
   if (selected && sq !== selected && tryMove(selected, sq, sqEl)) return;
 
   if (piece && (isWhite(piece) ? "w" : "b") === pos.turn) {
+    // Capture first: render() below replaces the element under the pointer,
+    // and some browsers end the gesture when the pressed element disappears.
+    try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    e.preventDefault();
     var wasSelected = selected === sq;
     selected = sq;
     render();
-    var img = boardEl.querySelector('.sq[data-sq="' + sq + '"] .piece');
-    var size = sqEl.getBoundingClientRect().width;
-    var ghost = img.cloneNode();
-    ghost.className = "ghost";
-    ghost.style.width = ghost.style.height = size + "px";
-    drag = { from: sq, img: img, ghost: ghost, x: e.clientX, y: e.clientY, moved: false, wasSelected: wasSelected };
-    try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
-    e.preventDefault();
+    startDrag(sq, e, wasSelected);
   } else {
     selected = null;
     render();
   }
 });
 
-boardEl.addEventListener("pointermove", function (e) {
-  if (!drag) return;
-  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return;
-  if (!drag.moved) {
-    drag.moved = true;
-    document.body.appendChild(drag.ghost);
-    document.body.classList.add("grabbing");
-    drag.img.classList.add("dragging");
-    // "Lift" the piece: grow it from its square up to the cursor.
-    if (!reduceMotion) {
-      var r = drag.img.getBoundingClientRect();
-      var ox = r.left + r.width / 2 - e.clientX, oy = r.top + r.height / 2 - e.clientY;
-      drag.ghost.animate([
-        { transform: "translate(calc(-50% + " + ox + "px), calc(-50% + " + oy + "px)) scale(1)" },
-        { transform: "translate(-50%, -50%) scale(1.15)" }
-      ], { duration: 120, easing: "ease-out" });
-    }
+// The piece is picked up as soon as it is pressed: it pops to the cursor and
+// follows it. Releasing without moving counts as a click.
+function startDrag(sq, e, wasSelected) {
+  var sqEl = squareEl(sq);
+  var img = sqEl.querySelector(".piece");
+  var size = sqEl.getBoundingClientRect().width;
+  var ghost = img.cloneNode();
+  ghost.className = "ghost";
+  ghost.style.width = ghost.style.height = size + "px";
+  ghost.style.left = e.clientX + "px";
+  ghost.style.top = e.clientY + "px";
+  document.body.appendChild(ghost);
+  document.body.classList.add("grabbing");
+  img.classList.add("dragging");
+  if (!reduceMotion) { // "lift": grow from the square up to the cursor
+    var r = img.getBoundingClientRect();
+    var ox = r.left + r.width / 2 - e.clientX, oy = r.top + r.height / 2 - e.clientY;
+    ghost.animate([
+      { transform: "translate(calc(-50% + " + ox + "px), calc(-50% + " + oy + "px)) scale(1)" },
+      { transform: "translate(-50%, -50%) scale(1.15)" }
+    ], { duration: 120, easing: "ease-out" });
   }
+  drag = { from: sq, img: img, ghost: ghost, x: e.clientX, y: e.clientY, moved: false,
+           wasSelected: wasSelected, pointerId: e.pointerId };
+}
+
+function endDrag() {
+  var d = drag;
+  drag = null;
+  d.ghost.remove();
+  document.body.classList.remove("grabbing");
+  d.img.classList.remove("dragging");
+  if (d.over) d.over.classList.remove("drag-over");
+  return d;
+}
+
+boardEl.addEventListener("pointermove", function (e) {
+  if (!drag || e.pointerId !== drag.pointerId) return;
   drag.ghost.style.left = e.clientX + "px";
   drag.ghost.style.top = e.clientY + "px";
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return;
+  drag.moved = true;
   var over = squareAt(e.clientX, e.clientY);
   if (over !== drag.over) {
     if (drag.over) drag.over.classList.remove("drag-over");
@@ -517,12 +536,7 @@ boardEl.addEventListener("pointermove", function (e) {
 
 boardEl.addEventListener("pointerup", function (e) {
   if (!drag || e.button !== 0) return;
-  var d = drag;
-  drag = null;
-  d.ghost.remove();
-  document.body.classList.remove("grabbing");
-  d.img.classList.remove("dragging");
-  if (d.over) d.over.classList.remove("drag-over");
+  var d = endDrag();
   if (d.moved) {
     var target = squareAt(e.clientX, e.clientY);
     noAnimSq = target && target.dataset.sq; // dropped pieces land in place, no slide
@@ -538,6 +552,14 @@ boardEl.addEventListener("pointerup", function (e) {
     selected = null; // second click on the same piece deselects it
     render();
   }
+});
+
+// The browser can take the pointer away (alt-tab, touch gestures): put the
+// piece back instead of leaving it stuck to the cursor.
+["pointercancel", "lostpointercapture"].forEach(function (type) {
+  boardEl.addEventListener(type, function (e) {
+    if (drag && e.pointerId === drag.pointerId) { endDrag(); render(); }
+  });
 });
 
 // ---------------------------------------------------------------- Animation
