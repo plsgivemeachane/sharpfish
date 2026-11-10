@@ -252,3 +252,26 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
   .panel { width: min(100%, 640px); }
   .moves-card { max-height: 200px; }
 }
+
+/* ---------------------------------------------------------------- Bots */
+.avatar-bot img { border-radius: 6px; }
+.tag-rating { color: var(--muted); font-size: 0.9em; }
+.bots-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 600; }
+.bot-current { color: var(--muted); font-weight: 400; }
+.bot-groups { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bot-group-name { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.bot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.bot {
+  padding: 0; border: 2px solid transparent; border-radius: 8px; background: none;
+  cursor: pointer; aspect-ratio: 1; max-width: 56px; overflow: hidden;
+}
+.bot img { width: 100%; height: 100%; display: block; border-radius: 6px; }
+.bot:hover { border-color: var(--border); }
+.bot.chosen { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(31, 163, 184, 0.35); }
+.bot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bot[data-id="stockfish"] { background: rgba(255, 255, 255, 0.06); }
+.bot[data-id="stockfish"] img { border-radius: 0; }
+.advanced { margin-top: 10px; font-size: 14px; }
+.advanced summary { cursor: pointer; color: var(--muted); }
+.advanced[open] summary { margin-bottom: 8px; }
+.advanced input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0; }

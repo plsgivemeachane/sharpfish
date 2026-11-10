@@ -7,22 +7,33 @@
 "use strict";
 
 // ---------------------------------------------------------------- Engine
-// Avatars next to the player names: a drawn person for you, the official
-// Stockfish logo (stockfishchess.org, GPLv3) for the engine
-var AVATARS = {
-  you: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f7fd8"/>' +
+// Avatar next to your name: a drawn person. The engine's avatar comes from
+// the chosen bot (bots.js); Stockfish's is the official logo
+// (stockfishchess.org, GPLv3).
+var YOU_AVATAR = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f7fd8"/>' +
        '<circle cx="16" cy="12.5" r="5.5" fill="#e8f2ff"/>' +
-       '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>',
-  engine: '<img src="stockfish-logo.png" alt="">'
-};
+       '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>';
 var tagState = new WeakMap();
 function setTag(el, who, engineName) {
-  var name = who === "you" ? "You" : engineName;
-  if (tagState.get(el) === who + name) return; // skip rebuilding on every render
-  tagState.set(el, who + name);
-  el.innerHTML = '<span class="avatar avatar-' + who + '"></span><span class="tag-name"></span>';
-  el.firstChild.innerHTML = AVATARS[who];
-  el.lastChild.textContent = name;
+  var name = who === "you" ? "You" : bot.id === "stockfish" ? engineName : bot.name;
+  var rating = who === "you" ? "" : botRating(bot);
+  var key = who + name + rating + bot.avatar;
+  if (tagState.get(el) === key) return; // skip rebuilding on every render
+  tagState.set(el, key);
+  var avatarClass = who === "you" ? "avatar-you" : bot.id === "stockfish" ? "avatar-engine" : "avatar-bot";
+  el.innerHTML = '<span class="avatar ' + avatarClass + '"></span><span class="tag-name"></span>' +
+    '<span class="tag-rating"></span>';
+  if (who === "you") el.firstChild.innerHTML = YOU_AVATAR;
+  else el.firstChild.appendChild(avatarImg(bot));
+  el.children[1].textContent = name;
+  el.children[2].textContent = rating ? "(" + rating + ")" : "";
+}
+
+function avatarImg(b) {
+  var img = document.createElement("img");
+  img.src = b.avatar;
+  img.alt = "";
+  return img;
 }
 
 // Small wrapper around the Web Worker. Requests run one at a time; each one
@@ -187,6 +198,7 @@ function engineMove() {
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
       if (token !== game.token || l.indexOf("info depth") !== 0) return;
+      if (/ multipv (?!1 )\d+/.test(l)) return; // weak bots score every move; show the main line
       var depth = (l.match(/ depth (\d+)/) || [])[1];
       var score = formatScore(l, turn);
       if (score) $("engine-line").textContent = "Depth " + depth + " · eval " + score;
@@ -363,12 +375,70 @@ function takeBack() {
   });
 }
 
+// ---------------------------------------------------------------- Bots
+// The opponent: a bot from bots.js, or a custom Elo from the slider.
+var bot = loadBot();
+
+function loadBot() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("sharpfish-bot"));
+    if (saved && saved.id === "custom") return customBot(saved.elo);
+    if (saved && findBot(saved.id)) return findBot(saved.id);
+  } catch (e) { /* storage blocked: use the default */ }
+  return findBot("martin");
+}
+
+function chooseBot(b) {
+  bot = b;
+  try {
+    localStorage.setItem("sharpfish-bot", JSON.stringify({ id: b.id, elo: b.elo }));
+  } catch (e) { /* storage blocked: fine, just not remembered */ }
+  setStrength();
+  renderBots();
+  render();
+}
+
 function setStrength() {
-  var elo = Number($("sel-elo").value);
-  var cmds = elo
-    ? ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + elo]
-    : ["setoption name UCI_LimitStrength value false"];
+  var cmds = bot.elo === FULL
+    ? ["setoption name UCI_LimitStrength value false"]
+    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + bot.elo];
   engine.request(cmds.concat("isready"), function (l) { return l === "readyok"; });
+}
+
+function renderBots() {
+  var box = $("bot-groups");
+  if (!box.firstChild) {
+    BOT_GROUPS.forEach(function (g) {
+      var group = document.createElement("div");
+      group.className = "bot-group";
+      group.innerHTML = '<div class="bot-group-name"></div><div class="bot-grid"></div>';
+      group.firstChild.textContent = g.name;
+      g.bots.forEach(function (b) {
+        var btn = document.createElement("button");
+        btn.className = "bot";
+        btn.dataset.id = b.id;
+        btn.title = b.name + " (" + botRating(b) + ")";
+        btn.setAttribute("aria-label", btn.title);
+        btn.appendChild(avatarImg(b));
+        btn.onclick = function () { chooseBot(b); };
+        group.lastChild.appendChild(btn);
+      });
+      box.appendChild(group);
+    });
+  }
+  box.querySelectorAll(".bot").forEach(function (btn) {
+    btn.classList.toggle("chosen", btn.dataset.id === bot.id);
+    btn.setAttribute("aria-pressed", btn.dataset.id === bot.id);
+  });
+  $("bot-current").textContent = (bot.custom ? "Custom" : bot.name) + " · " + botRating(bot);
+  var slider = $("rng-elo");
+  slider.value = bot.elo === FULL ? slider.max : bot.elo;
+  $("elo-out").textContent = bot.elo === FULL ? "Full" : bot.elo;
+}
+
+function sliderBot() {
+  var v = Number($("rng-elo").value);
+  return customBot(v > ELO_MAX ? FULL : v);
 }
 
 // ---------------------------------------------------------------- Input
@@ -810,7 +880,11 @@ $("btn-copy").onclick = function () {
     setTimeout(function () { btn.textContent = "Copy PGN"; }, 1200);
   });
 };
-$("sel-elo").onchange = setStrength;
+$("rng-elo").oninput = function () {  // live label while dragging
+  var b = sliderBot();
+  $("elo-out").textContent = b.elo === FULL ? "Full" : b.elo;
+};
+$("rng-elo").onchange = function () { chooseBot(sliderBot()); };
 $("btn-first").onclick = function () { viewPly(0); };
 $("btn-prev").onclick = function () { viewPly(shownPly() - 1); };
 $("btn-next").onclick = function () { viewPly(shownPly() + 1); };
@@ -851,11 +925,14 @@ $("chk-eval").onchange = toggleEval;
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };
+  renderBots();
   engine.request(["uci"], function (l) { return l === "uciok"; }).then(function (lines) {
     var id = lines.find(function (l) { return l.indexOf("id name ") === 0; });
     var name = id ? id.slice(8) : "Engine";
     $("engine-name").textContent = name;
     document.title = "Sharpfish · " + name.replace(/ \(based on.*\)/, "");
+    render();
   });
+  setStrength();
   newGame("w");
 })();
