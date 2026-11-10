@@ -855,7 +855,7 @@ $("chk-eval").onchange = toggleEval;
     var id = lines.find(function (l) { return l.indexOf("id name ") === 0; });
     var name = id ? id.slice(8) : "Engine";
     $("engine-name").textContent = name;
-    document.title = "Play " + name.replace(/ \(based on.*\)/, "");
+    document.title = "Sharpfish · " + name.replace(/ \(based on.*\)/, "");
   });
   newGame("w");
 })();
