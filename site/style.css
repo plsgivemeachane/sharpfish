@@ -44,7 +44,14 @@ body {
 a { color: var(--accent); }
 
 .top { padding: 12px 16px; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; }
+.brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 600; font-size: 17px; }
+.brand img { border-radius: 7px; box-shadow: 0 0 0 1px var(--border); }
+.site-name { font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+.tagline { color: var(--muted); font-size: 13px; font-weight: 500; font-style: italic; }
+.engine-tag {
+  margin-left: auto; font-size: 13px; font-weight: 600; color: var(--text);
+  padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border);
+}
 
 .layout {
   flex: 1;

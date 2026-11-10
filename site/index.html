@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Play the Engine</title>
-<meta name="description" content="Play chess in your browser against a custom Stockfish build.">
-<link rel="icon" href="pieces/wN.svg" type="image/svg+xml">
+<title>Sharpfish</title>
+<meta name="description" content="Sharpfish: Stockfish variants, but not dumb. Play them in your browser.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <!-- Written by make-web.sh: sets window.ENGINE_FILE to the built engine -->
 <script src="engine-file.js"></script>
@@ -13,8 +13,10 @@
 <body>
 <header class="top">
   <div class="brand">
-    <img src="pieces/wN.svg" alt="" width="28" height="28">
-    <span id="engine-name">Loading engine…</span>
+    <img src="favicon.svg" alt="" width="30" height="30">
+    <span class="site-name">Sharpfish</span>
+    <span class="tagline">Stockfish variants, but not dumb</span>
+    <span id="engine-name" class="engine-tag">Loading engine…</span>
   </div>
 </header>
 
