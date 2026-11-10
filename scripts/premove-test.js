@@ -34,7 +34,7 @@ function declaration(name) {
 
 const names = [
   "canMove", "canPremove", "premoveBoard", "premoveMoves", "queuePremove",
-  "runPremove", "clearPremoves"
+  "runPremove", "clearPremoves", "maybeEngineTurn"
 ];
 const context = {
   console,
@@ -47,6 +47,8 @@ const context = {
   pos: { turn: "w", legal: [], board: {}, pending: false },
   rendered: 0,
   played: [],
+  engineMove() { context.thinking = true; context.searches++; },
+  searches: 0,
   render() { context.rendered++; },
   playMove(move) { context.played.push(move); },
   isWhite(piece) { return piece && piece === piece.toUpperCase(); },
@@ -64,6 +66,7 @@ function reset(opts = {}) {
   context.drag = null;
   context.rendered = 0;
   context.played.length = 0;
+  context.searches = 0;
   context.game = { playerColor: "w", over: null, view: null };
   context.pos = { turn: "w", legal: [], pending: false, board: {
     a1: "R", e1: "K", h1: "R", e2: "P", e7: "p", e8: "k", a8: "r"
@@ -181,3 +184,15 @@ test("allows premoves only during the opponent turn", () => {
 });
 
 if (process.exitCode) process.exit(process.exitCode);
+
+// A delayed SCP animation callback must not launch another search after a
+// human has already moved and a bot search is in progress.
+test("does not start duplicate bot searches after an animation", () => {
+  reset({ pos: { turn: "b", pending: true } });
+  context.maybeEngineTurn();
+  assert.equal(context.searches, 0);
+  context.pos.pending = false;
+  context.maybeEngineTurn();
+  context.maybeEngineTurn();
+  assert.equal(context.searches, 1);
+});

@@ -384,7 +384,7 @@ function checkGameOver() {
 }
 
 function maybeEngineTurn() {
-  if (!game.over && pos.turn !== game.playerColor) engineMove();
+  if (pos && !pos.pending && !thinking && !game.over && pos.turn !== game.playerColor) engineMove();
 }
 
 function newGame(color) {
