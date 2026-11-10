@@ -34,14 +34,9 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.locator('[data-sq="e2"]').click();
       await page.locator('[data-sq="e4"]').click();
       await page.waitForFunction(() => game.moves.length >= 2 && pos && !pos.pending, null, { timeout: 30000 });
-      // SCP-096 deliberately disables stock evaluation: its positions include a new piece.
-      if (link === "variants/scp-096/") {
-        assert(await page.locator("#evalbar").evaluate(el => el.classList.contains("off")));
-      } else {
-        assert(await page.evaluate(() => !!evalEngine));
-        await page.locator("#chk-eval").check();
-        await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");
-      }
+      assert(await page.evaluate(() => !!evalEngine));
+      await page.locator("#chk-eval").check();
+      await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");
       console.log(`PASS ${link}: board, human move, bot reply, branch-specific evaluation behavior`);
       await page.getByRole("link", { name: "← All variants" }).click();
       await page.waitForURL(`${base}/`);

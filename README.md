@@ -10,8 +10,7 @@ Sharpfish is a browser chess collection built on Stockfish.js. Play online at
 Choose a bot and play in your browser. The default think time is two seconds;
 bots take at least 2.1 seconds per move to leave time for premoves. You can
 change the think time, queue premoves while the bot thinks, review moves, and
-copy the game as PGN. Stockfish evaluation is disabled in SCP-096 because the
-standard engine cannot evaluate its rules.
+copy the game as PGN. SCP-096 uses its own engine for the optional evaluation bar.
 
 For local development, run `./make-web.sh serve`. See [FORKING.md](FORKING.md)
 for variant development and [DEPLOYMENT.md](DEPLOYMENT.md) for building and
