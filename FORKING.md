@@ -25,7 +25,7 @@ The first run installs the pinned Emscripten version (about 1 GB, one time) into
 
 | I want to… | Edit |
 | --- | --- |
-| Rename my engine | `EngineName` in `src/variant/config.h` |
+| Name my variant ("Stockfish variant (…)") | `EngineName` in `src/variant/config.h` |
 | Change a piece's value | `PieceValueTweakCp` in `src/variant/config.h` |
 | Make the engine trust its neural net less | `NnueScalePercent` in `src/variant/config.h` |
 | Add my own evaluation terms | `eval_bonus_cp()` in `src/variant/hooks.h` + `EnableEvalHook` |

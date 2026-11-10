@@ -138,8 +138,7 @@ std::string UCIEngine::process_cmd(const std::string& cmd) {
         if (*Variant::EngineName)
         {
             auto nl = id.find('\n');
-            id = std::string(Variant::EngineName) + " (based on " + id.substr(0, nl) + ")"
-               + id.substr(nl);
+            id = "Stockfish variant (" + std::string(Variant::EngineName) + ")" + id.substr(nl);
         }
 
         sync_cout << "id name " << id << "\n"
