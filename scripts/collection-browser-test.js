@@ -35,6 +35,10 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.locator('[data-sq="e4"]').click();
       await page.waitForFunction(() => game.moves.length >= 2 && pos && !pos.pending, null, { timeout: 30000 });
       assert(await page.evaluate(() => !!evalEngine));
+      if (link === "variants/scp-096/") {
+        assert(await page.evaluate(() => evalEngine.worker instanceof Worker && new URL(window.STOCK_ENGINE_FILE, location.href).pathname.includes("/stock-engine/")));
+        assert(await page.evaluate(() => evalEngine.worker !== engine.worker));
+      }
       await page.locator("#chk-eval").check();
       await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");
       console.log(`PASS ${link}: board, human move, bot reply, branch-specific evaluation behavior`);
