@@ -233,10 +233,7 @@ function engineMove() {
 }
 
 // ---------------------------------------------------------------- Eval bar
-// Driven by the stock Stockfish build in site/stock-engine/, not your variant,
-// so it shows how plain Stockfish rates the game. Your variant may only remove
-// moves, so every position it reaches is a normal chess position stock
-// Stockfish can judge (it just does not know about your rule changes).
+// Analyse the actual position with a separate SCP-aware engine.
 var EVAL_DEPTH = 16;
 var evalEngine = null;
 var evalKey = null;     // position being analysed
@@ -256,7 +253,9 @@ function setEvalBar(share, text, title) {
 
 function analyse() {
   if (!evalEngine || !pos || pos.pending || !$("chk-eval").checked) return;
-  var key = positionCmd(game.view);
+  var position = game.view === null ? pos : game.boards[game.view];
+  if (game.view === null && game.over) return;
+  var key = "position fen " + position.fen;
   if (key === evalKey) return;
   evalKey = key;
   if (evalRunning) evalEngine.stop(); // a new position: drop the old search
@@ -270,7 +269,7 @@ function analyse() {
       if (!m) return;
       var depth = (l.match(/ depth (\d+)/) || [])[1];
       var n = Number(m[2]);
-      var title = "Stock Stockfish · depth " + depth;
+      var title = "SCP-096 engine · depth " + depth;
       if (m[1] === "mate") {
         // "mate 0" = the side to move is already mated
         var whiteWins = n === 0 ? turn === "b" : (n > 0) === (turn === "w");
@@ -293,7 +292,7 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [], sees: p.sees || [] };
+  return { fen: p.fen, board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [], sees: p.sees || [] };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -1133,10 +1132,8 @@ $("chk-eval").onchange = toggleEval;
     return;
   }
   engine = new Engine(window.ENGINE_FILE);
-  // SCP-096 changes the start position and the moves, so stock Stockfish
-  // can't follow the game: no eval bar (evalEngine stays null).
-  $("chk-eval").closest("label").style.display = "none";
-  $("evalbar").classList.add("off");
+  evalEngine = new Engine(window.ENGINE_FILE);
+  evalEngine.request(["uci"], function (l) { return l === "uciok"; });
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };
