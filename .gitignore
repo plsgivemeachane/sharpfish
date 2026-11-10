@@ -39,3 +39,7 @@ tests/bench_tmp.epd
 # Web build outputs (made by ./make-web.sh, published by CI)
 site/engine/
 site/engine-file.js
+
+# Generated multi-variant deployment and temporary build snapshots
+/deploy/
+/.collection-*/

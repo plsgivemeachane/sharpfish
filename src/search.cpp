@@ -254,7 +254,7 @@ void Search::Worker::start_searching() {
 
     Worker* bestThread = this;
     Skill   skill =
-      Skill(options["Skill Level"], options["UCI_LimitStrength"] ? int(options["UCI_Elo"]) : 0);
+      Skill(options["Skill Level"], bool(options["UCI_LimitStrength"]), int(options["UCI_Elo"]));
 
     if (!limits.depth && !skill.enabled())
         bestThread = threads.get_best_thread()->worker.get();
@@ -326,12 +326,13 @@ bool Search::Worker::iterative_deepening() {
     }
 
     usize multiPV = usize(options["MultiPV"]);
-    Skill skill(options["Skill Level"], options["UCI_LimitStrength"] ? int(options["UCI_Elo"]) : 0);
+    Skill skill(options["Skill Level"], bool(options["UCI_LimitStrength"]), int(options["UCI_Elo"]));
 
     // When playing with strength handicap enable MultiPV search that we will
-    // use behind-the-scenes to retrieve a set of possible moves.
+    // use behind-the-scenes to retrieve a set of possible moves. The beginner
+    // zone scores every legal move, so it can also pick bad ones.
     if (skill.enabled())
-        multiPV = std::max(multiPV, usize(4));
+        multiPV = std::max(multiPV, skill.beginner() ? rootMoves.size() : usize(4));
 
     multiPV = std::min(multiPV, rootMoves.size());
 
@@ -571,7 +572,12 @@ bool Search::Worker::iterative_deepening() {
 
         // If the skill level is enabled and time is up, pick a sub-optimal best move
         if (skill.enabled() && skill.time_to_pick(rootDepth))
-            skill.pick_best(rootMoves, multiPV);
+        {
+            skill.pick_best(rootPos, rootMoves, multiPV);
+            // A beginner's choice is final: move now instead of searching on.
+            if (skill.beginner() && !limits.infinite && !mainThread->ponder)
+                threads.stop = true;
+        }
 
         // Use part of the gained time from a previous stable move for the current move
         for (auto&& th : threads)
@@ -641,7 +647,7 @@ bool Search::Worker::iterative_deepening() {
     if (skill.enabled())
         std::swap(rootMoves[0],
                   *std::find(rootMoves.begin(), rootMoves.end(),
-                             skill.best ? skill.best : skill.pick_best(rootMoves, multiPV)));
+                             skill.best ? skill.best : skill.pick_best(rootPos, rootMoves, multiPV)));
 
     return uciPvSent;
 }
@@ -2097,8 +2103,49 @@ void update_quiet_histories(
 // When playing with strength handicap, choose the best move among a set of
 // RootMoves using a statistical rule dependent on 'level'.
 // Idea by Heinz van Saanen.
-Move Skill::pick_best(const RootMoves& rootMoves, usize multiPV) {
+Move Skill::pick_best(const Position& pos, const RootMoves& rootMoves, usize multiPV) {
     static PRNG rng(now());  // PRNG sequence should be non-deterministic
+
+    // Beginner zone: sometimes blunder, aiming for a mistake of size 'mistake'
+    // (lost win chance); otherwise aim for the best move. Moves whose loss is
+    // close to the target are likely, the rest unlikely.
+    if (beginner())
+    {
+        auto   uniform = [&] { return double(rng.rand<u64>() >> 11) / double(1ULL << 53); };
+        auto winChance = [&](Value v) {  // side to move's view, same curve as Lichess
+            return 1.0 / (1.0 + std::exp(-0.00368208 * UCIEngine::to_cp(v, pos)));
+        };
+        double top = 0.0;
+        for (usize i = 0; i < multiPV; ++i)
+            if (rootMoves[i].score != -VALUE_INFINITE)
+                top = std::max(top, winChance(rootMoves[i].score));
+
+        // Blunder less once clearly winning, so won games get finished.
+        double chance = blunderChance < 1.0 && top > 0.8
+                        ? blunderChance * std::max(0.2, (1.0 - top) / 0.2)
+                        : blunderChance;
+        double target = uniform() < chance ? mistake : 0.0;
+
+        constexpr double Spread = 0.03;  // how far from the target a move may land
+        std::vector<double> weight(multiPV, 0.0);
+        double              total = 0.0;
+        for (usize i = 0; i < multiPV; ++i)
+            if (rootMoves[i].score != -VALUE_INFINITE)
+            {
+                double loss = top - winChance(rootMoves[i].score);
+                total += weight[i] = std::exp(-std::abs(loss - target) / Spread);
+            }
+
+        double r = uniform() * total;
+        best     = rootMoves[0].pv[0];
+        for (usize i = 0; i < multiPV; ++i)
+            if (weight[i] > 0.0 && (r -= weight[i]) <= 0.0)
+            {
+                best = rootMoves[i].pv[0];
+                break;
+            }
+        return best;
+    }
 
     // With tablebases at the root, rootMoves are ordered by tbRank rather
     // than by score, so compute the score range explicitly to keep 'delta'

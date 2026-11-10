@@ -7,22 +7,33 @@
 "use strict";
 
 // ---------------------------------------------------------------- Engine
-// Avatars next to the player names: a drawn person for you, the official
-// Stockfish logo (stockfishchess.org, GPLv3) for the engine
-var AVATARS = {
-  you: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f7fd8"/>' +
+// Avatar next to your name: a drawn person. The engine's avatar comes from
+// the chosen bot (bots.js); Stockfish's is the official logo
+// (stockfishchess.org, GPLv3).
+var YOU_AVATAR = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f7fd8"/>' +
        '<circle cx="16" cy="12.5" r="5.5" fill="#e8f2ff"/>' +
-       '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>',
-  engine: '<img src="stockfish-logo.png" alt="">'
-};
+       '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>';
 var tagState = new WeakMap();
 function setTag(el, who, engineName) {
-  var name = who === "you" ? "You" : engineName;
-  if (tagState.get(el) === who + name) return; // skip rebuilding on every render
-  tagState.set(el, who + name);
-  el.innerHTML = '<span class="avatar avatar-' + who + '"></span><span class="tag-name"></span>';
-  el.firstChild.innerHTML = AVATARS[who];
-  el.lastChild.textContent = name;
+  var name = who === "you" ? "You" : bot.id === "stockfish" ? engineName : bot.name;
+  var rating = who === "you" ? "" : botRating(bot);
+  var key = who + name + rating + bot.avatar;
+  if (tagState.get(el) === key) return; // skip rebuilding on every render
+  tagState.set(el, key);
+  var avatarClass = who === "you" ? "avatar-you" : bot.id === "stockfish" ? "avatar-engine" : "avatar-bot";
+  el.innerHTML = '<span class="avatar ' + avatarClass + '"></span><span class="tag-name"></span>' +
+    '<span class="tag-rating"></span>';
+  if (who === "you") el.firstChild.innerHTML = YOU_AVATAR;
+  else el.firstChild.appendChild(avatarImg(bot));
+  el.children[1].textContent = name;
+  el.children[2].textContent = rating ? "(" + rating + ")" : "";
+}
+
+function avatarImg(b) {
+  var img = document.createElement("img");
+  img.src = b.avatar;
+  img.alt = "";
+  return img;
 }
 
 // Small wrapper around the Web Worker. Requests run one at a time; each one
@@ -123,6 +134,7 @@ function insufficientMaterial(board) {
 
 // ---------------------------------------------------------------- State
 var engine;
+var engineName = "Stockfish";
 var game = {
   moves: [],        // UCI moves from the start position
   san: [],          // matching SAN strings
@@ -138,6 +150,7 @@ var game = {
 var pos = null;     // { fen, board, turn, legal: [uci], inCheck }
 var selected = null;
 var thinking = false;
+var premoves = []; // queued UCI moves, checked against engine legality one at a time
 
 var $ = function (id) { return document.getElementById(id); };
 var boardEl = $("board");
@@ -184,6 +197,8 @@ function formatScore(info, turn) {
   return (n > 0 ? "+" : "") + (n / 100).toFixed(2);
 }
 
+var MIN_BOT_MOVE_MS = 2100; // leave a little more than two seconds for premoves
+
 function engineMove() {
   var token = game.token;
   var turn = pos.turn;
@@ -195,11 +210,18 @@ function engineMove() {
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
       if (token !== game.token || l.indexOf("info depth") !== 0) return;
+      if (/ multipv (?!1 )\d+/.test(l)) return; // weak bots score every move; show the main line
       var depth = (l.match(/ depth (\d+)/) || [])[1];
       var score = formatScore(l, turn);
       if (score) $("engine-line").textContent = "Depth " + depth + " · eval " + score;
     }
-  ).then(function (lines) {
+  ).then(async function (lines) {
+    if (token !== game.token) return;
+    // A fast search still leaves time to plan. This wait does not occupy the
+    // engine request queue; a new game/takeback can start immediately.
+    await new Promise(function (resolve) {
+      setTimeout(resolve, Math.max(0, MIN_BOT_MOVE_MS - (performance.now() - started)));
+    });
     if (token !== game.token) return;
     thinking = false;
     var best = lines[lines.length - 1].split(" ")[1];
@@ -278,6 +300,7 @@ function snapshot(p, lastMove) {
 function viewPly(ply) {
   var live = game.boards.length - 1;
   ply = Math.max(0, Math.min(ply, live));
+  clearPremoves();
   game.view = ply === live ? null : ply;
   selected = null;
   render();
@@ -285,12 +308,13 @@ function viewPly(ply) {
 function shownPly() { return game.view === null ? game.boards.length - 1 : game.view; }
 
 function playMove(uci) {
+  $("promo").hidden = true;
   var token = game.token;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
   game.san.push(toSan(pos, uci));
   game.ate.push([]);
   game.moves.push(uci);
-  selected = null;
+  if (!drag) selected = null;
   pos = Object.assign({}, pos, { lastMove: uci, pending: true });
   render();
 
@@ -324,9 +348,14 @@ function playMove(uci) {
       else if (next.inCheck) game.san[i] += "+";
 
       checkGameOver();
-      render();
-      if (next.ate.length) later(SCP_EAT_MS, maybeEngineTurn);
-      else maybeEngineTurn();
+      if (game.over) clearPremoves();
+      function continuePlay() {
+        if (runPremove()) return;
+        render();
+        maybeEngineTurn();
+      }
+      if (next.ate.length) { render(); later(SCP_EAT_MS, continuePlay); }
+      else continuePlay();
     }
   });
 
@@ -360,7 +389,9 @@ function maybeEngineTurn() {
 }
 
 function newGame(color) {
-  game.token++;
+  clearPremoves();
+  var token = ++game.token;
+  pos = null;
   if (thinking) engine.stop();
   thinking = false;
   game.moves = []; game.san = []; game.ate = []; game.over = null; scpShow = null;
@@ -371,6 +402,7 @@ function newGame(color) {
   $("engine-line").innerHTML = "&nbsp;";
   engine.request(["ucinewgame", "isready"], function (l) { return l === "readyok"; });
   refreshPosition().then(function (p) {
+    if (token !== game.token) return;
     pos = p;
     game.repKeys = [p.repKey];
     game.boards = [snapshot(p, null)];
@@ -380,8 +412,10 @@ function newGame(color) {
 }
 
 function takeBack() {
+  clearPremoves();
   if (!game.moves.length) return;
-  game.token++;
+  var token = ++game.token;
+  pos = Object.assign({}, pos, { pending: true });
   if (thinking) engine.stop();
   thinking = false;
   // Undo back to the last position where it is the player's turn.
@@ -395,6 +429,7 @@ function takeBack() {
   selected = null;
   scpShow = null;
   refreshPosition().then(function (p) {
+    if (token !== game.token) return;
     p.lastMove = game.moves[game.moves.length - 1];
     pos = p;
     render();
@@ -402,12 +437,70 @@ function takeBack() {
   });
 }
 
+// ---------------------------------------------------------------- Bots
+// The opponent: a bot from bots.js, or a custom Elo from the slider.
+var bot = loadBot();
+
+function loadBot() {
+  try {
+    var saved = JSON.parse(localStorage.getItem("sharpfish-bot"));
+    if (saved && saved.id === "custom") return customBot(saved.elo);
+    if (saved && findBot(saved.id)) return findBot(saved.id);
+  } catch (e) { /* storage blocked: use the default */ }
+  return findBot("martin");
+}
+
+function chooseBot(b) {
+  bot = b;
+  try {
+    localStorage.setItem("sharpfish-bot", JSON.stringify({ id: b.id, elo: b.elo }));
+  } catch (e) { /* storage blocked: fine, just not remembered */ }
+  setStrength();
+  renderBots();
+  render();
+}
+
 function setStrength() {
-  var elo = Number($("sel-elo").value);
-  var cmds = elo
-    ? ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + elo]
-    : ["setoption name UCI_LimitStrength value false"];
+  var cmds = bot.elo === FULL
+    ? ["setoption name UCI_LimitStrength value false"]
+    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + bot.elo];
   engine.request(cmds.concat("isready"), function (l) { return l === "readyok"; });
+}
+
+function renderBots() {
+  var box = $("bot-groups");
+  if (!box.firstChild) {
+    BOT_GROUPS.forEach(function (g) {
+      var group = document.createElement("div");
+      group.className = "bot-group";
+      group.innerHTML = '<div class="bot-group-name"></div><div class="bot-grid"></div>';
+      group.firstChild.textContent = g.name;
+      g.bots.forEach(function (b) {
+        var btn = document.createElement("button");
+        btn.className = "bot";
+        btn.dataset.id = b.id;
+        btn.title = b.name + " (" + botRating(b) + ")";
+        btn.setAttribute("aria-label", btn.title);
+        btn.appendChild(avatarImg(b));
+        btn.onclick = function () { chooseBot(b); };
+        group.lastChild.appendChild(btn);
+      });
+      box.appendChild(group);
+    });
+  }
+  box.querySelectorAll(".bot").forEach(function (btn) {
+    btn.classList.toggle("chosen", btn.dataset.id === bot.id);
+    btn.setAttribute("aria-pressed", btn.dataset.id === bot.id);
+  });
+  $("bot-current").textContent = (bot.custom ? "Custom" : bot.name) + " · " + botRating(bot);
+  var slider = $("rng-elo");
+  slider.value = bot.elo === FULL ? slider.max : bot.elo;
+  $("elo-out").textContent = bot.elo === FULL ? "Full" : bot.elo;
+}
+
+function sliderBot() {
+  var v = Number($("rng-elo").value);
+  return customBot(v > ELO_MAX ? FULL : v);
 }
 
 // ---------------------------------------------------------------- Input
@@ -416,21 +509,100 @@ function canMove() {
     pos.turn === game.playerColor;
 }
 
-function movesFrom(sq) {
-  return pos.legal.filter(function (m) { return m.slice(0, 2) === sq; });
+// Premoves are speculative: geometry is only a preview. The engine's legal
+// moves remain authoritative when each queued move reaches the player's turn.
+function canPremove() {
+  return pos && !pos.pending && !game.over && game.view === null &&
+    pos.turn !== game.playerColor;
 }
 
-function tryMove(from, to, anchorEl) {
-  var options = pos.legal.filter(function (m) { return m.slice(0, 4) === from + to; });
-  if (!options.length) return false;
-  if (options.length === 1) { playMove(options[0]); return true; }
-  showPromotion(options, anchorEl);
+function clearPremoves() {
+  premoves = [];
+  selected = null;
+  $("promo").hidden = true;
+  if (drag) endDrag();
+}
+
+function premoveBoard(base) {
+  var board = Object.assign({}, base || pos.board);
+  premoves.forEach(function (uci) {
+    var from = uci.slice(0, 2), to = uci.slice(2, 4), piece = board[from];
+    if (!piece || piece === "*" || (isWhite(piece) ? "w" : "b") !== game.playerColor) return;
+    if (piece.toUpperCase() === "P" && from[0] !== to[0] && !board[to]) {
+      var captured = to[0] + from[1];
+      if (board[captured] === (isWhite(piece) ? "p" : "P")) delete board[captured];
+    }
+    delete board[from];
+    board[to] = uci[4] ? (isWhite(piece) ? uci[4].toUpperCase() : uci[4]) : piece;
+    if (piece.toUpperCase() === "K" && Math.abs(FILES.indexOf(to[0]) - FILES.indexOf(from[0])) === 2) {
+      var rookFrom = (to[0] === "g" ? "h" : "a") + from[1];
+      var rookTo = (to[0] === "g" ? "f" : "d") + from[1];
+      if (board[rookFrom] === (isWhite(piece) ? "R" : "r")) {
+        board[rookTo] = board[rookFrom];
+        delete board[rookFrom];
+      }
+    }
+  });
+  return board;
+}
+
+function premoveMoves(from) {
+  var board = premoveBoard(), piece = board[from];
+  if (!piece || piece === "*" || (isWhite(piece) ? "w" : "b") !== game.playerColor) return [];
+  var moves = [], type = piece.toUpperCase(), direction = isWhite(piece) ? 1 : -1;
+  for (var f = 0; f < 8; f++) for (var rank = 1; rank <= 8; rank++) {
+    var to = FILES[f] + rank, target = board[to];
+    if (to === from || target === "*" || (target && isWhite(target) === isWhite(piece))) continue;
+    var dx = Math.abs(f - FILES.indexOf(from[0])), dy = rank - Number(from[1]), ay = Math.abs(dy);
+    var allowed = type === "N" ? dx * ay === 2 :
+      type === "B" ? dx === ay : type === "R" ? dx === 0 || dy === 0 :
+      type === "Q" ? dx === ay || dx === 0 || dy === 0 :
+      type === "K" ? Math.max(dx, ay) === 1 ||
+        (from === (isWhite(piece) ? "e1" : "e8") && dy === 0 && dx === 2) :
+      type === "P" && ((dy === direction && dx <= 1) ||
+        (dx === 0 && dy === direction * 2 && Number(from[1]) === (isWhite(piece) ? 2 : 7)));
+    if (!allowed) continue;
+    if (type === "P" && (rank === 1 || rank === 8)) {
+      ["q", "r", "b", "n"].forEach(function (p) { moves.push(from + to + p); });
+    } else moves.push(from + to);
+  }
+  return moves;
+}
+
+function queuePremove(uci) {
+  premoves.push(uci);
+  selected = null;
+  noAnimSq = null;
+  render();
+}
+
+function runPremove() {
+  if (!premoves.length || !canMove()) return false;
+  var uci = premoves.shift();
+  if (pos.legal.indexOf(uci) < 0) { clearPremoves(); return false; }
+  playMove(uci);
   return true;
 }
 
-function showPromotion(options, anchorEl) {
+function movesFrom(sq) {
+  return canPremove() ? premoveMoves(sq) : pos.legal.filter(function (m) { return m.slice(0, 2) === sq; });
+}
+
+function tryMove(from, to, anchorEl) {
+  var queued = canPremove();
+  if (!queued && !canMove()) return false;
+  var options = movesFrom(from).filter(function (m) { return m.slice(2, 4) === to; });
+  if (!options.length) return false;
+  var commit = queued ? function (uci) { if (canPremove()) queuePremove(uci); } :
+    function (uci) { if (canMove() && pos.legal.indexOf(uci) >= 0) playMove(uci); };
+  if (options.length === 1) { commit(options[0]); return true; }
+  showPromotion(options, anchorEl, commit);
+  return true;
+}
+
+function showPromotion(options, anchorEl, commit) {
   var box = $("promo");
-  var white = pos.turn === "w";
+  var white = game.playerColor === "w";
   box.innerHTML = "";
   ["q", "n", "r", "b"].forEach(function (p) {
     var uci = options.find(function (m) { return m[4] === p; });
@@ -438,7 +610,7 @@ function showPromotion(options, anchorEl) {
     var btn = document.createElement("button");
     btn.setAttribute("aria-label", "Promote to " + PIECE_NAMES[p]);
     btn.innerHTML = '<img src="' + pieceImg(white ? p.toUpperCase() : p) + '" alt="">';
-    btn.onclick = function () { box.hidden = true; playMove(uci); };
+    btn.onclick = function () { box.hidden = true; commit(uci); };
     box.appendChild(btn);
   });
   var r = anchorEl.getBoundingClientRect();
@@ -454,7 +626,7 @@ document.addEventListener("pointerdown", function (e) {
   if (!box.hidden && !box.contains(e.target)) {
     box.hidden = true; selected = null; noAnimSq = null; render();
   }
-});
+}, true);
 
 function squareAt(x, y) {
   var el = document.elementFromPoint(x, y);
@@ -465,19 +637,26 @@ function squareAt(x, y) {
 var drag = null;
 
 // ---- Annotations: right-click a square for a circle, right-drag for an arrow.
-// Shift = red, Alt/Ctrl = blue, Shift+Alt = yellow. Left click clears them.
+// Default = blue, Shift = red, Alt/Ctrl = purple, Shift+Alt = yellow. Left click clears them.
 var shapes = [];      // { from, to, color }; from === to is a circle
 var drawing = null;   // the shape being drawn right now
-var SHAPE_COLORS = { green: "#15781B", red: "#882020", blue: "#003088", yellow: "#e68f00" };
+var SHAPE_COLORS = { blue: "#2589e8", red: "#882020", purple: "#a855f7", yellow: "#e68f00" };
 
 function shapeColor(e) {
   var alt = e.altKey || e.ctrlKey || e.metaKey;
-  return e.shiftKey && alt ? "yellow" : e.shiftKey ? "red" : alt ? "blue" : "green";
+  return e.shiftKey && alt ? "yellow" : e.shiftKey ? "red" : alt ? "purple" : "blue";
 }
 
 boardEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+boardEl.addEventListener("auxclick", function (e) { if (e.button === 1) e.preventDefault(); });
 
 boardEl.addEventListener("pointerdown", function (e) {
+  if (e.button === 1) {
+    e.preventDefault();
+    clearPremoves();
+    render();
+    return;
+  }
   if (e.button === 2 && !drag) {
     var sqEl = e.target.closest(".sq");
     if (!sqEl) return;
@@ -542,14 +721,14 @@ function shapeSvg(s) { // board is an 8x8 viewBox, one unit per square
 // ---- Moving pieces with the left button (drag or click-click).
 boardEl.addEventListener("pointerdown", function (e) {
   var sqEl = e.target.closest(".sq");
-  if (!sqEl || !canMove() || e.button > 0) return;
+  if (!sqEl || (!canMove() && !canPremove()) || e.button > 0) return;
   var sq = sqEl.dataset.sq;
-  var piece = pos.board[sq];
+  var piece = (canPremove() ? premoveBoard() : pos.board)[sq];
 
   // Clicking a highlighted target finishes a click-move.
   if (selected && sq !== selected && tryMove(selected, sq, sqEl)) return;
 
-  if (piece && (isWhite(piece) ? "w" : "b") === pos.turn) {
+  if (piece && piece !== SCP && (isWhite(piece) ? "w" : "b") === game.playerColor) {
     // Capture first: render() below replaces the element under the pointer,
     // and some browsers end the gesture when the pressed element disappears.
     try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
@@ -559,7 +738,7 @@ boardEl.addEventListener("pointerdown", function (e) {
     render();
     startDrag(sq, e, wasSelected);
   } else {
-    selected = null;
+    clearPremoves();
     render();
   }
 });
@@ -654,6 +833,7 @@ var SCP_EAT_MS = 750;      // SCP-096 lunging onto that piece
 var animMs = MOVE_MS;      // duration for the animations the next redraw starts
 var scpShow = null;        // { from, victim } while SCP-096's turn plays out
 var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+var shownPremoves = false; // speculative boards must not seed real-move animations
 var shownBoard = null;  // board as last drawn
 var anims = [];         // { type: "slide"|"fade"|"snap", ... , start }
 var noAnimSq = null;    // where a dragged piece was dropped: it should not slide
@@ -761,6 +941,11 @@ function render() {
     if (p.toUpperCase() === "P" && df !== 0 && !pos.board[to]) delete board[to[0] + from[1]]; // en passant
   }
 
+  // Keep the final queue projection visible even while a played move is
+  // awaiting confirmation. Never animate between speculative snapshots.
+  var projecting = !shown && premoves.length > 0;
+  if (projecting) board = premoveBoard(board);
+
   var html = "";
   for (var row = 0; row < 8; row++) {
     for (var col = 0; col < 8; col++) {
@@ -770,6 +955,11 @@ function render() {
       var cls = "sq " + ((file + rank) % 2 ? "dark" : "light");
       if (last.indexOf(sq) >= 0) cls += " last";
       if (sq === selected) cls += " sel";
+      var queuedAt = game.view === null ? premoves.reduce(function (list, m, i) {
+        if (m.slice(2, 4) === sq) list.push(i + 1);
+        return list;
+      }, []) : [];
+      if (queuedAt.length) cls += " premove";
       if (sq === kingSq) cls += " check";
       if (live && scpShow && sq === scpShow.victim) cls += " trigger";
       if (eaten.indexOf(sq) >= 0) cls += " eaten";
@@ -784,6 +974,7 @@ function render() {
         html += '<img class="piece' + (pc === SCP ? " scp" : "") + (raging ? " raging" : "") + '" draggable="false" src="' +
           pieceImg(pc) + '" alt="' + pieceAlt(pc) + '">';
       }
+      if (queuedAt.length) html += '<span class="premove-order">' + queuedAt.join(",") + "</span>";
       html += "</div>";
     }
   }
@@ -793,13 +984,26 @@ function render() {
     html += '<svg class="scp-beam" viewBox="0 0 8 8" aria-hidden="true"><line x1="' + (a.x + 0.5) + '" y1="' + (a.y + 0.5) +
       '" x2="' + (b.x + 0.5) + '" y2="' + (b.y + 0.5) + '" pathLength="1"/></svg>';
   }
-  diffAnims(shownBoard, board);
+  if (projecting || shownPremoves) { anims = []; noAnimSq = null; }
+  else diffAnims(shownBoard, board);
+  shownPremoves = projecting;
   shownBoard = board;
   boardEl.innerHTML = html;
   applyAnims();
+  // The board DOM changes when the bot moves, but the user's pointer capture
+  // and ghost belong to the ongoing gesture. Rebind its source image.
+  if (drag) {
+    var source = squareEl(drag.from).querySelector(".piece:not(.captured)");
+    if (source && source.getAttribute("src") === drag.ghost.getAttribute("src")) {
+      drag.img = source;
+      source.classList.add("dragging");
+    } else {
+      endDrag();
+      selected = null; // the bot captured the piece being held
+    }
+  }
   drawShapes();
 
-  var engineName = $("engine-name").textContent;
   var youTop = game.playerColor === (flipped ? "w" : "b");
   setTag($("tag-top"), youTop ? "you" : "engine", engineName);
   setTag($("tag-bottom"), youTop ? "engine" : "you", engineName);
@@ -813,6 +1017,8 @@ function render() {
   else status = "Waiting…";
   if (game.view !== null) status = "Reviewing move " + game.view + " of " + game.moves.length +
     (thinking ? " · engine is thinking" : "") + " — press End to return";
+  $("premove-state").hidden = !premoves.length;
+  $("premove-count").textContent = premoves.length + (premoves.length === 1 ? " premove queued" : " premoves queued");
   $("status").textContent = status;
   $("status").classList.toggle("reviewing", game.view !== null);
 
@@ -883,6 +1089,7 @@ function pgn() {
 $("btn-new-white").onclick = function () { newGame("w"); };
 $("btn-new-black").onclick = function () { newGame("b"); };
 $("btn-undo").onclick = takeBack;
+$("btn-cancel-premoves").onclick = function () { clearPremoves(); render(); };
 $("btn-flip").onclick = function () { game.flipped = !game.flipped; render(); };
 $("btn-copy").onclick = function () {
   var btn = this;
@@ -891,7 +1098,11 @@ $("btn-copy").onclick = function () {
     setTimeout(function () { btn.textContent = "Copy PGN"; }, 1200);
   });
 };
-$("sel-elo").onchange = setStrength;
+$("rng-elo").oninput = function () {  // live label while dragging
+  var b = sliderBot();
+  $("elo-out").textContent = b.elo === FULL ? "Full" : b.elo;
+};
+$("rng-elo").onchange = function () { chooseBot(sliderBot()); };
 $("btn-first").onclick = function () { viewPly(0); };
 $("btn-prev").onclick = function () { viewPly(shownPly() - 1); };
 $("btn-next").onclick = function () { viewPly(shownPly() + 1); };
@@ -901,6 +1112,7 @@ $("moves").onclick = function (e) {
   if (td) viewPly(Number(td.dataset.ply));
 };
 document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") { clearPremoves(); render(); return; }
   if (e.altKey || e.ctrlKey || e.metaKey || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   var to = { ArrowLeft: shownPly() - 1, ArrowRight: shownPly() + 1, Home: 0, End: Infinity }[e.key];
   if (to === undefined || !game.boards.length) return;
@@ -928,11 +1140,14 @@ $("chk-eval").onchange = toggleEval;
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };
+  renderBots();
   engine.request(["uci"], function (l) { return l === "uciok"; }).then(function (lines) {
     var id = lines.find(function (l) { return l.indexOf("id name ") === 0; });
     var name = id ? id.slice(8) : "Engine";
-    $("engine-name").textContent = name;
+    engineName = name;
     document.title = "Sharpfish · " + name.replace(/ \(based on.*\)/, "");
+    render();
   });
+  setStrength();
   newGame("w");
 })();
