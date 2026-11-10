@@ -7,6 +7,26 @@
 "use strict";
 
 // ---------------------------------------------------------------- Engine
+// Avatars next to the player names (inline SVG, nothing to download)
+var AVATARS = {
+  you: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f7fd8"/>' +
+       '<circle cx="16" cy="12.5" r="5.5" fill="#e8f2ff"/>' +
+       '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>',
+  engine: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0b1a2b"/>' +
+          '<path d="M5 16c3.5-5.5 9-7.5 14.5-6.5 2.4.4 4.2 1.7 5.5 3.2L29 9.5l-1.6 6.5L29 22.5l-4-3.2c-1.3 1.5-3.1 2.8-5.5 3.2C14 23.5 8.5 21.5 5 16z" fill="#f2f6fa"/>' +
+          '<circle cx="10" cy="14.6" r="1.4" fill="#0b1a2b"/>' +
+          '<path d="M15 12.2c1.2 1.1 1.2 6.5 0 7.6M18.5 11.6c1.3 1.3 1.3 7.5 0 8.8" stroke="#0b1a2b" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>'
+};
+var tagState = new WeakMap();
+function setTag(el, who, engineName) {
+  var name = who === "you" ? "You" : engineName;
+  if (tagState.get(el) === who + name) return; // skip rebuilding on every render
+  tagState.set(el, who + name);
+  el.innerHTML = '<span class="avatar avatar-' + who + '"></span><span class="tag-name"></span>';
+  el.firstChild.innerHTML = AVATARS[who];
+  el.lastChild.textContent = name;
+}
+
 // Small wrapper around the Web Worker. Requests run one at a time; each one
 // sends some UCI commands and collects output lines until a "done" line.
 function Engine(file) {
@@ -700,8 +720,8 @@ function render() {
 
   var engineName = $("engine-name").textContent;
   var youTop = game.playerColor === (flipped ? "w" : "b");
-  $("tag-top").textContent = youTop ? "You" : engineName;
-  $("tag-bottom").textContent = youTop ? engineName : "You";
+  setTag($("tag-top"), youTop ? "you" : "engine", engineName);
+  setTag($("tag-bottom"), youTop ? "engine" : "you", engineName);
 
   // Status line
   var status;

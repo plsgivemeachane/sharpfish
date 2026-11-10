@@ -160,7 +160,15 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .sq.light .coord { color: var(--sq-dark); }
 .sq.dark  .coord { color: var(--sq-light); }
 
-.player-tag { color: var(--muted); font-size: 13px; padding: 6px 2px; min-height: 30px; }
+.player-tag {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text); font-size: 13px; font-weight: 600;
+  padding: 6px 2px; min-height: 30px;
+}
+.avatar { width: 26px; height: 26px; flex: none; display: block; }
+.avatar svg { width: 100%; height: 100%; display: block; }
+.avatar-you svg { border-radius: 50%; box-shadow: 0 0 0 2px rgba(110,190,235,0.35); }
+.avatar-engine svg { border-radius: 7px; box-shadow: 0 0 0 1px rgba(110,190,235,0.35); }
 
 /* ---------- Panel ---------- */
 .panel { display: flex; flex-direction: column; gap: 12px; }
