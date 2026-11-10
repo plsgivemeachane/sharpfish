@@ -82,6 +82,28 @@ For evaluation changes, compare the `eval` command before and after:
   | node site/engine/stockfish-*-lite-single.js | grep "Final evaluation"
 ```
 
+## Engine strength
+
+The site's bots (`site/bots.js`) are all the same engine with `UCI_Elo` set,
+so they work for every variant without changes. `UCI_Elo` goes from 0 to
+3190 and is rounded to steps of 50.
+
+- **1320 and up:** stock Stockfish's own skill levels.
+- **Below 1320 (the beginner zone):** the engine scores every legal move at
+  depth 5. On each move it may blunder: a blunder aims to lose a set share of
+  its win chance; otherwise it plays near its best. Lower Elo means more
+  frequent and bigger blunders, and fewer of them once it is clearly winning
+  (so won games get finished). At Elo 0 every move is its worst.
+
+To retune, edit `blunder_chance` and `blunder_size` in `src/search.h`, then
+play bots against each other natively. With 40 games at 50 ms per move, every
+250-Elo step down (1320 → 1000 → 750 → 500 → 250 → 0) lost its match, and Elo
+0 never won a game. These self-play numbers are only roughly calibrated
+against human ratings.
+
+To add, rename or re-rate a bot, edit `site/bots.js`. Martin (250) and
+Stockfish (full strength) are fixed.
+
 ## Publishing your fork's site
 
 `.github/workflows/build-site.yml` builds the engine and runs the test on every

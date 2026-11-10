@@ -1,5 +1,8 @@
 # Stockfish.js
 
+> **Multi-variant hosting:** see [DEPLOYMENT.md](DEPLOYMENT.md) to register branches,
+> build the ignored `deploy/` archive, and serve the collection with Docker on port 8096.
+>
 > **This fork** is set up for making engine variants: edit `src/variant/config.h`
 > (piece values, move rating, rules), run `./make-web.sh serve`, and play your
 > engine in the browser from `site/`. See **[FORKING.md](FORKING.md)**.

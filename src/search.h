@@ -250,26 +250,60 @@ struct InfoIteration {
 // Stockfish at various skill levels and various versions of the Stash engine.
 // Skill 0 .. 19 now covers CCRL Blitz Elo from 1320 to 3190, approximately
 // Reference: https://github.com/vondele/Stockfish/commit/a08b8d4e9711c2
+//
+// Below 1320 (down to 0) we use our own "beginner zone": every legal move is
+// scored, and on each move the engine may blunder. A blunder aims for a
+// mistake of a set size, measured as lost win chance (0 = best move, 1 =
+// throws the game); other moves are close to its best. The lower the Elo,
+// the more often it blunders and the bigger the blunders; at 0 every move is
+// its worst move.
 struct Skill {
     // Lowest and highest Elo ratings used in the skill level calculation
     constexpr static int LowestElo  = 1320;
     constexpr static int HighestElo = 3190;
+    // Our extended floor, and the step UCI_Elo is rounded to
+    constexpr static int MinElo  = 0;
+    constexpr static int EloStep = 50;
 
-    Skill(int skill_level, int uci_elo) {
-        if (uci_elo)
+    Skill(int skill_level, bool limit_strength, int uci_elo) {
+        if (limit_strength)
         {
-            double e = double(uci_elo - LowestElo) / (HighestElo - LowestElo);
-            level = std::clamp((((37.2473 * e - 40.8525) * e + 22.2943) * e - 0.311438), 0.0, 19.0);
+            uci_elo = (uci_elo + EloStep / 2) / EloStep * EloStep;
+            if (uci_elo < LowestElo)
+            {
+                double t      = double(LowestElo - std::max(uci_elo, MinElo)) / LowestElo;  // 0..1
+                level         = 0.0;
+                blunderChance = blunder_chance(t);
+                mistake       = blunder_size(t);
+            }
+            else
+            {
+                double e = double(uci_elo - LowestElo) / (HighestElo - LowestElo);
+                level = std::clamp((((37.2473 * e - 40.8525) * e + 22.2943) * e - 0.311438), 0.0, 19.0);
+            }
         }
         else
             level = double(skill_level);
     }
+
+    // Beginner zone, t = 0 at LowestElo .. 1 at MinElo. Tuned by self-play
+    // (see FORKING.md, "Engine strength").
+    static double blunder_chance(double t) { return 0.10 + 0.90 * t * t; }  // per move
+    static double blunder_size(double t) { return 0.15 + 0.85 * t * t; }    // lost win chance
+
     bool enabled() const { return level < 20.0; }
-    bool time_to_pick(Depth depth) const { return depth == 1 + int(level); }
-    Move pick_best(const RootMoves&, usize multiPV);
+    bool beginner() const { return mistake >= 0.0; }
+    // Beginners look a few plies ahead, so their good moves can still mate.
+    static constexpr int BeginnerDepth = 5;
+    bool time_to_pick(Depth depth) const {
+        return depth == (beginner() ? BeginnerDepth : 1 + int(level));
+    }
+    Move pick_best(const Position&, const RootMoves&, usize multiPV);
 
     double level;
-    Move   best = Move::none();
+    double blunderChance = 0.0;
+    double mistake       = -1.0;  // blunder size, >= 0 only in the beginner zone
+    Move   best    = Move::none();
 };
 
 // SearchManager manages the search from the main thread. It is responsible for
