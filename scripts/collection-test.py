@@ -30,14 +30,14 @@ class CollectionTest(unittest.TestCase):
         self.git('config', 'user.email', 'fixture@example.test')
         shutil.copytree(PROJECT / 'collection-server', self.root / 'collection-server')
         (self.root / 'site').mkdir()
-        (self.root / 'site/index.html').write_text('<html><body><a id="source-link" href="old">Source</a></body></html>')
+        (self.root / 'site/index.html').write_text('<html><link href="style.css"><body><a id="source-link" href="old">Source</a><script src="engine-file.js"></script><script src="bots.js"></script><script src="app.js"></script></body></html>')
         (self.root / 'site/favicon.svg').write_text('<svg/>')
         for name in ('Copying.txt', 'AUTHORS'):
             (self.root / name).write_text(name)
         (self.root / '.gitignore').write_text('/deploy/\n/.collection-*/\n')
         (self.root / 'make-web.sh').write_text(
             'set -eu\n[ "$1" = test ]\nmkdir -p site/engine\n'
-            'echo built > site/engine/mock.wasm\necho built > site/engine-file.js\n')
+            'echo built > site/engine/mock.wasm\necho \'window.ENGINE_FILE = "engine/mock.js";\' > site/engine-file.js\n')
         manifest = dict(source_url='https://github.com/example/chess', variants=[dict(
             branch='fixture', slug='one', title='One <two>', description='Chess & more')])
         (self.root / 'variants.json').write_text(json.dumps(manifest))
@@ -63,6 +63,12 @@ class CollectionTest(unittest.TestCase):
         self.assertIn('One &lt;two&gt;', page)
         self.assertIn(self.git('rev-parse', 'HEAD'), page)
         self.assertIn('Download engine source', page)
+        commit = self.git('rev-parse', 'HEAD')
+        for asset in ('style.css', 'engine-file.js', 'bots.js', 'app.js'):
+            self.assertIn(asset + '?v=' + commit, page)
+        self.assertIn('assets/' + commit + '/engine/mock.js',
+                      (output / 'variants/one/engine-file.js').read_text())
+        self.assertTrue((output / 'variants/one/assets' / commit / 'engine/mock.wasm').is_file())
         self.assertTrue((output / 'variants/one/source.tar.gz').is_file())
         self.assertTrue((output / 'variants/one/engine/mock.wasm').is_file())
         self.assertEqual(self.git('status', '--porcelain'), before)

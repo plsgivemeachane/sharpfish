@@ -64,7 +64,7 @@ def add(args):
     print(f'Registered {args.slug}. Commit the manifest, then rebuild.')
 
 
-def export_page(path, title, source_url):
+def export_page(path, title, source_url, commit):
     content = path.read_text()
     if content.count('<body>') != 1:
         raise ValueError(f'{path}: expected one <body> navigation insertion point')
@@ -78,6 +78,9 @@ def export_page(path, title, source_url):
                             lambda m: m[1] + html.escape(source_url, quote=True) + m[2], content)
     if count != 1:
         raise ValueError(f'{path}: expected one source-link')
+    # Cloudflare may override cache headers; stable URLs can mix releases.
+    content = re.sub(r'((?:src|href)="(?:engine-file\.js|bots\.js|app\.js|style\.css))(")',
+                     lambda m: m[1] + '?v=' + commit + m[2], content)
     path.write_text(content)
 
 
@@ -122,8 +125,21 @@ def build():
                 shutil.copyfileobj(src, dest)
             for filename in ('Copying.txt', 'AUTHORS'):
                 shutil.copy2(snapshot / filename, target)
+            # Workers derive their WASM URL from their own path, so version both
+            # together rather than only adding a query string to the worker.
+            versioned = target / 'assets' / entry['commit']
+            for engine_dir in ('engine', 'stock-engine'):
+                if (target / engine_dir).is_dir():
+                    shutil.copytree(target / engine_dir, versioned / engine_dir)
+            selector = target / 'engine-file.js'
+            if selector.exists():
+                content = selector.read_text()
+                for engine_dir in ('engine', 'stock-engine'):
+                    content = content.replace('\"' + engine_dir + '/',
+                                              '\"assets/' + entry['commit'] + '/' + engine_dir + '/')
+                selector.write_text(content)
             export_page(target / 'index.html', entry['title'],
-                        data['source_url'] + '/tree/' + entry['commit'])
+                        data['source_url'] + '/tree/' + entry['commit'], entry['commit'])
             shutil.rmtree(snapshot)
             archive.unlink()
         homepage(site, data)
