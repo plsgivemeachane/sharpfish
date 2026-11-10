@@ -16,7 +16,6 @@
     <img src="favicon.svg" alt="" width="30" height="30">
     <span class="site-name">Sharpfish</span>
     <span class="tagline">Stockfish variants, but not dumb</span>
-    <span id="engine-name" class="engine-tag">Loading engine…</span>
   </div>
 </header>
 
@@ -37,6 +36,10 @@
     <div class="card status-card">
       <div id="status" class="status">Starting…</div>
       <div id="engine-line" class="engine-line">&nbsp;</div>
+      <div id="premove-state" class="premove-state" hidden>
+        <span id="premove-count" role="status"></span>
+        <button id="btn-cancel-premoves" class="btn" type="button">Cancel premoves</button>
+      </div>
     </div>
 
     <div class="card moves-card">
@@ -87,9 +90,11 @@
           <option value="5000">5 s</option>
         </select>
       </label>
+      <div class="hint">Bots take at least 2.1 seconds per move, even when their search finishes sooner.</div>
       <label class="field">Eval bar (stock Stockfish)
         <input type="checkbox" id="chk-eval">
       </label>
+      <div class="hint">While the bot thinks, move your pieces to queue premoves, including consecutive moves with the same piece. Middle-click, press Esc, or use Cancel premoves to clear the queue.</div>
       <div class="hint">Right-click a square to circle it, right-drag to draw an arrow.
         Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears.</div>
     </div>
