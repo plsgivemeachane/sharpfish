@@ -1,0 +1,29 @@
+{
+  "source_url": "https://github.com/plsgivemeachane/sharpfish",
+  "variants": [
+    {
+      "branch": "main",
+      "slug": "classic",
+      "title": "Classic",
+      "description": "Stockfish but with classic chess rules."
+    },
+    {
+      "branch": "elo-ladder",
+      "slug": "elo-ladder",
+      "title": "Elo ladder",
+      "description": "Stockfish but with a ladder of opponents from beginner to full strength."
+    },
+    {
+      "branch": "alternating-colors",
+      "slug": "alternating-colors",
+      "title": "Alternating colors",
+      "description": "Stockfish but its moves alternate between light and dark squares."
+    },
+    {
+      "branch": "scp-096",
+      "slug": "scp-096",
+      "title": "SCP-096",
+      "description": "Stockfish but SCP-096 stalks the board and eats pieces it sees."
+    }
+  ]
+}

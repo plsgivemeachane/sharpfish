@@ -1,6 +1,5 @@
-# Builds the engine and publishes site/ to GitHub Pages on every push.
-# Every fork gets its own playable site: enable Pages once in the fork's
-# Settings -> Pages -> Source: "GitHub Actions".
+# Builds individual branches. The complete collection is deployed separately.
+# Optional Pages deployment also requires repository variable ENABLE_GITHUB_PAGES=true.
 name: Build engine and site
 
 on:
@@ -41,15 +40,25 @@ jobs:
       - name: Build engine and run smoke test
         run: ./make-web.sh test
 
-      - name: Upload site
+      - name: Test collection tooling
+        run: python3 scripts/collection-test.py
+
+      - name: Upload branch site
         if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-site
+          path: site
+
+      - name: Upload site
+        if: github.event_name != 'pull_request' && vars.ENABLE_GITHUB_PAGES == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
     # Only the default branch is published; other branches just build + test.
-    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && vars.ENABLE_GITHUB_PAGES == 'true'
     needs: build
     runs-on: ubuntu-latest
     environment:

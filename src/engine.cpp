@@ -127,7 +127,7 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
     options.add("UCI_LimitStrength", Option(false));
 
     options.add("UCI_Elo",
-                Option(Stockfish::Search::Skill::LowestElo, Stockfish::Search::Skill::LowestElo,
+                Option(Stockfish::Search::Skill::LowestElo, Stockfish::Search::Skill::MinElo,
                        Stockfish::Search::Skill::HighestElo));
 
     options.add("UCI_ShowWDL", Option(false));
