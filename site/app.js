@@ -496,14 +496,14 @@ function squareAt(x, y) {
 var drag = null;
 
 // ---- Annotations: right-click a square for a circle, right-drag for an arrow.
-// Shift = red, Alt/Ctrl = blue, Shift+Alt = yellow. Left click clears them.
+// Default = blue, Shift = red, Alt/Ctrl = purple, Shift+Alt = yellow. Left click clears them.
 var shapes = [];      // { from, to, color }; from === to is a circle
 var drawing = null;   // the shape being drawn right now
-var SHAPE_COLORS = { green: "#15781B", red: "#882020", blue: "#003088", yellow: "#e68f00" };
+var SHAPE_COLORS = { blue: "#2589e8", red: "#882020", purple: "#a855f7", yellow: "#e68f00" };
 
 function shapeColor(e) {
   var alt = e.altKey || e.ctrlKey || e.metaKey;
-  return e.shiftKey && alt ? "yellow" : e.shiftKey ? "red" : alt ? "blue" : "green";
+  return e.shiftKey && alt ? "yellow" : e.shiftKey ? "red" : alt ? "purple" : "blue";
 }
 
 boardEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });

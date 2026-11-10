@@ -3,7 +3,8 @@
 //
 // Martin (250) and Stockfish (full strength) are fixed: keep their names,
 // Elo and avatars. Every other bot can be renamed, re-rated or re-drawn.
-// Avatars: DiceBear "notionists" (CC0), saved in avatars/.
+// Avatars: DiceBear 9.x "avataaars" by Pablo Stanley (free for personal and
+// commercial use), saved in avatars/. Martin: Chess.com portrait; see avatars/README.md.
 "use strict";
 
 var FULL = null; // elo for full strength (no limit)
@@ -12,7 +13,7 @@ var BOT_GROUPS = [
   { name: "Beginner", bots: [
     { id: "pebble", name: "Pebble", elo: 0 },
     { id: "noodle", name: "Noodle", elo: 100 },
-    { id: "martin", name: "Martin", elo: 250, fixed: true },
+    { id: "martin", name: "Martin", elo: 250, fixed: true, avatar: "avatars/martin.png" },
     { id: "sunny",  name: "Sunny",  elo: 400 },
     { id: "milo",   name: "Milo",   elo: 550 },
   ] },
