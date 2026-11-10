@@ -1,4 +1,23 @@
-# Stockfish.js
+# Sharpfish
+
+Sharpfish is a browser chess collection built on Stockfish.js. Play online at
+[sharpfish.yuzukateam.io.vn](https://sharpfish.yuzukateam.io.vn/).
+
+- **Classic** and **Elo ladder** offer standard chess with a roster of opponents.
+- **Alternating colors** requires the engine to alternate the color of its destination squares, except when it is in check.
+- **SCP-096** adds an uncapturable piece that blocks lines. After Black moves, it eats one randomly chosen piece that attacks its current square; a king sees adjacent squares. Losing a king to SCP-096 ends the game.
+
+Choose a bot and play in your browser. The default think time is two seconds;
+bots take at least 2.1 seconds per move to leave time for premoves. You can
+change the think time, queue premoves while the bot thinks, review moves, and
+copy the game as PGN. Stockfish evaluation is disabled in SCP-096 because the
+standard engine cannot evaluate its rules.
+
+For local development, run `./make-web.sh serve`. See [FORKING.md](FORKING.md)
+for variant development and [DEPLOYMENT.md](DEPLOYMENT.md) for building and
+publishing the collection. Pushing a branch does not deploy the site.
+
+## About Stockfish.js
 
 > **Multi-variant hosting:** see [DEPLOYMENT.md](DEPLOYMENT.md) to register branches,
 > build the ignored `deploy/` archive, and serve the collection with Docker on port 8096.
