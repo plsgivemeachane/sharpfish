@@ -29,8 +29,9 @@
 
 namespace Stockfish::Variant {
 
-// Name shown by "uci" as "id name ...". Give your fork its own name.
-constexpr const char* EngineName = "Alternating Stockfish";  // "" keeps the default Stockfish name
+// What your variant is, shown by "uci" as "id name Stockfish variant (<this>)".
+// Example: "Knights only". "" keeps the default Stockfish name.
+constexpr const char* EngineName = "Alternating square colors";
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
