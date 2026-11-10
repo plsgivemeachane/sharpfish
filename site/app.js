@@ -127,6 +127,8 @@ var game = {
   playerColor: "w",
   flipped: false,
   over: null,       // result text when the game has ended
+  boards: [],       // snapshot after each ply (0 = start): { board, lastMove, turn, inCheck }
+  view: null,       // ply being reviewed, or null for the live position
   token: 0          // bumped on new game / take back to ignore stale engine replies
 };
 var pos = null;     // { fen, board, turn, legal: [uci], inCheck }
@@ -137,8 +139,9 @@ var $ = function (id) { return document.getElementById(id); };
 var boardEl = $("board");
 
 // ---------------------------------------------------------------- Engine I/O
-function positionCmd() {
-  return "position startpos" + (game.moves.length ? " moves " + game.moves.join(" ") : "");
+function positionCmd(ply) { // ply: how many moves to include (default: all)
+  var moves = ply == null ? game.moves : game.moves.slice(0, ply);
+  return "position startpos" + (moves.length ? " moves " + moves.join(" ") : "");
 }
 
 function refreshPosition() {
@@ -223,12 +226,12 @@ function setEvalBar(share, text, title) {
 
 function analyse() {
   if (!evalEngine || !pos || pos.pending || !$("chk-eval").checked) return;
-  var key = positionCmd();
+  var key = positionCmd(game.view);
   if (key === evalKey) return;
   evalKey = key;
   if (evalRunning) evalEngine.stop(); // a new position: drop the old search
   evalRunning = true;
-  var turn = pos.turn;
+  var turn = game.view === null ? pos.turn : game.boards[game.view].turn;
   evalEngine.request([key, "go depth " + EVAL_DEPTH],
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
@@ -259,6 +262,20 @@ function toggleEval() {
 }
 
 // ---------------------------------------------------------------- Game flow
+function snapshot(p, lastMove) {
+  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck };
+}
+
+// Review: step through earlier positions without changing the game.
+function viewPly(ply) {
+  var live = game.boards.length - 1;
+  ply = Math.max(0, Math.min(ply, live));
+  game.view = ply === live ? null : ply;
+  selected = null;
+  render();
+}
+function shownPly() { return game.view === null ? game.boards.length - 1 : game.view; }
+
 function playMove(uci) {
   var token = game.token;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
@@ -273,6 +290,7 @@ function playMove(uci) {
     next.lastMove = uci;
     pos = next;
     game.repKeys.push(next.repKey);
+    game.boards.push(snapshot(next, uci));
 
     var i = game.san.length - 1;
     if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
@@ -308,6 +326,7 @@ function newGame(color) {
   if (thinking) engine.stop();
   thinking = false;
   game.moves = []; game.san = []; game.over = null;
+  game.boards = []; game.view = null;
   game.playerColor = color;
   game.flipped = color === "b";
   selected = null;
@@ -316,6 +335,7 @@ function newGame(color) {
   refreshPosition().then(function (p) {
     pos = p;
     game.repKeys = [p.repKey];
+    game.boards = [snapshot(p, null)];
     render();
     maybeEngineTurn();
   });
@@ -331,6 +351,8 @@ function takeBack() {
     game.moves.pop(); game.san.pop(); game.repKeys.pop();
   } while (game.moves.length && (game.moves.length % 2 === 0 ? "w" : "b") !== game.playerColor);
   // If that leaves the engine to move (playing Black, all undone), it moves again below.
+  game.boards.length = game.moves.length + 1;
+  game.view = null;
   game.over = null;
   selected = null;
   refreshPosition().then(function (p) {
@@ -351,7 +373,8 @@ function setStrength() {
 
 // ---------------------------------------------------------------- Input
 function canMove() {
-  return pos && !pos.pending && !thinking && !game.over && pos.turn === game.playerColor;
+  return pos && !pos.pending && !thinking && !game.over && game.view === null &&
+    pos.turn === game.playerColor;
 }
 
 function movesFrom(sq) {
@@ -666,14 +689,17 @@ function render() {
   var dests = selected ? movesFrom(selected).map(function (m) { return m.slice(2, 4); }) : [];
   var last = pos.lastMove ? [pos.lastMove.slice(0, 2), pos.lastMove.slice(2, 4)] : [];
   var kingSq = null;
-  if (pos.inCheck && !pos.pending) {
-    var k = pos.turn === "w" ? "K" : "k";
-    kingSq = Object.keys(pos.board).find(function (s) { return pos.board[s] === k; });
+  var shown = game.view === null ? null : game.boards[game.view];
+  if (shown) last = shown.lastMove ? [shown.lastMove.slice(0, 2), shown.lastMove.slice(2, 4)] : [];
+  var src = shown || (pos.pending ? null : pos);
+  if (src && src.inCheck) {
+    var k = src.turn === "w" ? "K" : "k";
+    kingSq = Object.keys(src.board).find(function (s) { return src.board[s] === k; });
   }
 
   // While waiting for the engine to confirm a move, show the move already made.
-  var board = pos.board;
-  if (pos.pending && pos.lastMove) {
+  var board = shown ? shown.board : pos.board;
+  if (!shown && pos.pending && pos.lastMove) {
     board = Object.assign({}, board);
     var m = pos.lastMove, from = m.slice(0, 2), to = m.slice(2, 4), p = board[from];
     var df = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
@@ -727,10 +753,16 @@ function render() {
   else if (thinking) status = "Engine is thinking…";
   else if (pos.turn === game.playerColor) status = "Your move" + (pos.inCheck ? " — check!" : "");
   else status = "Waiting…";
+  if (game.view !== null) status = "Reviewing move " + game.view + " of " + game.moves.length +
+    (thinking ? " · engine is thinking" : "") + " — press End to return";
   $("status").textContent = status;
+  $("status").classList.toggle("reviewing", game.view !== null);
 
   renderMoves();
   $("btn-undo").disabled = !game.moves.length;
+  var ply = shownPly(), live = game.boards.length - 1;
+  $("btn-first").disabled = $("btn-prev").disabled = ply <= 0;
+  $("btn-next").disabled = $("btn-last").disabled = ply >= live;
   $("evalbar").classList.toggle("flipped", flipped);
   analyse();
 }
@@ -738,11 +770,13 @@ function render() {
 function renderMoves() {
   var body = $("moves");
   var rows = "";
+  var cur = shownPly() - 1; // index into game.san of the move shown on the board
+  function cell(j) {
+    if (j >= game.san.length) return "<td></td>";
+    return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '">' + game.san[j] + "</td>";
+  }
   for (var i = 0; i < game.san.length; i += 2) {
-    var lastW = i === game.san.length - 1, lastB = i + 1 === game.san.length - 1;
-    rows += "<tr><td>" + (i / 2 + 1) + ".</td>" +
-      '<td class="' + (lastW ? "current" : "") + '">' + game.san[i] + "</td>" +
-      '<td class="' + (lastB ? "current" : "") + '">' + (game.san[i + 1] || "") + "</td></tr>";
+    rows += "<tr><td>" + (i / 2 + 1) + ".</td>" + cell(i) + cell(i + 1) + "</tr>";
   }
   body.innerHTML = rows;
   $("moves-empty").hidden = game.san.length > 0;
@@ -750,7 +784,9 @@ function renderMoves() {
     ? "No moves yet. You play White — make the first move."
     : "No moves yet. The engine plays White.";
   var card = body.closest(".moves-card");
-  card.scrollTop = card.scrollHeight;
+  var curEl = body.querySelector("td.current");
+  if (game.view === null) card.scrollTop = card.scrollHeight;
+  else if (curEl) curEl.scrollIntoView({ block: "nearest" });
 }
 
 function pgn() {
@@ -775,6 +811,27 @@ $("btn-copy").onclick = function () {
   });
 };
 $("sel-elo").onchange = setStrength;
+$("btn-first").onclick = function () { viewPly(0); };
+$("btn-prev").onclick = function () { viewPly(shownPly() - 1); };
+$("btn-next").onclick = function () { viewPly(shownPly() + 1); };
+$("btn-last").onclick = function () { viewPly(Infinity); };
+$("moves").onclick = function (e) {
+  var td = e.target.closest("td[data-ply]");
+  if (td) viewPly(Number(td.dataset.ply));
+};
+document.addEventListener("keydown", function (e) {
+  if (e.altKey || e.ctrlKey || e.metaKey || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  var to = { ArrowLeft: shownPly() - 1, ArrowRight: shownPly() + 1, Home: 0, End: Infinity }[e.key];
+  if (to === undefined || !game.boards.length) return;
+  e.preventDefault();
+  viewPly(to);
+});
+// Clicking the board while reviewing jumps back to the game.
+boardEl.addEventListener("pointerdown", function (e) {
+  if (game.view === null || e.button > 0) return;
+  e.stopPropagation();
+  viewPly(Infinity);
+}, true);
 $("chk-eval").onchange = toggleEval;
 
 (function start() {
@@ -783,6 +840,7 @@ $("chk-eval").onchange = toggleEval;
     return;
   }
   engine = new Engine(window.ENGINE_FILE);
+  $("evalbar").classList.toggle("off", !$("chk-eval").checked); // off unless ticked
   if (window.STOCK_ENGINE_FILE) {
     evalEngine = new Engine(window.STOCK_ENGINE_FILE);
     evalEngine.worker.onerror = function () { $("evalbar").classList.add("off"); evalEngine = null; };
