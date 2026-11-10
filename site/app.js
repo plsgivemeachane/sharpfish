@@ -233,7 +233,7 @@ function engineMove() {
 }
 
 // ---------------------------------------------------------------- Eval bar
-// Analyse the actual position with a separate SCP-aware engine.
+// Analyse the position with ordinary Stockfish, without the SCP piece.
 var EVAL_DEPTH = 16;
 var evalEngine = null;
 var evalKey = null;     // position being analysed
@@ -251,11 +251,19 @@ function setEvalBar(share, text, title) {
   $("eval-label").textContent = text;
 }
 
+function stockFen(fen) {
+  var fields = fen.split(" ");
+  fields[0] = fields[0].replace(/\*/g, "1").replace(/[1-8]+/g, function (run) {
+    return String(Array.from(run).reduce(function (sum, digit) { return sum + Number(digit); }, 0));
+  });
+  return fields.join(" ");
+}
+
 function analyse() {
   if (!evalEngine || !pos || pos.pending || !$("chk-eval").checked) return;
   var position = game.view === null ? pos : game.boards[game.view];
   if (game.view === null && game.over) return;
-  var key = "position fen " + position.fen;
+  var key = "position fen " + stockFen(position.fen);
   if (key === evalKey) return;
   evalKey = key;
   if (evalRunning) evalEngine.stop(); // a new position: drop the old search
@@ -269,7 +277,7 @@ function analyse() {
       if (!m) return;
       var depth = (l.match(/ depth (\d+)/) || [])[1];
       var n = Number(m[2]);
-      var title = "SCP-096 engine · depth " + depth;
+      var title = "Stock Stockfish · depth " + depth;
       if (m[1] === "mate") {
         // "mate 0" = the side to move is already mated
         var whiteWins = n === 0 ? turn === "b" : (n > 0) === (turn === "w");
@@ -1132,8 +1140,10 @@ $("chk-eval").onchange = toggleEval;
     return;
   }
   engine = new Engine(window.ENGINE_FILE);
-  evalEngine = new Engine(window.ENGINE_FILE);
-  evalEngine.request(["uci"], function (l) { return l === "uciok"; });
+  if (window.STOCK_ENGINE_FILE) {
+    evalEngine = new Engine(window.STOCK_ENGINE_FILE);
+    evalEngine.request(["uci"], function (l) { return l === "uciok"; });
+  }
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };

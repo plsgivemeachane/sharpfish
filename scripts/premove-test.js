@@ -34,7 +34,7 @@ function declaration(name) {
 
 const names = [
   "canMove", "canPremove", "premoveBoard", "premoveMoves", "queuePremove",
-  "runPremove", "clearPremoves", "maybeEngineTurn"
+  "runPremove", "clearPremoves", "maybeEngineTurn", "stockFen"
 ];
 const context = {
   console,
@@ -195,4 +195,11 @@ test("does not start duplicate bot searches after an animation", () => {
   context.maybeEngineTurn();
   context.maybeEngineTurn();
   assert.equal(context.searches, 1);
+});
+
+test("stock evaluation removes SCP and preserves FEN fields", () => {
+  assert.equal(context.stockFen("r3*2k/8/8/8/8/8/8/K7 w - - 0 1"),
+               "r6k/8/8/8/8/8/8/K7 w - - 0 1");
+  assert.equal(context.stockFen("*7/8/8/8/8/8/8/K6k b - - 3 5"),
+               "8/8/8/8/8/8/8/K6k b - - 3 5");
 });
