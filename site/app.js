@@ -152,12 +152,13 @@ function refreshPosition() {
   return engine.request([positionCmd(), "d", "go perft 1", "isready"],
     function (l) { return l === "readyok"; }
   ).then(function (lines) {
-    var fen = "", inCheck = false, legal = [], ate = [];
+    var fen = "", inCheck = false, legal = [], ate = [], sees = [];
     lines.forEach(function (l) {
       var m;
       if (l.indexOf("Fen: ") === 0) fen = l.slice(5).trim();
       else if (l.indexOf("Checkers:") === 0) inCheck = l.slice(9).trim().length > 0;
       else if (l.indexOf("SCP-096 ate:") === 0) ate = l.slice(12).trim().split(/\s+/).filter(Boolean);
+      else if (l.indexOf("SCP-096 sees:") === 0) sees = l.slice(13).trim().split(/\s+/).filter(Boolean);
       else if ((m = l.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/))) legal.push(m[1]);
     });
     var parts = fen.split(" ");
@@ -169,7 +170,8 @@ function refreshPosition() {
       repKey: parts.slice(0, 4).join(" "),
       legal: legal,
       inCheck: inCheck,
-      ate: ate
+      ate: ate,
+      sees: sees
     };
   });
 }
@@ -269,7 +271,7 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [] };
+  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [], sees: p.sees || [] };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -705,6 +707,7 @@ function render() {
   if (shown) last = shown.lastMove ? [shown.lastMove.slice(0, 2), shown.lastMove.slice(2, 4)] : [];
   var src = shown || (pos.pending ? null : pos);
   var eaten = src && src.ate ? src.ate.map(function (a) { return a.slice(1); }) : [];
+  var seen = src && src.sees ? src.sees : [];
   if (src && src.inCheck) {
     var k = src.turn === "w" ? "K" : "k";
     kingSq = Object.keys(src.board).find(function (s) { return src.board[s] === k; });
@@ -737,6 +740,7 @@ function render() {
       if (sq === selected) cls += " sel";
       if (sq === kingSq) cls += " check";
       if (eaten.indexOf(sq) >= 0) cls += " eaten";
+      else if (seen.indexOf(sq) >= 0) cls += " seen";
       if (dests.indexOf(sq) >= 0) cls += " dest" + (board[sq] ? " occupied" : "");
       html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell">';
       if (col === 0) html += '<span class="coord rank">' + rank + "</span>";

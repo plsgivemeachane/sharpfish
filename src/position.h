@@ -66,12 +66,12 @@ struct StateInfo {
     Piece      capturedPiece;
     int        repetition;
 
-    // SCP-096: who it ate during the last move (undone in reverse order), and
+    // SCP-096: what it ate on its turn after the last move (at most one), and
     // the color whose king it ate (COLOR_NB = none; the game is then over).
     Color  kingEaten;
     int    scpEatCount;
-    Piece  scpEatenPc[32];
-    Square scpEatenSq[32];
+    Piece  scpEatenPc[1];
+    Square scpEatenSq[1];
 };
 
 
@@ -207,7 +207,7 @@ class Position {
     Key  compute_material_key() const;
     void set_state() const;
     void set_check_info() const;
-    void scp_rampage(Move m, DirtyPiece& dp);
+    void scp_turn(Move m, DirtyPiece& dp);
     bool scp_legal(Move m) const;
     void scp_undo();
 

@@ -100,6 +100,13 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
         if (si->kingEaten != COLOR_NB)
             os << PieceToChar[make_piece(si->kingEaten, KING)]
                << UCIEngine::square(pos.square<KING>(si->kingEaten));
+        else
+        {
+            // The pieces it may eat on its next turn
+            os << "\nSCP-096 sees: ";
+            for (Bitboard b = pos.attackers_to(pos.scp_square()) & pos.real_pieces(); b;)
+                os << UCIEngine::square(pop_lsb(b)) << " ";
+        }
     }
 
 #ifndef __NO_SYZYGY__
@@ -1108,11 +1115,12 @@ void Position::do_move(Move                      m,
     // Calculate checkers bitboard (if move gives check)
     st->checkersBB = givesCheck ? attackers_to(square<KING>(them)) & pieces(us) : 0;
 
-    // SCP-096 takes its turn(s) right after the move
-    if (Variant::EnableScp096 && st->scpSq != SQ_NONE)
+    // SCP-096 takes its turn once per round, right after Black's move
+    if (Variant::EnableScp096 && us == BLACK && st->scpSq != SQ_NONE)
     {
-        scp_rampage(m, dp);
-        st->checkersBB = attackers_to(square<KING>(them)) & pieces(us);
+        scp_turn(m, dp);
+        if (st->scpEatCount)
+            st->checkersBB = attackers_to(square<KING>(them)) & pieces(us);
     }
 
     sideToMove = ~sideToMove;
@@ -1412,23 +1420,23 @@ void Position::do_castling(Color               us,
 }
 
 
-// SCP-096 eats, one watcher per step, right after a move: any piece that
-// attacks its square is a watcher (a king only sees the squares next to it).
-// With several watchers one is picked at random. SCP-096 lands on the eaten
-// piece's square and goes again while anything still sees it. Eating a king
-// ends the game: the king stays on the board and kingEaten records it.
-void Position::scp_rampage(Move m, DirtyPiece& dp) {
+// SCP-096's turn (after Black's move, so the order is White, Black, SCP-096).
+// Any piece that attacks its square is a watcher (a king only sees the squares
+// next to it). If there are watchers it eats one, picked at random, and lands
+// on its square. Eating a king ends the game: the king stays on the board and
+// kingEaten records it.
+void Position::scp_turn(Move m, DirtyPiece& dp) {
 
     const Key before = st->previous->key;
 
-    for (int step = 0;; ++step)
+    do
     {
         const Square s        = st->scpSq;
         Bitboard     watchers = attackers_to(s) & real_pieces();
         if (!watchers)
             break;
 
-        for (int i = Variant::scp_pick(before, m, step, popcount(watchers)); i > 0; --i)
+        for (int i = Variant::scp_pick(before, m, 0, popcount(watchers)); i > 0; --i)
             watchers &= watchers - 1;
 
         const Square v  = lsb(watchers);
@@ -1471,7 +1479,7 @@ void Position::scp_rampage(Move m, DirtyPiece& dp) {
         st->scpEatenSq[st->scpEatCount] = v;
         ++st->scpEatCount;
         dp.forceRefresh = true;
-    }
+    } while (false);
 
     // En passant survives only if both pawns involved are still there.
     // sideToMove is still the side that made the move.
@@ -1488,7 +1496,7 @@ void Position::scp_rampage(Move m, DirtyPiece& dp) {
     }
 }
 
-// Puts back what SCP-096 ate during the last move and returns it to where it was
+// Puts back what SCP-096 ate after the last move and returns it to where it was
 void Position::scp_undo() {
 
     byTypeBB[ALL_PIECES] ^= st->scpSq;
@@ -1498,7 +1506,7 @@ void Position::scp_undo() {
 }
 
 // Legality with SCP-096 on the board. A move is legal if, after it and
-// everything SCP-096 eats, the mover's king is not attacked. A move after
+// SCP-096's turn (if it follows), the mover's king is not attacked. A move after
 // which a king gets eaten is legal (it ends the game). Nothing is legal once
 // a king has been eaten.
 bool Position::scp_legal(Move m) const {

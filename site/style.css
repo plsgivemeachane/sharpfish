@@ -257,3 +257,8 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .moves tr.scp-turn td:first-child { text-align: center; }
 .moves tr.scp-turn img, .scp-eat img { width: 18px; height: 18px; vertical-align: -4px; }
 .scp-eat { margin-right: 6px; white-space: nowrap; }
+/* Pieces SCP-096 can see: it may eat one of them after Black's move */
+.sq.seen::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 3px rgba(200, 30, 30, 0.75);
+}
