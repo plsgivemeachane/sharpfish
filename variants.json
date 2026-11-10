@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/plsgivemeachane/sharpfish",
+  "variants": [
+    {"branch": "main", "slug": "classic", "title": "Classic", "description": "The original Sharpfish experience. Familiar rules, a formidable opponent."},
+    {"branch": "elo-ladder", "slug": "elo-ladder", "title": "Elo ladder", "description": "Find your match among a full roster of bots, from beginner to full strength."},
+    {"branch": "alternating-colors", "slug": "alternating-colors", "title": "Alternating colors", "description": "An opponent whose moves alternate between light and dark destination squares."},
+    {"branch": "scp-096", "slug": "scp-096", "title": "SCP-096", "description": "Meet the Shy Guy on the chessboard. An unusual opponent with its own rules."}
+  ]
+}
