@@ -262,3 +262,31 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
   content: ""; position: absolute; inset: 0; pointer-events: none;
   box-shadow: inset 0 0 0 3px rgba(200, 30, 30, 0.75);
 }
+
+/* SCP-096's turn: the piece that saw it pulses, a beam joins them, SCP-096 shakes */
+.sq.trigger::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at center, rgba(230, 30, 30, 0.75) 0%, rgba(150, 0, 0, 0) 75%);
+  box-shadow: inset 0 0 0 3px rgba(230, 30, 30, 0.9);
+  animation: scp-pulse 0.43s ease-in-out infinite alternate;
+}
+@keyframes scp-pulse { from { opacity: 0.35; } to { opacity: 1; } }
+.scp-beam {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3;
+}
+.scp-beam line {
+  stroke: rgba(235, 35, 35, 0.85); stroke-width: 0.08; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 0.08px rgba(255, 60, 60, 1));
+  animation: scp-beam 0.5s ease-out forwards;
+}
+@keyframes scp-beam { to { stroke-dashoffset: 0; } }
+.piece.raging { animation: scp-shake 0.09s linear infinite alternate; z-index: 3; }
+@keyframes scp-shake {
+  from { transform: translate(-3%, 1%) rotate(-3deg) scale(1.08); }
+  to   { transform: translate(3%, -1%) rotate(3deg) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq.trigger::before, .scp-beam line, .piece.raging { animation: none; }
+  .scp-beam line { stroke-dashoffset: 0; }
+}

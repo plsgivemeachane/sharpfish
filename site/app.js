@@ -294,22 +294,46 @@ function playMove(uci) {
   pos = Object.assign({}, pos, { lastMove: uci, pending: true });
   render();
 
+  var moved = performance.now();
   refreshPosition().then(function (next) {
     if (token !== game.token) return;
     next.lastMove = uci;
-    pos = next;
-    game.repKeys.push(next.repKey);
-    game.boards.push(snapshot(next, uci));
+    if (!next.ate.length) return finish();
 
-    var i = game.san.length - 1;
-    game.ate[i] = next.ate;
-    if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
-    else if (next.inCheck) game.san[i] += "+";
+    // SCP-096's turn: let Black's move land, show which piece set it off, then eat.
+    var scpFrom = Object.keys(pos.board).find(function (s) { return pos.board[s] === SCP; });
+    var victim = next.ate[0].slice(1);
+    later(Math.max(0, MOVE_MS + SCP_PAUSE_MS - (performance.now() - moved)), function () {
+      scpShow = { from: scpFrom, victim: victim };
+      render();
+      later(SCP_TRIGGER_MS, function () {
+        scpShow = null;
+        animMs = SCP_EAT_MS;
+        finish();
+      });
+    });
 
-    checkGameOver();
-    render();
-    maybeEngineTurn();
+    function finish() {
+      pos = next;
+      game.repKeys.push(next.repKey);
+      game.boards.push(snapshot(next, uci));
+
+      var i = game.san.length - 1;
+      game.ate[i] = next.ate;
+      if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
+      else if (next.inCheck) game.san[i] += "+";
+
+      checkGameOver();
+      render();
+      if (next.ate.length) later(SCP_EAT_MS, maybeEngineTurn);
+      else maybeEngineTurn();
+    }
   });
+
+  // Run fn after ms, unless a new game or take back happened meanwhile
+  function later(ms, fn) {
+    setTimeout(function () { if (token === game.token) fn(); }, ms);
+  }
 }
 
 function checkGameOver() {
@@ -339,7 +363,7 @@ function newGame(color) {
   game.token++;
   if (thinking) engine.stop();
   thinking = false;
-  game.moves = []; game.san = []; game.ate = []; game.over = null;
+  game.moves = []; game.san = []; game.ate = []; game.over = null; scpShow = null;
   game.boards = []; game.view = null;
   game.playerColor = color;
   game.flipped = color === "b";
@@ -369,6 +393,7 @@ function takeBack() {
   game.view = null;
   game.over = null;
   selected = null;
+  scpShow = null;
   refreshPosition().then(function (p) {
     p.lastMove = game.moves[game.moves.length - 1];
     pos = p;
@@ -599,7 +624,7 @@ boardEl.addEventListener("pointerup", function (e) {
       // Illegal drop: let the piece fly back home from where it was let go.
       noAnimSq = null;
       var r = d.img.getBoundingClientRect();
-      anims.push({ type: "snap", to: d.from, start: performance.now(),
+      anims.push({ type: "snap", to: d.from, start: performance.now(), ms: 220,
         dx: e.clientX - (r.left + r.width / 2), dy: e.clientY - (r.top + r.height / 2) });
       render();
     }
@@ -622,7 +647,12 @@ boardEl.addEventListener("pointerup", function (e) {
 // pieces that moved. That covers your moves, engine moves, castling, take
 // backs and new games with one mechanism. Animations in progress survive a
 // redraw: they are re-created at the point they had reached.
-var ANIM_MS = 220;
+var MOVE_MS = 420;         // a normal move sliding
+var SCP_PAUSE_MS = 450;    // after Black's move lands, before SCP-096 reacts
+var SCP_TRIGGER_MS = 1300; // SCP-096 glares at the piece that saw it
+var SCP_EAT_MS = 750;      // SCP-096 lunging onto that piece
+var animMs = MOVE_MS;      // duration for the animations the next redraw starts
+var scpShow = null;        // { from, victim } while SCP-096's turn plays out
 var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 var shownBoard = null;  // board as last drawn
 var anims = [];         // { type: "slide"|"fade"|"snap", ... , start }
@@ -657,20 +687,21 @@ function diffAnims(before, after) {
       nearest(to, function (q, s) { return p !== pawn && q === pawn && dist(s, to) < 1.5; });
     if (!from) return;
     used[from] = true;
-    if (to !== noAnimSq) anims.push({ type: "slide", from: from, to: to, start: now });
+    if (to !== noAnimSq) anims.push({ type: "slide", from: from, to: to, start: now, ms: animMs });
   });
   // Pieces that vanished were captured: fade them out.
   gone.forEach(function (s) {
-    if (!used[s] && s !== noAnimSq) anims.push({ type: "fade", sq: s, piece: before[s], start: now });
+    if (!used[s] && s !== noAnimSq) anims.push({ type: "fade", sq: s, piece: before[s], start: now, ms: animMs });
   });
   noAnimSq = null;
+  animMs = MOVE_MS;
 }
 
 function applyAnims() {
   var now = performance.now(), size = boardEl.clientWidth / 8;
-  anims = anims.filter(function (a) { return now - a.start < ANIM_MS; });
+  anims = anims.filter(function (a) { return now - a.start < (a.ms || MOVE_MS); });
   anims.forEach(function (a) {
-    var opts = { duration: ANIM_MS, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" };
+    var opts = { duration: a.ms || MOVE_MS, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" };
     var el, anim;
     if (a.type === "fade") {
       el = document.createElement("img");
@@ -706,6 +737,7 @@ function render() {
   var shown = game.view === null ? null : game.boards[game.view];
   if (shown) last = shown.lastMove ? [shown.lastMove.slice(0, 2), shown.lastMove.slice(2, 4)] : [];
   var src = shown || (pos.pending ? null : pos);
+  var live = !shown;
   var eaten = src && src.ate ? src.ate.map(function (a) { return a.slice(1); }) : [];
   var seen = src && src.sees ? src.sees : [];
   if (src && src.inCheck) {
@@ -739,6 +771,7 @@ function render() {
       if (last.indexOf(sq) >= 0) cls += " last";
       if (sq === selected) cls += " sel";
       if (sq === kingSq) cls += " check";
+      if (live && scpShow && sq === scpShow.victim) cls += " trigger";
       if (eaten.indexOf(sq) >= 0) cls += " eaten";
       else if (seen.indexOf(sq) >= 0) cls += " seen";
       if (dests.indexOf(sq) >= 0) cls += " dest" + (board[sq] ? " occupied" : "");
@@ -747,13 +780,19 @@ function render() {
       if (row === 7) html += '<span class="coord file">' + FILES[file] + "</span>";
       if (board[sq]) {
         var pc = board[sq];
-        html += '<img class="piece' + (pc === SCP ? " scp" : "") + '" draggable="false" src="' +
+        var raging = live && scpShow && sq === scpShow.from;
+        html += '<img class="piece' + (pc === SCP ? " scp" : "") + (raging ? " raging" : "") + '" draggable="false" src="' +
           pieceImg(pc) + '" alt="' + pieceAlt(pc) + '">';
       }
       html += "</div>";
     }
   }
   html += '<svg id="shapes" class="shapes" viewBox="0 0 8 8" aria-hidden="true"></svg>';
+  if (live && scpShow) { // SCP-096's gaze: a beam from the piece that saw it
+    var a = sqXY(scpShow.victim), b = sqXY(scpShow.from);
+    html += '<svg class="scp-beam" viewBox="0 0 8 8" aria-hidden="true"><line x1="' + (a.x + 0.5) + '" y1="' + (a.y + 0.5) +
+      '" x2="' + (b.x + 0.5) + '" y2="' + (b.y + 0.5) + '" pathLength="1"/></svg>';
+  }
   diffAnims(shownBoard, board);
   shownBoard = board;
   boardEl.innerHTML = html;
@@ -768,6 +807,7 @@ function render() {
   // Status line
   var status;
   if (game.over) status = game.over;
+  else if (scpShow) status = "SCP-096 was seen…";
   else if (thinking) status = "Engine is thinking…";
   else if (pos.turn === game.playerColor) status = "Your move" + (pos.inCheck ? " — check!" : "");
   else status = "Waiting…";
