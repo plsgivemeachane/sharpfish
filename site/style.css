@@ -212,6 +212,11 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .btn:hover { filter: brightness(1.15); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn:disabled { opacity: 0.5; cursor: default; }
+.row.nav .btn { flex: 1; padding-left: 0; padding-right: 0; display: flex; align-items: center; justify-content: center; }
+.row.nav .btn svg { width: 14px; height: 14px; }
+.moves td[data-ply] { cursor: pointer; }
+.moves td[data-ply]:hover { background: var(--surface-2); }
+.status.reviewing { color: var(--accent); }
 .field { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
 .field input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 .field select {

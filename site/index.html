@@ -50,6 +50,12 @@
         <button id="btn-new-white" class="btn primary">New game as White</button>
         <button id="btn-new-black" class="btn">as Black</button>
       </div>
+      <div class="row nav" aria-label="Review moves">
+        <button id="btn-first" class="btn" title="First position (Home)" aria-label="First position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg></button>
+        <button id="btn-prev" class="btn" title="Previous move (&larr;)" aria-label="Previous move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/></svg></button>
+        <button id="btn-next" class="btn" title="Next move (&rarr;)" aria-label="Next move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l7-5z" fill="currentColor"/></svg></button>
+        <button id="btn-last" class="btn" title="Back to the game (End)" aria-label="Back to the game"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
+      </div>
       <div class="row">
         <button id="btn-undo" class="btn">Take back</button>
         <button id="btn-flip" class="btn">Flip board</button>
@@ -75,7 +81,7 @@
         </select>
       </label>
       <label class="field">Eval bar (stock Stockfish)
-        <input type="checkbox" id="chk-eval" checked>
+        <input type="checkbox" id="chk-eval">
       </label>
       <div class="hint">Right-click a square to circle it, right-drag to draw an arrow.
         Hold Shift (red), Alt (blue) or both (yellow) to change color. Left-click clears.</div>
