@@ -245,3 +245,15 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
   .panel { width: min(100%, 640px); }
   .moves-card { max-height: 200px; }
 }
+
+/* SCP-096 */
+.sq.eaten::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(180, 20, 20, 0.55) 0%, rgba(120, 0, 0, 0) 75%);
+}
+.piece.scp { filter: drop-shadow(0 0 3px rgba(150, 0, 0, 0.7)); }
+.moves td.skip { color: var(--muted); }
+.moves tr.scp-turn td { background: rgba(150, 20, 20, 0.16) !important; color: #e3b4b4; font-size: 13px; }
+.moves tr.scp-turn td:first-child { text-align: center; }
+.moves tr.scp-turn img, .scp-eat img { width: 18px; height: 18px; vertical-align: -4px; }
+.scp-eat { margin-right: 6px; white-space: nowrap; }

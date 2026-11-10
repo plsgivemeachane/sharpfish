@@ -54,6 +54,7 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    Square scpSq;  // SCP-096 square, SQ_NONE when absent
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -64,6 +65,13 @@ struct StateInfo {
     Bitboard   checkSquares[PIECE_TYPE_NB];
     Piece      capturedPiece;
     int        repetition;
+
+    // SCP-096: who it ate during the last move (undone in reverse order), and
+    // the color whose king it ate (COLOR_NB = none; the game is then over).
+    Color  kingEaten;
+    int    scpEatCount;
+    Piece  scpEatenPc[32];
+    Square scpEatenSq[32];
 };
 
 
@@ -97,7 +105,11 @@ class Position {
     std::string                     fen() const;
 
     // Position representation
-    Bitboard pieces() const;  // All pieces
+    Bitboard pieces() const;  // All pieces, plus SCP-096 (it blocks lines)
+    Bitboard real_pieces() const;  // All pieces without SCP-096
+    Square   scp_square() const;
+    Bitboard scp_bb() const;
+    Color    king_eaten() const;
     template<typename... PieceTypes>
     Bitboard pieces(PieceTypes... pts) const;
     Bitboard pieces(Color c) const;
@@ -195,6 +207,9 @@ class Position {
     Key  compute_material_key() const;
     void set_state() const;
     void set_check_info() const;
+    void scp_rampage(Move m, DirtyPiece& dp);
+    bool scp_legal(Move m) const;
+    void scp_undo();
 
     // Other helpers
     template<bool ComputeRay = true>
@@ -242,7 +257,14 @@ inline Piece Position::piece_on(Square s) const {
 
 inline const std::array<Piece, SQUARE_NB>& Position::piece_array() const { return board; }
 
-inline bool Position::empty(Square s) const { return piece_on(s) == NO_PIECE; }
+inline bool Position::empty(Square s) const { return !(pieces() & s); }
+
+inline Bitboard Position::real_pieces() const { return byColorBB[WHITE] | byColorBB[BLACK]; }
+inline Square   Position::scp_square() const { return st->scpSq; }
+inline Bitboard Position::scp_bb() const {
+    return st->scpSq == SQ_NONE ? Bitboard(0) : square_bb(st->scpSq);
+}
+inline Color Position::king_eaten() const { return st->kingEaten; }
 
 inline Piece Position::moved_piece(Move m) const { return piece_on(m.from_sq()); }
 

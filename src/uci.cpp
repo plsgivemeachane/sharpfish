@@ -44,6 +44,7 @@
 #include "types.h"
 #include "ucioption.h"
 #include "variant/config.h"
+#include "variant/hooks.h"
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
@@ -167,7 +168,11 @@ std::string UCIEngine::process_cmd(const std::string& cmd) {
     else if (token == "position")
         position(is);
     else if (token == "ucinewgame")
+    {
+        if constexpr (Variant::EnableScp096)
+            Variant::new_game_seed();
         engine.search_clear();
+    }
     else if (token == "isready")
         sync_cout << "readyok" << sync_endl;
 
@@ -377,6 +382,8 @@ void UCIEngine::bench(std::istream& args) {
             position(is);
         else if (token == "ucinewgame")
         {
+            if constexpr (Variant::EnableScp096)
+                Variant::new_game_seed();
             engine.search_clear();  // search_clear may take a while
             elapsed = now();
         }
@@ -443,6 +450,8 @@ void UCIEngine::benchmark(std::istream& args) {
             position(is);
         else if (token == "ucinewgame")
         {
+            if constexpr (Variant::EnableScp096)
+                Variant::new_game_seed();
             engine.search_clear();  // search_clear may take a while
         }
 
@@ -513,6 +522,8 @@ void UCIEngine::benchmark(std::istream& args) {
             position(is);
         else if (token == "ucinewgame")
         {
+            if constexpr (Variant::EnableScp096)
+                Variant::new_game_seed();
             engine.search_clear();  // search_clear may take a while
         }
     }
@@ -585,7 +596,7 @@ void UCIEngine::position(std::istringstream& is) {
 
     if (token == "startpos")
     {
-        fen = StartFEN;
+        fen = Variant::EnableScp096 ? Variant::scp_start_fen() : std::string(StartFEN);
         is >> token;  // Consume the "moves" token, if any
     }
     else if (token == "fen")

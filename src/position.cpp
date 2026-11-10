@@ -52,6 +52,7 @@ Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
 Key side, noPawns;
+Key scp[SQUARE_NB];
 
 }
 
@@ -72,7 +73,9 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
     for (Rank r = RANK_8;; --r)
     {
         for (File f = FILE_A; f <= FILE_H; ++f)
-            os << " | " << PieceToChar[pos.piece_on(make_square(f, r))];
+            os << " | "
+               << (make_square(f, r) == pos.scp_square() ? '*'
+                                                         : PieceToChar[pos.piece_on(make_square(f, r))]);
 
         os << " | " << (1 + r) << "\n +---+---+---+---+---+---+---+---+\n";
 
@@ -87,8 +90,21 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
     for (Bitboard b = pos.checkers(); b;)
         os << UCIEngine::square(pop_lsb(b)) << " ";
 
+    if (pos.scp_square() != SQ_NONE)
+    {
+        // SCP-096 info for the site: where it is, and what it ate on the last move
+        os << "\nSCP-096: " << UCIEngine::square(pos.scp_square()) << "\nSCP-096 ate: ";
+        const StateInfo* si = pos.state();
+        for (int i = 0; i < si->scpEatCount; ++i)
+            os << PieceToChar[si->scpEatenPc[i]] << UCIEngine::square(si->scpEatenSq[i]) << " ";
+        if (si->kingEaten != COLOR_NB)
+            os << PieceToChar[make_piece(si->kingEaten, KING)]
+               << UCIEngine::square(pos.square<KING>(si->kingEaten));
+    }
+
 #ifndef __NO_SYZYGY__
-    if (Tablebases::MaxCardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
+    if (!Variant::EnableScp096 && Tablebases::MaxCardinality >= popcount(pos.pieces())
+        && !pos.can_castle(ANY_CASTLING))
     {
         StateInfo st;
 
@@ -139,6 +155,9 @@ void Position::init() {
 
     Zobrist::side    = rng.rand<Key>();
     Zobrist::noPawns = rng.rand<Key>();
+
+    for (Square s = SQ_A1; s <= SQ_H8; ++s)
+        Zobrist::scp[s] = rng.rand<Key>();
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -211,7 +230,9 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
 
     std::memset(reinterpret_cast<char*>(this), 0, sizeof(Position));
     std::memset(si, 0, sizeof(StateInfo));
-    st = si;
+    st            = si;
+    st->scpSq     = SQ_NONE;
+    st->kingEaten = COLOR_NB;
 
     ss >> std::noskipws;
 
@@ -249,6 +270,17 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
 
             if (rank < RANK_1)
                 return PositionSetError("Invalid FEN. Invalid rank reached.");
+        }
+        else if (Variant::EnableScp096 && token == '*')
+        {
+            if (file >= FILE_NB)
+                return PositionSetError("Invalid FEN. Invalid file reached.");
+            if (st->scpSq != SQ_NONE)
+                return PositionSetError("Invalid FEN. More than one SCP-096.");
+
+            st->scpSq = make_square(File(file), Rank(rank));
+            byTypeBB[ALL_PIECES] |= st->scpSq;
+            ++file;
         }
         else
         {
@@ -498,7 +530,10 @@ void Position::set_state() const {
 
     set_check_info();
 
-    for (Bitboard b = pieces(); b;)
+    if (st->scpSq != SQ_NONE)
+        st->key ^= Zobrist::scp[st->scpSq];
+
+    for (Bitboard b = real_pieces(); b;)
     {
         Square s  = pop_lsb(b);
         Piece  pc = piece_on(s);
@@ -568,18 +603,29 @@ string Position::fen() const {
     int                emptyCnt;
     std::ostringstream ss;
 
+    // SCP-096 is '*'. When it ate a king (game over) it is shown on the king's square.
+    const Square scpShown =
+      king_eaten() != COLOR_NB ? square<KING>(king_eaten()) : scp_square();
+    auto cell = [&](Square sq) -> char {
+        if (sq == scpShown)
+            return '*';
+        if (sq == scp_square() || piece_on(sq) == NO_PIECE)
+            return 0;
+        return PieceToChar[piece_on(sq)];
+    };
+
     for (Rank r = RANK_8;; --r)
     {
         for (File f = FILE_A; f <= FILE_H; ++f)
         {
-            for (emptyCnt = 0; f <= FILE_H && empty(make_square(f, r)); ++f)
+            for (emptyCnt = 0; f <= FILE_H && !cell(make_square(f, r)); ++f)
                 ++emptyCnt;
 
             if (emptyCnt)
                 ss << emptyCnt;
 
             if (f <= FILE_H)
-                ss << PieceToChar[piece_on(make_square(f, r))];
+                ss << cell(make_square(f, r));
         }
 
         if (r == RANK_1)
@@ -678,6 +724,10 @@ bool Position::legal(Move m) const {
         if (!Variant::move_allowed(*this, m))
             return false;
 
+    if constexpr (Variant::EnableScp096)
+        if (st->scpSq != SQ_NONE)
+            return scp_legal(m);
+
     // Castling moves generation does not check if the castling path is clear of
     // enemy attacks, it is delayed at a later time: now!
     if (m.type_of() == CASTLING)
@@ -731,8 +781,8 @@ bool Position::pseudo_legal(const Move m) const {
     if (pc == NO_PIECE || color_of(pc) != us)
         return false;
 
-    // The destination square cannot be occupied by a friendly piece
-    if (pieces(us) & to)
+    // The destination square cannot be occupied by a friendly piece (or SCP-096)
+    if ((pieces(us) | scp_bb()) & to)
         return false;
 
     // Handle the special case of a pawn move
@@ -755,7 +805,8 @@ bool Position::pseudo_legal(const Move m) const {
     else if (!(attacks_bb(type_of(pc), from, pieces()) & to))
         return false;
 
-    if (checkers() && type_of(pc) != KING)
+    // With SCP-096 a check can also be answered by feeding it the checker
+    if (checkers() && type_of(pc) != KING && st->scpSq == SQ_NONE)
     {
         // In double check, only a king move can evade
         if (more_than_one(checkers()))
@@ -861,10 +912,14 @@ void Position::do_move(Move                      m,
     Piece  pc       = piece_on(from);
     Piece  captured = m.type_of() == EN_PASSANT ? make_piece(them, PAWN) : piece_on(to);
 
-    dp.pc     = pc;
-    dp.from   = from;
-    dp.to     = to;
-    dp.add_sq = SQ_NONE;
+    dp.pc           = pc;
+    dp.from         = from;
+    dp.to           = to;
+    dp.add_sq       = SQ_NONE;
+    dp.forceRefresh = false;
+
+    st->kingEaten   = COLOR_NB;
+    st->scpEatCount = 0;
 
     assert(color_of(pc) == us);
     assert(captured == NO_PIECE || color_of(captured) == (m.type_of() != CASTLING ? them : us));
@@ -1053,6 +1108,13 @@ void Position::do_move(Move                      m,
     // Calculate checkers bitboard (if move gives check)
     st->checkersBB = givesCheck ? attackers_to(square<KING>(them)) & pieces(us) : 0;
 
+    // SCP-096 takes its turn(s) right after the move
+    if (Variant::EnableScp096 && st->scpSq != SQ_NONE)
+    {
+        scp_rampage(m, dp);
+        st->checkersBB = attackers_to(square<KING>(them)) & pieces(us);
+    }
+
     sideToMove = ~sideToMove;
 
     // Update king attacks used for fast check detection
@@ -1096,6 +1158,9 @@ void Position::undo_move(Move m) {
     assert(m.is_ok());
 
     sideToMove = ~sideToMove;
+
+    if (Variant::EnableScp096 && st->scpEatCount)
+        scp_undo();
 
     Color  us   = sideToMove;
     Square from = m.from_sq();
@@ -1344,6 +1409,125 @@ void Position::do_castling(Color               us,
     remove_piece(Do ? rfrom : rto, dts);
     put_piece(make_piece(us, KING), Do ? to : from, dts);
     put_piece(make_piece(us, ROOK), Do ? rto : rfrom, dts);
+}
+
+
+// SCP-096 eats, one watcher per step, right after a move: any piece that
+// attacks its square is a watcher (a king only sees the squares next to it).
+// With several watchers one is picked at random. SCP-096 lands on the eaten
+// piece's square and goes again while anything still sees it. Eating a king
+// ends the game: the king stays on the board and kingEaten records it.
+void Position::scp_rampage(Move m, DirtyPiece& dp) {
+
+    const Key before = st->previous->key;
+
+    for (int step = 0;; ++step)
+    {
+        const Square s        = st->scpSq;
+        Bitboard     watchers = attackers_to(s) & real_pieces();
+        if (!watchers)
+            break;
+
+        for (int i = Variant::scp_pick(before, m, step, popcount(watchers)); i > 0; --i)
+            watchers &= watchers - 1;
+
+        const Square v  = lsb(watchers);
+        const Piece  vp = piece_on(v);
+        const Color  vc = color_of(vp);
+
+        if (type_of(vp) == KING)
+        {
+            st->kingEaten = vc;
+            break;
+        }
+
+        remove_piece(v);
+        byTypeBB[ALL_PIECES] ^= s;  // SCP-096 leaves s...
+        byTypeBB[ALL_PIECES] |= v;  // ...and lands on the eaten piece
+        st->scpSq = v;
+
+        st->key ^= Zobrist::scp[s] ^ Zobrist::scp[v] ^ Zobrist::psq[vp][v];
+        if (type_of(vp) == PAWN)
+            st->pawnKey ^= Zobrist::psq[vp][v];
+        else
+        {
+            st->nonPawnMaterial[vc] -= PieceValue[vp];
+            st->nonPawnKey[vc] ^= Zobrist::psq[vp][v];
+            if (type_of(vp) <= BISHOP)
+                st->minorPieceKey ^= Zobrist::psq[vp][v];
+        }
+        st->materialKey ^= Zobrist::psq[vp][8 + pieceCount[vp]];
+        st->rule50 = 0;
+
+        // An eaten rook takes its castling right with it
+        if (castlingRightsMask[v] & st->castlingRights)
+        {
+            st->key ^= Zobrist::castling[st->castlingRights];
+            st->castlingRights &= ~castlingRightsMask[v];
+            st->key ^= Zobrist::castling[st->castlingRights];
+        }
+
+        st->scpEatenPc[st->scpEatCount] = vp;
+        st->scpEatenSq[st->scpEatCount] = v;
+        ++st->scpEatCount;
+        dp.forceRefresh = true;
+    }
+
+    // En passant survives only if both pawns involved are still there.
+    // sideToMove is still the side that made the move.
+    if (st->scpEatCount && st->epSquare != SQ_NONE)
+    {
+        const Color  us = sideToMove;
+        const Square ep = st->epSquare;
+        if (piece_on(ep + pawn_push(us)) != make_piece(us, PAWN)
+            || !(attacks_bb<PAWN>(ep, us) & pieces(~us, PAWN)))
+        {
+            st->key ^= Zobrist::enpassant[file_of(ep)];
+            st->epSquare = SQ_NONE;
+        }
+    }
+}
+
+// Puts back what SCP-096 ate during the last move and returns it to where it was
+void Position::scp_undo() {
+
+    byTypeBB[ALL_PIECES] ^= st->scpSq;
+    for (int i = st->scpEatCount - 1; i >= 0; --i)
+        put_piece(st->scpEatenPc[i], st->scpEatenSq[i]);
+    byTypeBB[ALL_PIECES] |= st->previous->scpSq;
+}
+
+// Legality with SCP-096 on the board. A move is legal if, after it and
+// everything SCP-096 eats, the mover's king is not attacked. A move after
+// which a king gets eaten is legal (it ends the game). Nothing is legal once
+// a king has been eaten.
+bool Position::scp_legal(Move m) const {
+
+    const Color us = sideToMove;
+
+    if (st->kingEaten != COLOR_NB)
+        return false;
+
+    if (m.type_of() == CASTLING)
+    {
+        if (checkers())
+            return false;
+
+        Square    kto  = relative_square(us, m.to_sq() > m.from_sq() ? SQ_G1 : SQ_C1);
+        Direction step = kto > m.from_sq() ? WEST : EAST;
+        for (Square s = kto; s != m.from_sq(); s += step)
+            if (attackers_to_exist(s, pieces(), ~us))
+                return false;
+    }
+
+    // Play it out on the real board, then take it back
+    Position& self = const_cast<Position&>(*this);
+    StateInfo tmp;
+    self.do_move(m, tmp);
+    const bool ok = tmp.kingEaten != COLOR_NB
+                 || !self.attackers_to_exist(self.square<KING>(us), self.pieces(), ~us);
+    self.undo_move(m);
+    return ok;
 }
 
 
@@ -1627,8 +1811,10 @@ bool Position::pos_is_ok() const {
 #else
         assert(0 && "pos_is_ok: Default");
 #endif
+    // A king SCP-096 ate stays on the board with the game over, so it may be "attacked"
     if (count<KING>(WHITE) != 1 || count<KING>(BLACK) != 1
-        || attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove))
+        || (king_eaten() == COLOR_NB
+            && attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove)))
 #ifdef __EMSCRIPTEN__
         return false;
 #else
@@ -1659,7 +1845,7 @@ bool Position::pos_is_ok() const {
             assert(0 && "pos_is_ok: En passant square");
     }
 
-    if ((pieces(WHITE) & pieces(BLACK)) || (pieces(WHITE) | pieces(BLACK)) != pieces()
+    if ((pieces(WHITE) & pieces(BLACK)) || (pieces(WHITE) | pieces(BLACK)) != real_pieces()
         || popcount(pieces(WHITE)) > 16 || popcount(pieces(BLACK)) > 16)
 #ifdef __EMSCRIPTEN__
         return false;

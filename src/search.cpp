@@ -741,6 +741,14 @@ Value Search::Worker::search(
     const bool     allNode  = !(PvNode || cutNode);
     const bool     seekMate = rootDepth >= 16 && std::abs(rootMoves[pvIdx].score) >= 2000;
 
+    if (!rootNode)
+    {
+        // SCP-096 ate a king on the last move: the game is over
+        if constexpr (Variant::EnableScp096)
+            if (pos.king_eaten() != COLOR_NB)
+                return pos.king_eaten() == pos.side_to_move() ? mated_in(ss->ply) : mate_in(ss->ply);
+    }
+
     // Dive into quiescence search when the depth reaches zero
     if (depth <= 0)
         return qsearch<PvNode ? PV : NonPV>(pos, ss, alpha, beta);
@@ -1680,6 +1688,11 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     assert(alpha >= -VALUE_INFINITE && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
+
+    // SCP-096 ate a king on the last move: the game is over
+    if constexpr (Variant::EnableScp096)
+        if (pos.king_eaten() != COLOR_NB)
+            return pos.king_eaten() == pos.side_to_move() ? mated_in(ss->ply) : mate_in(ss->ply);
 
     // Check if we have an upcoming move that draws by repetition
     if (alpha < VALUE_DRAW && pos.upcoming_repetition(ss->ply))

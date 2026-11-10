@@ -31,7 +31,7 @@ namespace Stockfish::Variant {
 
 // What your variant is, shown by "uci" as "id name Stockfish variant (<this>)".
 // Example: "Knights only". "" keeps the default Stockfish name.
-constexpr const char* EngineName = "";
+constexpr const char* EngineName = "SCP-096";
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
@@ -87,7 +87,17 @@ constexpr bool EnableCustomRules = false;
 // -----------------------------------------------------------------------------
 // Null-move pruning is a big speed-up, but it is unsound in some variants
 // (e.g. when passing would be good). Turn it off if your rules need that.
-constexpr bool EnableNullMove = true;
+constexpr bool EnableNullMove = false;  // off: SCP-096 makes passing unsound
+
+// -----------------------------------------------------------------------------
+// SCP-096. An immortal monster ('*' in FEN) starts on a random empty square of
+// ranks 4-5. It never moves on its own and cannot be captured, and it blocks
+// lines like a piece. After every move, if any piece of either color "sees" it
+// (attacks its square; a king only sees adjacent squares), SCP-096 eats one of
+// those watchers (random if several) and lands on its square. It keeps eating
+// at once while anything still sees it. A side whose king is eaten loses.
+// This rule binds BOTH sides: the human and the engine.
+constexpr bool EnableScp096 = true;
 
 }  // namespace Stockfish::Variant
 

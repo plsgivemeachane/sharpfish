@@ -65,8 +65,10 @@ function Engine(file) {
 // ---------------------------------------------------------------- Helpers
 var FILES = "abcdefgh";
 var PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+var SCP = "*"; // SCP-096 in the engine's FEN: no color, never moves on its own turn
 
 function pieceImg(p) { // p is a FEN letter, e.g. "N" or "q"
+  if (p === SCP) return "pieces/scp096.png";
   var color = p === p.toUpperCase() ? "w" : "b";
   return "pieces/" + color + p.toUpperCase() + ".svg";
 }
@@ -83,7 +85,8 @@ function parseBoard(fen) { // -> { e4: "P", ... }
   return board;
 }
 
-function isWhite(p) { return p && p === p.toUpperCase(); }
+function isWhite(p) { return !!p && /[A-Z]/.test(p); }
+function pieceAlt(p) { return p === SCP ? "SCP-096" : (isWhite(p) ? "white " : "black ") + PIECE_NAMES[p.toLowerCase()]; }
 
 // Standard algebraic notation for a UCI move, using the board and the legal
 // moves before the move. "+"/"#" are added later, once the engine reports
@@ -114,7 +117,7 @@ function toSan(pos, uci) {
 }
 
 function insufficientMaterial(board) {
-  var others = Object.values(board).filter(function (p) { return p.toUpperCase() !== "K"; });
+  var others = Object.values(board).filter(function (p) { return p !== SCP && p.toUpperCase() !== "K"; });
   return others.length === 0 || (others.length === 1 && /[nbNB]/.test(others[0]));
 }
 
@@ -127,7 +130,8 @@ var game = {
   playerColor: "w",
   flipped: false,
   over: null,       // result text when the game has ended
-  boards: [],       // snapshot after each ply (0 = start): { board, lastMove, turn, inCheck }
+  boards: [],       // snapshot after each ply (0 = start): { board, lastMove, turn, inCheck, ate }
+  ate: [],          // per move: what SCP-096 ate right after it, e.g. ["Qd3", "ra3"]
   view: null,       // ply being reviewed, or null for the live position
   token: 0          // bumped on new game / take back to ignore stale engine replies
 };
@@ -148,11 +152,12 @@ function refreshPosition() {
   return engine.request([positionCmd(), "d", "go perft 1", "isready"],
     function (l) { return l === "readyok"; }
   ).then(function (lines) {
-    var fen = "", inCheck = false, legal = [];
+    var fen = "", inCheck = false, legal = [], ate = [];
     lines.forEach(function (l) {
       var m;
       if (l.indexOf("Fen: ") === 0) fen = l.slice(5).trim();
       else if (l.indexOf("Checkers:") === 0) inCheck = l.slice(9).trim().length > 0;
+      else if (l.indexOf("SCP-096 ate:") === 0) ate = l.slice(12).trim().split(/\s+/).filter(Boolean);
       else if ((m = l.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/))) legal.push(m[1]);
     });
     var parts = fen.split(" ");
@@ -163,7 +168,8 @@ function refreshPosition() {
       halfmove: Number(parts[4]) || 0,
       repKey: parts.slice(0, 4).join(" "),
       legal: legal,
-      inCheck: inCheck
+      inCheck: inCheck,
+      ate: ate
     };
   });
 }
@@ -263,7 +269,7 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck };
+  return { board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [] };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -280,6 +286,7 @@ function playMove(uci) {
   var token = game.token;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
   game.san.push(toSan(pos, uci));
+  game.ate.push([]);
   game.moves.push(uci);
   selected = null;
   pos = Object.assign({}, pos, { lastMove: uci, pending: true });
@@ -293,6 +300,7 @@ function playMove(uci) {
     game.boards.push(snapshot(next, uci));
 
     var i = game.san.length - 1;
+    game.ate[i] = next.ate;
     if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
     else if (next.inCheck) game.san[i] += "+";
 
@@ -304,7 +312,11 @@ function playMove(uci) {
 
 function checkGameOver() {
   var winner = pos.turn === "w" ? "Black" : "White";
-  if (!pos.legal.length) {
+  var kings = Object.values(pos.board);
+  if (kings.indexOf("K") < 0 || kings.indexOf("k") < 0) {
+    var white = kings.indexOf("K") < 0;
+    game.over = "SCP-096 ate the " + (white ? "white" : "black") + " king — " + (white ? "Black" : "White") + " wins";
+  } else if (!pos.legal.length) {
     game.over = pos.inCheck ? "Checkmate — " + winner + " wins" : "Stalemate — draw";
   } else if (pos.halfmove >= 100) {
     game.over = "Draw by the 50-move rule";
@@ -325,7 +337,7 @@ function newGame(color) {
   game.token++;
   if (thinking) engine.stop();
   thinking = false;
-  game.moves = []; game.san = []; game.over = null;
+  game.moves = []; game.san = []; game.ate = []; game.over = null;
   game.boards = []; game.view = null;
   game.playerColor = color;
   game.flipped = color === "b";
@@ -348,7 +360,7 @@ function takeBack() {
   thinking = false;
   // Undo back to the last position where it is the player's turn.
   do {
-    game.moves.pop(); game.san.pop(); game.repKeys.pop();
+    game.moves.pop(); game.san.pop(); game.ate.pop(); game.repKeys.pop();
   } while (game.moves.length && (game.moves.length % 2 === 0 ? "w" : "b") !== game.playerColor);
   // If that leaves the engine to move (playing Black, all undone), it moves again below.
   game.boards.length = game.moves.length + 1;
@@ -692,6 +704,7 @@ function render() {
   var shown = game.view === null ? null : game.boards[game.view];
   if (shown) last = shown.lastMove ? [shown.lastMove.slice(0, 2), shown.lastMove.slice(2, 4)] : [];
   var src = shown || (pos.pending ? null : pos);
+  var eaten = src && src.ate ? src.ate.map(function (a) { return a.slice(1); }) : [];
   if (src && src.inCheck) {
     var k = src.turn === "w" ? "K" : "k";
     kingSq = Object.keys(src.board).find(function (s) { return src.board[s] === k; });
@@ -723,14 +736,15 @@ function render() {
       if (last.indexOf(sq) >= 0) cls += " last";
       if (sq === selected) cls += " sel";
       if (sq === kingSq) cls += " check";
+      if (eaten.indexOf(sq) >= 0) cls += " eaten";
       if (dests.indexOf(sq) >= 0) cls += " dest" + (board[sq] ? " occupied" : "");
       html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell">';
       if (col === 0) html += '<span class="coord rank">' + rank + "</span>";
       if (row === 7) html += '<span class="coord file">' + FILES[file] + "</span>";
       if (board[sq]) {
         var pc = board[sq];
-        html += '<img class="piece" draggable="false" src="' + pieceImg(pc) + '" alt="' +
-          (isWhite(pc) ? "white " : "black ") + PIECE_NAMES[pc.toLowerCase()] + '">';
+        html += '<img class="piece' + (pc === SCP ? " scp" : "") + '" draggable="false" src="' +
+          pieceImg(pc) + '" alt="' + pieceAlt(pc) + '">';
       }
       html += "</div>";
     }
@@ -775,8 +789,19 @@ function renderMoves() {
     if (j >= game.san.length) return "<td></td>";
     return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '">' + game.san[j] + "</td>";
   }
-  for (var i = 0; i < game.san.length; i += 2) {
-    rows += "<tr><td>" + (i / 2 + 1) + ".</td>" + cell(i) + cell(i + 1) + "</tr>";
+  // Three movers: White, Black and SCP-096. A SCP-096 turn gets its own row,
+  // so a row can hold just White's move ("…" stands in for the other half).
+  var i = 0;
+  while (i < game.san.length) {
+    var num = Math.floor(i / 2) + 1;
+    var row = "<tr><td>" + num + ".</td>";
+    if (i % 2) row += '<td class="skip">…</td>' + cell(i);
+    else if (game.ate[i] && game.ate[i].length) row += cell(i) + '<td class="skip"></td>';
+    else row += cell(i) + cell(i + 1);
+    rows += row + "</tr>";
+    var j = i % 2 || (game.ate[i] && game.ate[i].length) || i + 1 >= game.san.length ? i : i + 1;
+    if (game.ate[j] && game.ate[j].length) rows += scpRow(game.ate[j]);
+    i = j + 1;
   }
   body.innerHTML = rows;
   $("moves-empty").hidden = game.san.length > 0;
@@ -789,9 +814,21 @@ function renderMoves() {
   else if (curEl) curEl.scrollIntoView({ block: "nearest" });
 }
 
+function scpRow(ate) {
+  var items = ate.map(function (a) {
+    return '<span class="scp-eat"><img src="' + pieceImg(a[0]) + '" alt="' + pieceAlt(a[0]) + '">' + a.slice(1) + "</span>";
+  }).join(" ");
+  return '<tr class="scp-turn"><td><img src="' + pieceImg(SCP) + '" alt="SCP-096"></td>' +
+    '<td colspan="2">SCP-096 eats ' + items + "</td></tr>";
+}
+
 function pgn() {
   var out = "";
-  game.san.forEach(function (s, i) { out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " "; });
+  game.san.forEach(function (s, i) {
+    var resume = i % 2 === 1 && game.ate[i - 1] && game.ate[i - 1].length;
+    out += (i % 2 === 0 ? (i / 2 + 1) + ". " : resume ? (i + 1) / 2 + "... " : "") + s + " ";
+    if (game.ate[i] && game.ate[i].length) out += "{SCP-096 eats " + game.ate[i].join(" ") + "} ";
+  });
   if (game.over) {
     out += /White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2";
   }
@@ -840,14 +877,10 @@ $("chk-eval").onchange = toggleEval;
     return;
   }
   engine = new Engine(window.ENGINE_FILE);
-  $("evalbar").classList.toggle("off", !$("chk-eval").checked); // off unless ticked
-  if (window.STOCK_ENGINE_FILE) {
-    evalEngine = new Engine(window.STOCK_ENGINE_FILE);
-    evalEngine.worker.onerror = function () { $("evalbar").classList.add("off"); evalEngine = null; };
-    evalEngine.request(["uci"], function (l) { return l === "uciok"; });
-  } else {
-    $("evalbar").classList.add("off");
-  }
+  // SCP-096 changes the start position and the moves, so stock Stockfish
+  // can't follow the game: no eval bar (evalEngine stays null).
+  $("chk-eval").closest("label").style.display = "none";
+  $("evalbar").classList.add("off");
   engine.worker.onerror = function (e) {
     $("status").textContent = "Engine failed to load: " + (e.message || "unknown error");
   };

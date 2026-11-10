@@ -136,6 +136,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
             && pos.count<ALL_PIECES>() >= MIN_PC_COUNT_HYBRID
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE  // excludes castling
+            && !dirtyPiece.forceRefresh
         )
         {
             update_accumulator_hybrid(perspective, pos, featureTransformer, mut_latest(),
@@ -160,7 +161,8 @@ usize AccumulatorStack::find_last_usable_accumulator(Color perspective) const no
 
         // The feature set requires a refresh when the king crosses the center
         // of the board (any king move in the full build).
-        if (PSQFeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective))
+        if (PSQFeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective)
+            || accumulators[curr_idx].dirtyPiece.forceRefresh)
             return curr_idx;
     }
 
@@ -782,7 +784,7 @@ void update_accumulator_hybrid(Color                     perspective,
     const auto& currentPieces  = pos.piece_array();
     auto        previousPieces = currentPieces;  // copies 64 bytes!
 
-    Bitboard previousPieceBB = pos.pieces();
+    Bitboard previousPieceBB = pos.real_pieces();
 
     assert(previousPieces[newKsq] == dirtyPiece.pc);
 
@@ -814,7 +816,7 @@ void update_accumulator_hybrid(Color                     perspective,
 
     Bitboard newChangedBB = get_changed_pieces(newEntry.pieces, currentPieces);
     Bitboard newRemovedBB = newChangedBB & newEntry.pieceBB;
-    Bitboard newAddedBB   = newChangedBB & pos.pieces();
+    Bitboard newAddedBB   = newChangedBB & pos.real_pieces();
 
 #if defined(USE_AVX512ICL)
     PSQFeatureSet::write_indices(oldEntry.pieces, previousPieces, oldRemovedBB, oldAddedBB,
@@ -912,7 +914,7 @@ void update_accumulator_hybrid(Color                     perspective,
     }
 
     newEntry.pieces  = currentPieces;
-    newEntry.pieceBB = pos.pieces();
+    newEntry.pieceBB = pos.real_pieces();
 
     target.computed[perspective] = true;
 }
@@ -936,7 +938,7 @@ void update_accumulator_refresh_cache(Color                     perspective,
 
     const Bitboard changedBB = get_changed_pieces(entry.pieces, pos.piece_array());
     Bitboard       removedBB = changedBB & entry.pieceBB;
-    Bitboard       addedBB   = changedBB & pos.pieces();
+    Bitboard       addedBB   = changedBB & pos.real_pieces();
 
 #if defined(USE_AVX512ICL)
     PSQFeatureSet::write_indices(entry.pieces, pos.piece_array(), removedBB, addedBB, perspective,
@@ -954,7 +956,7 @@ void update_accumulator_refresh_cache(Color                     perspective,
     }
 #endif
 
-    entry.pieceBB = pos.pieces();
+    entry.pieceBB = pos.real_pieces();
     entry.pieces  = pos.piece_array();
 
 #ifndef USE_LITE_NET

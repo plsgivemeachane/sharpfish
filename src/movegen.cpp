@@ -217,7 +217,7 @@ Move* generate_all(const Position& pos, Move* moveList) {
     if (Type != EVASIONS || !more_than_one(pos.checkers()))
     {
         target = Type == EVASIONS     ? Attacks::between_bb(ksq, lsb(pos.checkers()))
-               : Type == NON_EVASIONS ? ~pos.pieces(Us)
+               : Type == NON_EVASIONS ? ~(pos.pieces(Us) | pos.scp_bb())
                : Type == CAPTURES     ? pos.pieces(~Us)
                                       : ~pos.pieces();  // QUIETS
 
@@ -228,11 +228,13 @@ Move* generate_all(const Position& pos, Move* moveList) {
         moveList = generate_moves<Us, QUEEN>(pos, moveList, target);
     }
 
-    Bitboard b = Attacks::attacks_bb<KING>(ksq) & (Type == EVASIONS ? ~pos.pieces(Us) : target);
+    Bitboard b = Attacks::attacks_bb<KING>(ksq)
+               & (Type == EVASIONS ? ~(pos.pieces(Us) | pos.scp_bb()) : target);
 
     moveList = splat_moves(moveList, ksq, b);
 
-    if ((Type == QUIETS || Type == NON_EVASIONS) && pos.can_castle(Us & ANY_CASTLING))
+    if ((Type == QUIETS || Type == NON_EVASIONS) && !pos.checkers()
+        && pos.can_castle(Us & ANY_CASTLING))
         for (CastlingRights cr : {Us & KING_SIDE, Us & QUEEN_SIDE})
             if (!pos.castling_impeded(cr) && pos.can_castle(cr))
                 *moveList++ = Move::make<CASTLING>(ksq, pos.castling_rook_square(cr));
@@ -257,6 +259,13 @@ Move* generate(const Position& pos, Move* moveList) {
 
     Color us = pos.side_to_move();
 
+    // With SCP-096 a check can be met by any move that gets the checker eaten,
+    // so in check we hand out every move and let legal() sort them out.
+    if constexpr (Type == EVASIONS && Variant::EnableScp096)
+        if (pos.scp_square() != SQ_NONE)
+            return us == WHITE ? generate_all<WHITE, NON_EVASIONS>(pos, moveList)
+                               : generate_all<BLACK, NON_EVASIONS>(pos, moveList);
+
     return us == WHITE ? generate_all<WHITE, Type>(pos, moveList)
                        : generate_all<BLACK, Type>(pos, moveList);
 }
@@ -280,7 +289,8 @@ Move* generate<LEGAL>(const Position& pos, Move* moveList) {
     moveList =
       pos.checkers() ? generate<EVASIONS>(pos, moveList) : generate<NON_EVASIONS>(pos, moveList);
     while (cur != moveList)
-        if ((((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT)
+        if ((((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT
+              || (Variant::EnableScp096 && pos.scp_square() != SQ_NONE))
              && !pos.legal(*cur))
             || (Variant::HasRuleFilter && !Variant::move_allowed(pos, *cur)))
             *cur = *(--moveList);

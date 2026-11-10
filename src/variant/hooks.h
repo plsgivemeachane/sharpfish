@@ -30,6 +30,7 @@
 #define VARIANT_HOOKS_H_INCLUDED
 
 #include <random>
+#include <string>
 
 #include "../bitboard.h"
 #include "../position.h"
@@ -141,6 +142,36 @@ inline int root_bias(const Position& pos, Move m) {
     if constexpr (RootRandomnessCp > 0)
         cp += root_noise_cp(pos, m);
     return cp_to_internal(cp);
+}
+
+// SCP-096 randomness. One seed per game: it picks the start square and which
+// watcher gets eaten. Every pick is a hash of (seed, position, move, step), so
+// the same game always plays out the same way inside one engine, and legality
+// checks agree with the moves actually made. "ucinewgame" re-rolls the seed.
+inline u64 GameSeed = u64(std::random_device{}()) << 32 | std::random_device{}();
+
+inline void new_game_seed() { GameSeed = u64(std::random_device{}()) << 32 | std::random_device{}(); }
+
+inline u64 scp_hash(u64 x) {
+    x ^= x >> 33, x *= 0xFF51AFD7ED558CCDULL, x ^= x >> 33;
+    x *= 0xC4CEB9FE1A85EC53ULL, x ^= x >> 33;
+    return x;
+}
+
+// Index in [0, n) of the watcher eaten at this step.
+inline int scp_pick(Key beforeKey, Move m, int step, int n) {
+    u64 x = beforeKey ^ (u64(m.raw()) * 0x9E3779B97F4A7C15ULL) ^ GameSeed ^ (u64(step + 1) << 56);
+    return int(scp_hash(x) % u64(n));
+}
+
+// The start position with SCP-096 on a random square of rank 4 or 5.
+inline std::string scp_start_fen() {
+    int idx  = int(scp_hash(GameSeed ^ 0x5C9096ULL) % 16);
+    int file = idx % 8;
+    std::string row = (file ? std::to_string(file) : "") + "*"
+                    + (file < 7 ? std::to_string(7 - file) : "");
+    return std::string("rnbqkbnr/pppppppp/8/") + (idx < 8 ? row : "8") + "/"
+         + (idx < 8 ? "8" : row) + "/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 }
 
 // The rules filter. pos is the position before the move.

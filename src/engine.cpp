@@ -160,6 +160,10 @@ std::variant<u64, PositionSetError>
 Engine::perft(const std::string& fen, Depth depth, bool isChess960) {
     verify_network();
 
+    // SCP-096 ate a king: the game is over and the FEN has no king to rebuild
+    if (pos.king_eaten() != COLOR_NB && fen == pos.fen())
+        return u64(0);
+
     return Benchmark::perft(fen, depth, isChess960);
 }
 
