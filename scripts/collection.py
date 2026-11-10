@@ -20,8 +20,14 @@ def run(*args, cwd=None, **kwargs):
 
 
 def revision(branch):
-    return run('git', 'rev-parse', '--verify', '--end-of-options', branch + '^{commit}',
-               stdout=subprocess.PIPE, text=True).stdout.strip()
+    # A fresh clone has remote-tracking refs but only one local branch.
+    for candidate in (branch, 'refs/remotes/origin/' + branch):
+        result = subprocess.run(['git', 'rev-parse', '--quiet', '--verify',
+                                 '--end-of-options', candidate + '^{commit}'],
+                                cwd=ROOT, stdout=subprocess.PIPE, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    raise ValueError(f'No committed ref for {branch!r}; fetch or create the branch first')
 
 
 def load_manifest():

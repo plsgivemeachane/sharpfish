@@ -94,6 +94,11 @@ class CollectionTest(unittest.TestCase):
                 collection.add(argparse.Namespace(branch=branch, slug=slug, title='T', description='D'))
         self.assertEqual(len(collection.load_manifest()['variants']), 1)
 
+    def test_fresh_clone_remote_tracking_branch(self):
+        commit = self.git('rev-parse', 'HEAD')
+        self.git('update-ref', 'refs/remotes/origin/remote-only', commit)
+        self.assertEqual(collection.revision('remote-only'), commit)
+
 
 if __name__ == '__main__':
     unittest.main()

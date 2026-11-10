@@ -24,6 +24,8 @@ python3 scripts/collection.py build
 The build resolves every branch to a committed revision, creates a temporary
 source snapshot for it, runs its existing web build and smoke test, and stages a new
 archive. The previous `deploy/` directory is left intact if any variant fails.
+Local refs take precedence; when absent, `origin/<branch>` is used so a fresh
+clone works after `git fetch origin`. Fetch before rebuilding remote updates.
 The resulting layout is:
 
 ```
