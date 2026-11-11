@@ -1015,11 +1015,14 @@ function pgn() {
 }
 
 // ---------------------------------------------------------------- Start
-$("game-mode").onchange = function () {
-  var bots = this.value === "bots";
+function syncGameMode() {
+  var bots = $("game-mode").value === "bots";
   $("bot-match-options").hidden = !bots;
   $("btn-new-white").parentElement.hidden = bots;
-};
+}
+$("game-mode").onchange = syncGameMode;
+window.addEventListener("pageshow", syncGameMode);
+syncGameMode();
 ["white-bot", "black-bot"].forEach(function (id) {
   BOT_GROUPS.forEach(function (group) {
     group.bots.forEach(function (b) {
