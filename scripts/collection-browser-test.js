@@ -43,7 +43,20 @@ const base = process.argv[3] || "http://localhost:8096";
       }
       await page.locator("#chk-eval").check();
       await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");
-      console.log(`PASS ${link}: board, human move, bot reply, branch-specific evaluation behavior`);
+      await page.locator("#chk-eval").uncheck();
+      await page.locator("#game-mode").selectOption("bots");
+      await page.locator("#white-bot").selectOption("pebble");
+      await page.locator("#black-bot").selectOption("martin");
+      await page.locator("#btn-bot-match").click();
+      await page.waitForFunction(() => game.botMatch && game.moves.length >= 2, null, { timeout: 45000 });
+      assert.equal(await page.evaluate(() => canMove() || canPremove()), false);
+      assert.match(await page.locator("#tag-bottom").innerText(), /Pebble/);
+      assert.match(await page.locator("#tag-top").innerText(), /Martin/);
+      await page.locator("#game-mode").selectOption("human");
+      await page.locator("#btn-new-white").click();
+      await page.waitForFunction(() => !game.botMatch && pos && !pos.pending && pos.turn === "w");
+      assert(await page.evaluate(() => canMove()));
+      console.log(`PASS ${link}: human play, bot match and evaluation`);
       await page.getByRole("link", { name: "← All variants" }).click();
       await page.waitForURL(`${base}/`);
     }
