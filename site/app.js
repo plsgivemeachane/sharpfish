@@ -14,17 +14,18 @@ var YOU_AVATAR = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy
        '<circle cx="16" cy="12.5" r="5.5" fill="#e8f2ff"/>' +
        '<path d="M6 27.5c1.6-5.2 5.4-8 10-8s8.4 2.8 10 8a16 16 0 0 1-20 0z" fill="#e8f2ff"/></svg>';
 var tagState = new WeakMap();
-function setTag(el, who, engineName) {
-  var name = who === "you" ? "You" : bot.id === "stockfish" ? engineName : bot.name;
-  var rating = who === "you" ? "" : botRating(bot);
-  var key = who + name + rating + bot.avatar;
+function setTag(el, who, engineName, selectedBot) {
+  var displayBot = selectedBot || bot;
+  var name = who === "you" ? "You" : displayBot.id === "stockfish" ? engineName : displayBot.name;
+  var rating = who === "you" ? "" : botRating(displayBot);
+  var key = who + name + rating + displayBot.avatar;
   if (tagState.get(el) === key) return; // skip rebuilding on every render
   tagState.set(el, key);
-  var avatarClass = who === "you" ? "avatar-you" : bot.id === "stockfish" ? "avatar-engine" : "avatar-bot";
+  var avatarClass = who === "you" ? "avatar-you" : displayBot.id === "stockfish" ? "avatar-engine" : "avatar-bot";
   el.innerHTML = '<span class="avatar ' + avatarClass + '"></span><span class="tag-name"></span>' +
     '<span class="tag-rating"></span>';
   if (who === "you") el.firstChild.innerHTML = YOU_AVATAR;
-  else el.firstChild.appendChild(avatarImg(bot));
+  else el.firstChild.appendChild(avatarImg(displayBot));
   el.children[1].textContent = name;
   el.children[2].textContent = rating ? "(" + rating + ")" : "";
 }
@@ -206,7 +207,8 @@ function engineMove() {
   thinking = true;
   render();
 
-  engine.request([positionCmd(), "go movetime " + $("sel-time").value],
+  var activeBot = game.botMatch ? game.matchBots[turn] : bot;
+  engine.request(strengthCommands(activeBot).concat([positionCmd(), "go movetime " + $("sel-time").value]),
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
       if (token !== game.token || l.indexOf("info depth") !== 0) return;
@@ -392,10 +394,10 @@ function checkGameOver() {
 }
 
 function maybeEngineTurn() {
-  if (pos && !pos.pending && !thinking && !game.over && pos.turn !== game.playerColor) engineMove();
+  if (pos && !pos.pending && !thinking && !game.over && (game.botMatch || pos.turn !== game.playerColor)) engineMove();
 }
 
-function newGame(color) {
+function newGame(color, botMatch) {
   clearPremoves();
   var token = ++game.token;
   pos = null;
@@ -403,6 +405,8 @@ function newGame(color) {
   thinking = false;
   game.moves = []; game.san = []; game.ate = []; game.over = null; scpShow = null;
   game.boards = []; game.view = null;
+  game.botMatch = !!botMatch;
+  game.matchBots = botMatch ? { w: findBot($("white-bot").value), b: findBot($("black-bot").value) } : null;
   game.playerColor = color;
   game.flipped = color === "b";
   selected = null;
@@ -419,6 +423,7 @@ function newGame(color) {
 }
 
 function takeBack() {
+  if (game.botMatch) return;
   clearPremoves();
   if (!game.moves.length) return;
   var token = ++game.token;
@@ -467,11 +472,14 @@ function chooseBot(b) {
   render();
 }
 
-function setStrength() {
-  var cmds = bot.elo === FULL
+function strengthCommands(selectedBot) {
+  return selectedBot.elo === FULL
     ? ["setoption name UCI_LimitStrength value false"]
-    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + bot.elo];
-  engine.request(cmds.concat("isready"), function (l) { return l === "readyok"; });
+    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + selectedBot.elo];
+}
+
+function setStrength() {
+  engine.request(strengthCommands(bot).concat("isready"), function (l) { return l === "readyok"; });
 }
 
 function renderBots() {
@@ -512,14 +520,14 @@ function sliderBot() {
 
 // ---------------------------------------------------------------- Input
 function canMove() {
-  return pos && !pos.pending && !thinking && !game.over && game.view === null &&
+  return !game.botMatch && pos && !pos.pending && !thinking && !game.over && game.view === null &&
     pos.turn === game.playerColor;
 }
 
 // Premoves are speculative: geometry is only a preview. The engine's legal
 // moves remain authoritative when each queued move reaches the player's turn.
 function canPremove() {
-  return pos && !pos.pending && !game.over && game.view === null &&
+  return !game.botMatch && pos && !pos.pending && !game.over && game.view === null &&
     pos.turn !== game.playerColor;
 }
 
@@ -1012,15 +1020,20 @@ function render() {
   drawShapes();
 
   var youTop = game.playerColor === (flipped ? "w" : "b");
-  setTag($("tag-top"), youTop ? "you" : "engine", engineName);
-  setTag($("tag-bottom"), youTop ? "engine" : "you", engineName);
+  if (game.botMatch) {
+    setTag($("tag-top"), "engine", engineName, game.matchBots[flipped ? "w" : "b"]);
+    setTag($("tag-bottom"), "engine", engineName, game.matchBots[flipped ? "b" : "w"]);
+  } else {
+    setTag($("tag-top"), youTop ? "you" : "engine", engineName);
+    setTag($("tag-bottom"), youTop ? "engine" : "you", engineName);
+  }
 
   // Status line
   var status;
   if (game.over) status = game.over;
   else if (scpShow) status = "SCP-096 was seen…";
-  else if (thinking) status = "Engine is thinking…";
-  else if (pos.turn === game.playerColor) status = "Your move" + (pos.inCheck ? " — check!" : "");
+  else if (thinking) status = game.botMatch ? game.matchBots[pos.turn].name + " is thinking…" : "Engine is thinking…";
+  else if (!game.botMatch && pos.turn === game.playerColor) status = "Your move" + (pos.inCheck ? " — check!" : "");
   else status = "Waiting…";
   if (game.view !== null) status = "Reviewing move " + game.view + " of " + game.moves.length +
     (thinking ? " · engine is thinking" : "") + " — press End to return";
@@ -1030,7 +1043,7 @@ function render() {
   $("status").classList.toggle("reviewing", game.view !== null);
 
   renderMoves();
-  $("btn-undo").disabled = !game.moves.length;
+  $("btn-undo").disabled = game.botMatch || !game.moves.length;
   var ply = shownPly(), live = game.boards.length - 1;
   $("btn-first").disabled = $("btn-prev").disabled = ply <= 0;
   $("btn-next").disabled = $("btn-last").disabled = ply >= live;
@@ -1062,7 +1075,7 @@ function renderMoves() {
   }
   body.innerHTML = rows;
   $("moves-empty").hidden = game.san.length > 0;
-  $("moves-empty").textContent = game.playerColor === "w"
+  $("moves-empty").textContent = game.botMatch ? "The bots are ready to play." : game.playerColor === "w"
     ? "No moves yet. You play White — make the first move."
     : "No moves yet. The engine plays White.";
   var card = body.closest(".moves-card");
@@ -1093,6 +1106,24 @@ function pgn() {
 }
 
 // ---------------------------------------------------------------- Start
+$("game-mode").onchange = function () {
+  var bots = this.value === "bots";
+  $("bot-match-options").hidden = !bots;
+  $("btn-new-white").parentElement.hidden = bots;
+};
+["white-bot", "black-bot"].forEach(function (id) {
+  BOT_GROUPS.forEach(function (group) {
+    group.bots.forEach(function (b) {
+      var option = document.createElement("option");
+      option.value = b.id;
+      option.textContent = b.name + " · " + botRating(b);
+      $(id).appendChild(option);
+    });
+  });
+});
+$("white-bot").value = "martin";
+$("black-bot").value = "stockfish";
+$("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
 $("btn-new-black").onclick = function () { newGame("b"); };
 $("btn-undo").onclick = takeBack;
