@@ -31,8 +31,10 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.goto(`${base}/${link}`);
       await page.waitForFunction(() => typeof pos !== "undefined" && pos && !pos.pending && pos.turn === "w");
       assert(await page.locator("#board .piece").count() >= 32);
-      await page.locator('[data-sq="e2"]').click();
-      await page.locator('[data-sq="e4"]').click();
+      const move = await page.evaluate(() => pos.legal.find(m => m.length === 4));
+      assert(move, "expected a legal opening move");
+      await page.locator(`[data-sq="${move.slice(0, 2)}"]`).click();
+      await page.locator(`[data-sq="${move.slice(2, 4)}"]`).click();
       await page.waitForFunction(() => game.moves.length >= 2 && pos && !pos.pending, null, { timeout: 30000 });
       assert(await page.evaluate(() => !!evalEngine));
       if (link === "variants/scp-096/") {
