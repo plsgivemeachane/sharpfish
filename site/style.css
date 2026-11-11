@@ -202,6 +202,8 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .moves-empty { padding: 12px 14px; color: var(--muted); font-size: 13px; }
 
 .controls { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.row[hidden], #bot-match-options[hidden] { display: none; }
+#bot-match-options:not([hidden]) { display: grid; gap: 10px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
   flex: 1 1 auto;

@@ -70,6 +70,14 @@
         <button id="btn-new-white" class="btn primary">New game as White</button>
         <button id="btn-new-black" class="btn">as Black</button>
       </div>
+      <label class="field">Game mode
+        <select id="game-mode"><option value="human">Play a bot</option><option value="bots">Bot vs bot</option></select>
+      </label>
+      <div id="bot-match-options" hidden>
+        <label class="field">White bot <select id="white-bot"></select></label>
+        <label class="field">Black bot <select id="black-bot"></select></label>
+        <button id="btn-bot-match" class="btn primary" type="button">Start bot match</button>
+      </div>
       <div class="row nav" aria-label="Review moves">
         <button id="btn-first" class="btn" title="First position (Home)" aria-label="First position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg></button>
         <button id="btn-prev" class="btn" title="Previous move (&larr;)" aria-label="Previous move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/></svg></button>
