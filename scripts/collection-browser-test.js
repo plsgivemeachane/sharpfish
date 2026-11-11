@@ -44,6 +44,15 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.locator("#chk-eval").check();
       await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");
       await page.locator("#chk-eval").uncheck();
+      // Browsers can restore a select after page initialization on reload.
+      await page.evaluate(() => {
+        document.getElementById("game-mode").value = "bots";
+        window.dispatchEvent(new Event("pageshow"));
+      });
+      assert(await page.locator("#bot-match-options").isVisible());
+      assert(!(await page.locator("#btn-new-white").isVisible()));
+      await page.reload();
+      await page.waitForFunction(() => typeof pos !== "undefined" && pos && !pos.pending);
       await page.locator("#game-mode").selectOption("bots");
       await page.locator("#white-bot").selectOption("pebble");
       await page.locator("#black-bot").selectOption("martin");
