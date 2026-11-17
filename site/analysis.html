@@ -67,14 +67,15 @@
       <p id="move-detail" class="detail">Select a move to see its analysis.</p>
     </section>
 
-    <section class="card controls" aria-label="Analysis settings">
+    <section class="card controls" aria-labelledby="settings-heading">
+      <h2 id="settings-heading" class="card-title">Settings</h2>
       <p id="analysis-context" class="hint" hidden>Ordinary chess analysis: SCP and custom move restrictions are ignored.</p>
       <label class="field" for="analysis-time">Thinking time / move <select id="analysis-time"><option value="1000">1 second</option><option value="2000" selected>2 seconds</option><option value="5000">5 seconds</option><option value="10000">10 seconds</option><option value="30000">30 seconds</option></select></label>
       <div class="hint">More time lets Stockfish search deeper.</div>
-      <label class="field">Real-time move grading <input id="grade-toggle" type="checkbox" checked></label>
-      <label class="field sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves <input id="special-toggle" type="checkbox" checked></label>
-      <label class="field">Eval bar (stock Stockfish) <input id="eval-toggle" type="checkbox" checked></label>
-      <label class="field">Sound effects <input id="sound-toggle" type="checkbox" checked></label>
+      <label class="field switch">Real-time move grading <input id="grade-toggle" type="checkbox" checked></label>
+      <label class="field switch sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves <input id="special-toggle" type="checkbox" checked></label>
+      <label class="field switch">Eval bar <span class="field-note">stock Stockfish</span> <input id="eval-toggle" type="checkbox" checked></label>
+      <label class="field switch">Sound effects <input id="sound-toggle" type="checkbox" checked></label>
       <div id="progress" class="hint" role="status"></div>
       <div class="row"><button id="cancel" class="btn" type="button" disabled>Stop</button><button id="copy" class="btn" type="button" disabled title="Copy the moves in PGN format">Copy PGN</button></div>
       <div class="hint">Right-click a square to circle it, right-drag to draw an arrow. Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears drawings.</div>
