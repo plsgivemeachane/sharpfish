@@ -199,11 +199,6 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .moves td:first-child { color: var(--muted); width: 3em; background: var(--surface-2); }
 .moves tr:nth-child(even) td:not(:first-child) { background: var(--row-alt); }
 .moves td.current { background: var(--current) !important; font-weight: 600; }
-.move-grade { display: inline-block; margin-left: 4px; color: var(--accent); font-size: 11px; font-weight: 700; }
-.grade-blunder, .grade-mistake { color: #ff9b8e; }
-.grade-inaccuracy { color: #f2c36b; }
-.grade-ok { color: #a8c78b; }
-.grade-good, .grade-excellent, .grade-best { color: #76d6c2; }
 .moves-empty { padding: 12px 14px; color: var(--muted); font-size: 13px; }
 
 .controls { padding: 16px; display: flex; flex-direction: column; gap: 12px; }

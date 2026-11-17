@@ -51,5 +51,7 @@ Direct, brief, welcoming. Show variant names and rules without build or deployme
 Plain HTML/CSS; no new frontend dependencies. Export whole branch sites. Check desktop and mobile in a real browser.
 Use native IndexedDB for bounded local history and Web Workers for analysis. Keep live play/premoves responsive. Version local JS/CSS and stock-engine paths from frozen source revisions. Test storage retention, replay, independent toggles, stale-job rejection, and user-provided metadata escaping.
 
+Move grades use original colored circular icons with familiar chess punctuation, a star, a thumbs up, and a check. OK uses a neutral equals sign. Keep a visible grade name beside each 24px icon so meaning does not depend on color or symbol recognition. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
+
 ## Open questions
 Difficulty heuristics are project-defined and require continued calibration against human examples; do not claim Chess.com parity or calibrated human Elo accuracy. No blocking design questions for the agreed implementation.
