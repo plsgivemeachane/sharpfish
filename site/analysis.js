@@ -419,8 +419,18 @@
     if (!evalOn()) { showEval(false); renderControls(); return; }
     showEval(true);
     $("eval-readout").classList.add("pending"); $("eval-label").textContent = "…"; $("eval-detail").textContent = "Evaluating";
-    state.evalTimer = setTimeout(function () { state.evalTimer = 0; evaluatePosition(); }, immediate ? 0 : 140); // let rapid replay settle
+    state.evalTimer = setTimeout(function () { state.evalTimer = 0; evaluatePosition(); }, immediate ? 0 : 60); // let rapid replay settle
     renderControls();
+  }
+  function showEvaluation(e, partial) {
+    var cp = e.cp == null ? (e.mateWinner === "w" ? 10000 : e.mateWinner === "b" ? -10000 : 0) : e.cp;
+    var share = 1 / (1 + Math.exp(-0.00368208 * cp)); // same curve as the play page
+    $("evalbar-white").style.height = (share * 100).toFixed(1) + "%";
+    $("eval-label").textContent = e.scoreText || (cp / 100).toFixed(1);
+    var lead = e.mate != null ? (e.mateWinner === "w" ? "White" : "Black") + " mates" : e.scoreText === "Draw" ? "Draw" : e.scoreText === "Checkmate" ? "Checkmate" : Math.abs(cp) < 35 ? "Equal" : (cp > 0 ? "White" : "Black") + " better";
+    $("eval-detail").textContent = lead + (e.depth ? " · depth " + e.depth : "") + (partial ? "…" : "");
+    $("eval-readout").classList.remove("pending");
+    $("eval-readout").classList.toggle("black-better", cp < 0);
   }
   async function evaluatePosition() {
     if (!evalOn()) return;
@@ -428,16 +438,10 @@
     if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
     state.evalBusy = true; renderControls();
     try {
-      var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: analysisTime() });
+      var live = function (e) { if (token === state.evalToken && epoch === state.epoch) showEvaluation(e, true); };
+      var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: analysisTime(), onProgress: live });
       if (token !== state.evalToken || epoch !== state.epoch) return;
-      var cp = e.cp == null ? (e.mateWinner === "w" ? 10000 : e.mateWinner === "b" ? -10000 : 0) : e.cp;
-      var share = 1 / (1 + Math.exp(-0.00368208 * cp));
-      $("evalbar-white").style.height = (share * 100).toFixed(1) + "%";
-      $("eval-label").textContent = e.scoreText || (cp / 100).toFixed(1);
-      var lead = e.mate != null ? (e.mateWinner === "w" ? "White" : "Black") + " mates" : e.scoreText === "Draw" ? "Draw" : e.scoreText === "Checkmate" ? "Checkmate" : Math.abs(cp) < 35 ? "Equal" : (cp > 0 ? "White" : "Black") + " better";
-      $("eval-detail").textContent = lead + (e.depth ? " · depth " + e.depth : "");
-      $("eval-readout").classList.remove("pending");
-      $("eval-readout").classList.toggle("black-better", cp < 0);
+      showEvaluation(e, false);
     } catch (err) {
       if (token === state.evalToken && epoch === state.epoch && err.name !== "AbortError") {
         $("eval-label").textContent = "—"; $("eval-detail").textContent = "Unavailable";

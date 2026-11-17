@@ -483,7 +483,16 @@
       var commands = options.keepHash ? [] : ["setoption name Clear Hash"];
       commands.push("setoption name MultiPV value " + count, positionCommand(record, ply),
         "go " + limit + (forced ? " searchmoves " + forced.join(" ") : ""));
-      var lines = await request(commands, function (line) { return /^bestmove\b/.test(line); }, token,
+      var onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+      var lines = await request(commands, function (line) {
+        // Stream each completed principal line so the UI can follow the search live.
+        if (onProgress && /^info depth\b/.test(line) && generation === token) {
+          var partial = null;
+          try { partial = parseInfo([line], pos.turn, 1); } catch (_) {}
+          if (partial) onProgress(partial);
+        }
+        return /^bestmove\b/.test(line);
+      }, token,
         options.timeout || (timed ? options.movetime + 2000 : 120000));
       assertActive(token);
       var info = parseInfo(lines, pos.turn, count);
