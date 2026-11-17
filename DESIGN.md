@@ -42,5 +42,7 @@ Direct, brief, welcoming. Show variant names and rules without build or deployme
 ## Implementation constraints
 Plain HTML/CSS; no new frontend dependencies. Export whole branch sites. Check desktop and mobile in a real browser.
 
+Move grades use original colored circular icons with familiar chess punctuation, a star, a thumbs up, and a check. OK uses a neutral equals sign. Keep a visible grade name beside each 24px icon so meaning does not depend on color or symbol recognition. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
+
 ## Open questions
 None for the initial collection.
