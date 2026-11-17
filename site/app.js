@@ -6,6 +6,8 @@
 // with no JavaScript changes.
 "use strict";
 
+var BADGE_ROOT = (window.SHARPFISH_VARIANT || {}).badgePath || "badges/";
+
 // ---------------------------------------------------------------- Engine
 // Avatar next to your name: a drawn person. The engine's avatar comes from
 // the chosen bot (bots.js); Stockfish's is the official logo
@@ -1051,7 +1053,7 @@ function render() {
           window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE);
         if (gradeVisible) {
           var gradeKey = String(grade.label || grade.objectiveLabel || "").toLowerCase().replace(/[^a-z]+/g, "-");
-          html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="badges/' + gradeKey + '.png" alt="' +
+          html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="' + BADGE_ROOT + gradeKey + '.png" alt="' +
             grade.label + '" title="' + grade.label + '" aria-label="' + grade.label + '">';
         }
       }
@@ -1129,7 +1131,7 @@ function renderMoves() {
   function cell(j) {
     if (j >= game.san.length) return "<td></td>";
     var grade = validLiveGrade(j), label = grade && (grade.label || grade.objectiveLabel), key = label && String(label).toLowerCase().replace(/[^a-z]+/g, "-");
-    var icon = label ? '<img class="move-grade-list-icon" src="badges/' + key + '.png" alt="" aria-hidden="true">' : "";
+    var icon = label ? '<img class="move-grade-list-icon" src="' + BADGE_ROOT + key + '.png" alt="" aria-hidden="true">' : "";
     var textGrade = label ? ' <span class="move-grade grade-' + key + '" title="' + label + '" aria-label="' + label + '">' + label + "</span>" : "";
     return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '"><span class="move-grade-slot" title="' + (label || "Grade pending") + '">' + icon + '</span>' + game.san[j] + textGrade + "</td>";
   }

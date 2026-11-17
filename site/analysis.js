@@ -1,6 +1,7 @@
 /* Standalone, read-only PGN/history review. No bots are started here. */
 (function () {
   "use strict";
+  var BADGE_ROOT = (window.SHARPFISH_VARIANT || {}).badgePath || "badges/";
   var $ = function (id) { return document.getElementById(id); };
   var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder", "Disaster", "Catastrophe", "Great", "Brilliant"];
   var BAD = { Inaccuracy: 1, Mistake: 1, Blunder: 1, Disaster: 1, Catastrophe: 1 };
@@ -37,7 +38,7 @@
         var moveIndex = state.ply - 1, shownMove = state.record && state.record.moves && state.record.moves[moveIndex];
         var grade = state.record && state.record.grades && validGrade(state.record, moveIndex, state.record.grades[moveIndex]) ? state.record.grades[moveIndex] : null;
         if (shownMove && shownMove.slice(2, 4) === square && $("grade-toggle").checked && grade) {
-          var key = labelKey(grade.label || grade.objectiveLabel), badge = document.createElement("img"); badge.className = "move-grade-overlay grade-" + key; badge.src = "badges/" + key + ".png"; badge.alt = grade.label; badge.title = grade.label; badge.setAttribute("aria-label", grade.label); cell.appendChild(badge);
+          var key = labelKey(grade.label || grade.objectiveLabel), badge = document.createElement("img"); badge.className = "move-grade-overlay grade-" + key; badge.src = BADGE_ROOT + key + ".png"; badge.alt = grade.label; badge.title = grade.label; badge.setAttribute("aria-label", grade.label); cell.appendChild(badge);
         }
       }
       board.appendChild(cell);
@@ -60,7 +61,7 @@
       var badge = document.createElement("span"); badge.className = "move-label " + labelKey(grade && grade.label); badge.textContent = showGrades && grade && grade.label || (showGrades ? "Pending" : "—"); badge.setAttribute("aria-label", showGrades && grade ? grade.label : "Grade hidden");
       if (showGrades && grade) { var side = sideAt(rec, i); counts[side][grade.label] = (counts[side][grade.label] || 0) + 1; }
       var slot = document.createElement("span"); slot.className = "move-grade-slot";
-      if (showGrades && grade) { var icon = document.createElement("img"); icon.className = "move-grade-list-icon"; icon.src = "badges/" + labelKey(grade.label) + ".png"; icon.alt = ""; slot.appendChild(icon); }
+      if (showGrades && grade) { var icon = document.createElement("img"); icon.className = "move-grade-list-icon"; icon.src = BADGE_ROOT + labelKey(grade.label) + ".png"; icon.alt = ""; slot.appendChild(icon); }
       li.tabIndex = 0; li.setAttribute("role", "button"); li.append(number, slot, text, badge); var select = function () { state.ply = Number(li.dataset.ply); render(); if ($("eval-toggle").checked) evaluatePosition(); }; li.onclick = select; li.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } };
       list.appendChild(li);
     });
