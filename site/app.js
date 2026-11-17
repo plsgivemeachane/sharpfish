@@ -146,7 +146,10 @@ var game = {
   boards: [],       // snapshot after each ply (0 = start): { board, lastMove, turn, inCheck, ate }
   ate: [],          // per move: what SCP-096 ate right after it, e.g. ["Qd3", "ra3"]
   view: null,       // ply being reviewed, or null for the live position
-  token: 0          // bumped on new game / take back to ignore stale engine replies
+  token: 0,         // bumped on new game / take back to ignore stale engine replies
+  historyId: null,
+  historyRevision: 0,
+  grades: {}
 };
 var pos = null;     // { fen, board, turn, legal: [uci], inCheck }
 var selected = null;
@@ -155,6 +158,51 @@ var premoves = []; // queued UCI moves, checked against engine legality one at a
 
 var $ = function (id) { return document.getElementById(id); };
 var boardEl = $("board");
+
+function variantInfo() {
+  var v = window.SHARPFISH_VARIANT || {};
+  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false };
+}
+function historyRecord() {
+  if (!game.historyId) return null;
+  return {
+    id: game.historyId, createdAt: game.historyCreatedAt, updatedAt: Date.now(), revision: game.historyRevision,
+    variant: variantInfo(), startFen: null, moves: game.moves.slice(), san: game.san.slice(), boards: game.boards.map(function (b) {
+      return Object.assign({}, b);
+    }), headers: {
+      White: game.botMatch ? game.matchBots.w.name : game.playerColor === "w" ? "You" : bot.name,
+      Black: game.botMatch ? game.matchBots.b.name : game.playerColor === "b" ? "You" : bot.name,
+      Event: variantInfo().title
+    }, result: game.over ? (/White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2") : "*",
+    grades: game.grades || {}, meta: { playerColor: game.playerColor, botMatch: !!game.botMatch,
+      bot: bot ? { id: bot.id, name: bot.name, elo: bot.elo } : null,
+      matchBots: game.matchBots ? { w: game.matchBots.w && { id: game.matchBots.w.id, name: game.matchBots.w.name, elo: game.matchBots.w.elo }, b: game.matchBots.b && { id: game.matchBots.b.id, name: game.matchBots.b.name, elo: game.matchBots.b.elo } } : null }
+  };
+}
+function persistGame() {
+  if (!window.SFHistory || (!game.historyId && !game.moves.length)) return Promise.resolve(null);
+  if (!game.historyId) { game.historyId = window.SFHistory.newId(); game.historyCreatedAt = Date.now(); game.historyRevision = 0; game.grades = {}; }
+  game.historyRevision++;
+  var record = historyRecord();
+  return window.SFHistory.save(record).then(function (saved) {
+    if (saved && saved._durable === false) $("history-status").textContent = "History is session-only — browser storage unavailable";
+    if (saved && game.historyId === record.id && game.historyRevision === record.revision && window.SFLive) window.SFLive.schedule(saved);
+    updateHistoryLinks();
+    return saved;
+  }).catch(function () { $("history-status").textContent = "Local history could not be saved. Play can continue."; return null; });
+}
+window.SFAppHooks = window.SFAppHooks || {};
+function updateHistoryLinks() {
+  var href = game.historyId ? "analysis.html?game=" + encodeURIComponent(game.historyId) : "analysis.html";
+  ["history-link", "analyze-link"].forEach(function (id) { var el = $(id); if (el) el.href = href; });
+}
+window.SFAppHooks.setGrade = function (index, grade, id, revision) {
+  if (id !== game.historyId || revision !== game.historyRevision || index >= game.moves.length) return;
+  game.grades[index] = grade;
+  renderMoves();
+};
+window.SFAppHooks.onGradeError = function () { $("grade-status").textContent = "Some moves need another analysis attempt. Toggle grading to retry."; };
+window.SFAppHooks.onGradeStatus = function (text) { $("grade-status").textContent = text; };
 
 // ---------------------------------------------------------------- Engine I/O
 function positionCmd(ply) { // ply: how many moves to include (default: all)
@@ -302,7 +350,7 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { fen: p.fen, board: p.board, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [], sees: p.sees || [] };
+  return { fen: p.fen, board: p.board, legal: p.legal, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck, ate: p.ate || [], sees: p.sees || [] };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -357,6 +405,7 @@ function playMove(uci) {
       else if (next.inCheck) game.san[i] += "+";
 
       checkGameOver();
+      persistGame();
       if (game.over) clearPremoves();
       function continuePlay() {
         if (runPremove()) return;
@@ -404,6 +453,9 @@ function newGame(color, botMatch) {
   if (thinking) engine.stop();
   thinking = false;
   game.moves = []; game.san = []; game.ate = []; game.over = null; scpShow = null;
+  game.historyId = null; game.historyCreatedAt = null; game.historyRevision = 0; game.grades = {};
+  updateHistoryLinks();
+  if (window.SFLive) window.SFLive.cancel();
   game.boards = []; game.view = null;
   game.botMatch = !!botMatch;
   game.matchBots = botMatch ? { w: findBot($("white-bot").value), b: findBot($("black-bot").value) } : null;
@@ -436,6 +488,8 @@ function takeBack() {
   } while (game.moves.length && (game.moves.length % 2 === 0 ? "w" : "b") !== game.playerColor);
   // If that leaves the engine to move (playing Black, all undone), it moves again below.
   game.boards.length = game.moves.length + 1;
+  Object.keys(game.grades).forEach(function (k) { if (Number(k) >= game.moves.length) delete game.grades[k]; });
+  game.historyRevision++;
   game.view = null;
   game.over = null;
   selected = null;
@@ -445,6 +499,7 @@ function takeBack() {
     p.lastMove = game.moves[game.moves.length - 1];
     pos = p;
     render();
+    persistGame();
     maybeEngineTurn();
   });
 }
@@ -1057,7 +1112,10 @@ function renderMoves() {
   var cur = shownPly() - 1; // index into game.san of the move shown on the board
   function cell(j) {
     if (j >= game.san.length) return "<td></td>";
-    return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '">' + game.san[j] + "</td>";
+    var grade = game.grades && game.grades[j];
+    var label = grade && (grade.label || grade.objectiveLabel);
+    return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '">' + game.san[j] +
+      (label ? ' <span class="move-grade grade-' + String(label).toLowerCase().replace(/[^a-z]+/g, "-") + '" title="' + label + '">' + label + "</span>" : "") + "</td>";
   }
   // Three movers: White, Black and SCP-096. A SCP-096 turn gets its own row,
   // so a row can hold just White's move ("…" stands in for the other half).
@@ -1167,6 +1225,12 @@ boardEl.addEventListener("pointerdown", function (e) {
   viewPly(Infinity);
 }, true);
 $("chk-eval").onchange = toggleEval;
+$("chk-grade").checked = window.SFLive ? window.SFLive.init() : false;
+if (!variantInfo().supported) {
+  $("chk-grade").checked = false; $("chk-grade").disabled = true;
+  $("grade-status").textContent = "Move grading is available for standard chess.";
+}
+$("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); };
 
 (function start() {
   if (!window.ENGINE_FILE) {
