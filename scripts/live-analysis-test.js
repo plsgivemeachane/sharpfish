@@ -8,6 +8,7 @@ const context = {
   localStorage: { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) },
   STOCK_ENGINE_FILE: "test-engine",
   SFAnalysis: {
+    supportsRecord: () => true,
     historyKey: (record, ply) => record.moves.slice(0, ply).join(" "),
     isValidGrade: (grade, record, index, engine, specialMoves) => !!grade && grade.specialMoves === specialMoves,
     Analyzer: class {

@@ -78,7 +78,7 @@ const origin = (process.argv[3] || "http://localhost:8096/variants/classic").rep
     assert.equal(await page.locator("#performance-white-elo").innerText(), "—", "short games do not invent precise ratings");
     const unsupportedId = await page.evaluate(async () => {
       const record = (await SFHistory.list())[0];
-      record.variant = { slug: "scp-096", supported: false }; record.revision++;
+      record.variant = { slug: "unregistered-custom", supported: false }; record.revision++;
       await SFHistory.save(record); return record.id;
     });
     await page.goto(origin + "/analysis.html?game=" + encodeURIComponent(unsupportedId));

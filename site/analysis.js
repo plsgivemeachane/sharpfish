@@ -42,8 +42,8 @@
   function sideAt(record, ply) { var snap = record && record.boards && record.boards[ply]; return snap && snap.turn || (ply % 2 ? "b" : "w"); }
   function moveCount() { return state.record && state.record.moves ? state.record.moves.length : 0; }
   function isWhite(p) { return !!p && p === p.toUpperCase(); }
-  function pieceAsset(piece) { if (piece === "*") return "/variants/scp-096/pieces/scp096.png"; return "pieces/" + (isWhite(piece) ? "w" : "b") + piece.toUpperCase() + ".svg"; }
-  function isSupported(record) { return !!record && (!record.variant || record.variant.supported !== false); }
+  function pieceAsset(piece) { if (piece === "*") return "pieces/scp096.png"; return "pieces/" + (isWhite(piece) ? "w" : "b") + piece.toUpperCase() + ".svg"; }
+  function isSupported(record) { return !!window.STOCK_ENGINE_FILE && SFAnalysis.supportsRecord(record); }
   function displayTitle(record) { var h = record.headers || {}; return h.White || h.Black ? (h.White || "White") + " — " + (h.Black || "Black") : (record.result && record.result !== "*" ? record.result : "Saved game"); }
   function resultText(record) { return record.result && record.result !== "*" ? " · " + record.result : " · in progress"; }
   function setError(message) { $("error").hidden = !message; $("error").textContent = message || ""; }
@@ -58,7 +58,7 @@
     var rec = state.record;
     if (!rec || index < 0 || !$("grade-toggle").checked) return null;
     var grade = rec.grades && rec.grades[index];
-    return validGrade(rec, index, grade) ? grade : null;
+    return validGrade(rec, index, grade) && !grade.unavailable ? grade : null;
   }
 
   // ------------------------------------------------------------ Board
@@ -148,7 +148,7 @@
       var piece = board[sq];
       if (piece) {
         var img = document.createElement("img"); img.className = "piece"; img.draggable = false; img.src = pieceAsset(piece);
-        img.alt = (isWhite(piece) ? "White " : "Black ") + (PIECE_NAMES[piece.toUpperCase()] || "piece");
+        img.alt = piece === "*" ? "SCP-096" : (isWhite(piece) ? "White " : "Black ") + (PIECE_NAMES[piece.toUpperCase()] || "piece");
         cell.setAttribute("aria-label", sq + ", " + img.alt); cell.appendChild(img);
       } else cell.setAttribute("aria-label", sq);
       el.appendChild(cell);
@@ -248,15 +248,17 @@
     if (!rec) { $("counts").textContent = ""; $("next-mistake").disabled = true; return; }
     var start = rec.startFen ? SFAnalysis.parseBoard(rec.startFen) : { turn: "w", fullmove: 1 }, offset = start.turn === "b" ? 1 : 0;
     (rec.san || []).forEach(function (move, i) {
-      var grade = shownGrade(i), li = document.createElement("li"); li.dataset.ply = i + 1;
+      var grade = shownGrade(i), raw = rec.grades && rec.grades[i], unavailable = showGrades && validGrade(rec, i, raw) && raw.unavailable;
+      var li = document.createElement("li"); li.dataset.ply = i + 1;
       if (state.ply === i + 1) { li.classList.add("selected"); li.setAttribute("aria-current", "step"); }
       var number = document.createElement("span"); number.className = "muted"; number.textContent = (start.fullmove + Math.floor((i + offset) / 2)) + (sideAt(rec, i) === "b" ? "…" : ".");
       var slot = document.createElement("span"); slot.className = "move-grade-slot";
       if (grade) { var icon = document.createElement("img"); icon.className = "move-grade-list-icon"; icon.src = BADGE_ROOT + labelKey(grade.label) + ".png"; icon.alt = ""; slot.appendChild(icon); }
       var text = document.createElement("span"); text.textContent = move || rec.moves[i] || "?";
       var badge = document.createElement("span"); badge.className = "move-label " + labelKey(grade && grade.label);
-      badge.textContent = grade ? grade.label : showGrades && isSupported(rec) ? "Pending" : "—";
-      badge.setAttribute("aria-label", grade ? grade.label : showGrades ? "Grade pending" : "Grade hidden");
+      badge.textContent = grade ? grade.label : unavailable ? "Unavailable" : showGrades && isSupported(rec) ? "Pending" : "—";
+      badge.setAttribute("aria-label", unavailable ? raw.reason : grade ? grade.label : showGrades ? "Grade pending" : "Grade hidden");
+      if (unavailable) badge.title = raw.reason;
       if (grade) { var side = sideAt(rec, i); counts[side][grade.label] = (counts[side][grade.label] || 0) + 1; }
       li.tabIndex = 0; li.setAttribute("role", "button"); li.append(number, slot, text, badge);
       li.onclick = function () { goTo(i + 1); };
@@ -278,6 +280,8 @@
   function renderDetail() {
     var detail = $("move-detail"), rec = state.record;
     if (!rec) { detail.textContent = "Import a PGN or choose a saved game."; return; }
+    var unavailable = rec.grades && rec.grades[state.ply - 1];
+    if ($("grade-toggle").checked && validGrade(rec, state.ply - 1, unavailable) && unavailable.unavailable) { detail.textContent = unavailable.reason; return; }
     if (!isSupported(rec)) { detail.textContent = "Replay only: this variant's custom rules cannot be graded by standard Stockfish."; return; }
     if (!$("grade-toggle").checked) { detail.textContent = "Turn on grading to analyze the recorded moves."; return; }
     if (!state.ply) { detail.textContent = "Select a move to see its analysis."; return; }
@@ -302,6 +306,7 @@
     $("next").disabled = $("last").disabled = !rec || state.ply >= n;
     $("copy").disabled = !rec;
     var supported = isSupported(rec);
+    $("analysis-context").hidden = !rec || !SFAnalysis.snapshotAnalysis(rec);
     $("grade-toggle").disabled = $("eval-toggle").disabled = $("special-toggle").disabled = !!rec && !supported;
     $("analysis-time").disabled = !!rec && !supported;
     var alternativeButton = $("alternative-move");
@@ -309,7 +314,7 @@
     alternativeButton.textContent = state.alternativePending ? "Loading alternative…" : state.alternative ? "Played move" : "Alternative move";
     alternativeButton.setAttribute("aria-pressed", String(!!state.alternative));
     alternativeButton.title = state.alternative ? "Return to the recorded move" : "Show Stockfish's alternative to the recorded move";
-    var remaining = rec && supported && $("grade-toggle").checked && rec.moves.some(function (_, i) { return !shownGrade(i); });
+    var remaining = rec && supported && $("grade-toggle").checked && rec.moves.some(function (_, i) { return !validGrade(rec, i, rec.grades && rec.grades[i]); });
     var evaluating = state.evalBusy || !!state.evalTimer;
     var resume = !state.grading && !evaluating && state.paused && remaining;
     $("cancel").textContent = resume ? "Resume grading" : state.grading ? "Stop grading" : evaluating ? "Stop evaluation" : "Stop";
@@ -338,6 +343,8 @@
       analyzed + " / " + total + " moves analyzed." + (analyzed ? " Accuracy is provisional." : "") : "All " + total + " moves analyzed.";
     if (analyzed < total && !$("grade-toggle").checked) text += " Turn on grading to continue.";
     else if (analyzed === total && total && (summary.w.elo == null || summary.b.elo == null)) text += " Elo needs at least " + summary.minDecisions + " decisions per player.";
+    var unavailable = grades.filter(function (grade) { return grade && grade.unavailable; }).length;
+    if (unavailable) text += " " + unavailable + " unavailable in ordinary chess.";
     $("performance-progress").textContent = text;
   }
   function render() { renderBoard(); renderMoves(); renderDetail(); renderControls(); }
@@ -361,7 +368,8 @@
     var grade = shownGrade(state.ply - 1), rec = state.record;
     if (!isSupported(rec) || !grade || ["Best", "Excellent"].includes(grade.label)) return null;
     var move = rec.moves[state.ply - 1], before = rec.boards && rec.boards[state.ply - 1];
-    return grade.bestMove && grade.bestMove !== move && before && before.legal && before.legal.includes(grade.bestMove) ? grade : null;
+    var legal = grade.analysisLegalMoves || (!SFAnalysis.snapshotAnalysis(rec) && before && before.legal);
+    return grade.bestMove && grade.bestMove !== move && legal && legal.includes(grade.bestMove) ? grade : null;
   }
   function clearAlternative() {
     state.alternativeToken++;
@@ -373,22 +381,23 @@
     if (state.alternative) { clearAlternative(); render(); scheduleEval(); return; }
     var grade = alternativeGrade(); if (!grade || state.alternativePending) return;
     var rec = state.record, ply = state.ply, move = grade.bestMove, token = ++state.alternativeToken;
-    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
     state.alternativeAnalyzer = analyzer; state.alternativePending = true;
     $("alternative-status").hidden = false; $("alternative-status").textContent = "Loading Stockfish's alternative…";
     renderControls();
     try {
-      var moves = rec.moves.slice(0, ply - 1).concat(move);
-      var position = await analyzer.position(rec.startFen, moves);
+      var projected = SFAnalysis.snapshotAnalysis(rec), before = projected ? await analyzer.recordPosition(rec, ply - 1) : rec.boards[ply - 1];
+      var moves = projected ? [move] : rec.moves.slice(0, ply - 1).concat(move), startFen = projected ? before.fen : rec.startFen;
+      var position = await analyzer.position(startFen, moves);
       if (token !== state.alternativeToken || rec !== state.record || ply !== state.ply) return;
       if (!alternativeGrade() || alternativeGrade().bestMove !== move) { clearAlternative(); renderControls(); return; }
-      var san = SFAnalysis.sanCore(rec.boards[ply - 1], move) + (position.inCheck ? position.legal.length ? "+" : "#" : "");
+      var san = SFAnalysis.sanCore(before, move) + (position.inCheck ? position.legal.length ? "+" : "#" : "");
       state.alternative = { move: move, position: position, san: san,
-        record: { startFen: rec.startFen, moves: moves, boards: rec.boards.slice(0, ply).concat(position) } };
+        record: projected ? { variant: rec.variant, moves: rec.moves.slice(), boards: rec.boards.slice(0, ply).concat(position) } : { startFen: startFen, moves: moves, boards: rec.boards.slice(0, ply).concat(position) } };
       state.shapes = []; state.drawing = null;
       $("alternative-status").textContent = "Stockfish: " + san + " instead of " + (rec.san[ply - 1] || rec.moves[ply - 1]) + ".";
       render(); scheduleEval(true);
-      if (window.SFSound) SFSound.move(rec.boards[ply - 1], move, position);
+      if (window.SFSound) SFSound.move(before, move, position);
     } catch (err) {
       if (token === state.alternativeToken && err.name !== "AbortError") $("alternative-status").textContent = "Could not load the alternative. Try again.";
     } finally {
@@ -416,7 +425,7 @@
   async function evaluatePosition() {
     if (!evalOn()) return;
     var token = ++state.evalToken, epoch = state.epoch, ply = state.ply;
-    if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+    if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
     state.evalBusy = true; renderControls();
     try {
       var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: analysisTime() });
@@ -430,7 +439,12 @@
       $("eval-readout").classList.remove("pending");
       $("eval-readout").classList.toggle("black-better", cp < 0);
     } catch (err) {
-      if (token === state.evalToken && epoch === state.epoch && err.name !== "AbortError") { $("eval-label").textContent = "?"; $("eval-detail").textContent = "Unavailable"; setError("Evaluation could not finish: " + err.message); }
+      if (token === state.evalToken && epoch === state.epoch && err.name !== "AbortError") {
+        $("eval-label").textContent = "—"; $("eval-detail").textContent = "Unavailable";
+        $("eval-readout").classList.remove("pending"); $("eval-readout").title = err.message;
+        $("evalbar").classList.add("off");
+        if (err.name !== "AnalysisUnavailableError") setError("Evaluation could not finish: " + err.message);
+      }
     } finally {
       if (token === state.evalToken) { state.evalBusy = false; renderControls(); }
     }
@@ -452,7 +466,7 @@
     var rec = state.record;
     if (!rec || !$("grade-toggle").checked || !isSupported(rec) || !window.SFAnalysis) { renderControls(); return; }
     var token = state.gradeToken, epoch = state.epoch, special = specialOn(), movetime = analysisTime();
-    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
     state.gradeAnalyzer = analyzer; state.grading = true; renderControls();
     function current() { return token === state.gradeToken && epoch === state.epoch && state.record === rec && special === specialOn() && movetime === analysisTime() && $("grade-toggle").checked; }
     var done = false;
@@ -466,7 +480,7 @@
           try { grade = await analyzer.grade(rec, i, { specialMoves: special, difficulty: true, movetime: movetime }); break; }
           catch (err) {
             if (!current() || attempt === 1) throw err;
-            analyzer.dispose(); analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+            analyzer.dispose(); analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
             state.gradeAnalyzer = analyzer;
             $("progress").textContent = "Retrying move " + (i + 1) + " / " + rec.moves.length + "…";
           }
@@ -478,7 +492,10 @@
         try { await SFHistory.updateGrades(rec.id, rec.revision, patch); } catch (_) { $("progress").textContent = "Grade ready; local saving failed."; }
       }
       done = current();
-      if (done) $("progress").textContent = rec.moves.length ? "All " + rec.moves.length + " moves graded." : "";
+      if (done) {
+        var unavailable = Object.keys(rec.grades || {}).filter(function (i) { return validGrade(rec, +i, rec.grades[i]) && rec.grades[i].unavailable; }).length;
+        $("progress").textContent = unavailable ? (rec.moves.length - unavailable) + " moves graded; " + unavailable + " unavailable in ordinary chess." : rec.moves.length ? "All " + rec.moves.length + " moves graded." : "";
+      }
     } catch (err) {
       if (token === state.gradeToken && err.name !== "AbortError") setError(err.message || "Move grading failed.");
     } finally {
@@ -501,13 +518,13 @@
     $("grade-toggle").checked = $("eval-toggle").checked = supported; // supported games start analyzed
     $("progress").textContent = "";
     render(); $("moves").scrollTop = 0;
-    if (!supported) { showEval(false); setError("This variant can be replayed here. Standard chess grading and evaluation are unavailable for its custom rules."); return; }
+    if (!supported) { showEval(false); setError(window.STOCK_ENGINE_FILE ? "This variant has no ordinary-chess analysis adapter yet. Replay is available." : "The stock Stockfish analysis engine is unavailable. Replay is available."); return; }
     gradeAll(); scheduleEval(true);
   }
   var importToken = 0;
   async function importPgn(text) {
-    if (!window.SFAnalysis || !SFAnalysis.Analyzer) throw new Error("Analysis engine is unavailable.");
-    var token = ++importToken, analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+    if (!window.SFAnalysis || !SFAnalysis.Analyzer || !window.STOCK_ENGINE_FILE) throw new Error("Analysis engine is unavailable.");
+    var token = ++importToken, analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
     $("progress").textContent = "Reading PGN…";
     try {
       var rec = await analyzer.replay(text); // the displayed game stays until this validates
@@ -536,6 +553,7 @@
   function pgnText() {
     if (!state.record) return "";
     var rec = state.record, headers = Object.assign({}, rec.headers || {}), out = "";
+    if (SFAnalysis.snapshotAnalysis(rec)) headers.Variant = rec.variant.slug;
     if (rec.startFen) { headers.SetUp = "1"; headers.FEN = rec.startFen; }
     Object.keys(headers).forEach(function (key) { out += "[" + key + " " + JSON.stringify(String(headers[key])) + "]\n"; });
     if (out) out += "\n";
