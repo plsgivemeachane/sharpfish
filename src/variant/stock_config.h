@@ -27,6 +27,7 @@ constexpr bool AllowUnderpromotion  = true;
 constexpr bool AllowPawnDoubleStep  = true;
 constexpr bool EnableCustomRules    = false;
 constexpr bool EnableNullMove       = true;
+constexpr int  QuietPickTopN        = 0;
 
 }  // namespace Stockfish::Variant
 

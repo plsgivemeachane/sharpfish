@@ -31,7 +31,7 @@ namespace Stockfish::Variant {
 
 // What your variant is, shown by "uci" as "id name Stockfish variant (<this>)".
 // Example: "Knights only". "" keeps the default Stockfish name.
-constexpr const char* EngineName = "";
+constexpr const char* EngineName = "Sufferfish";
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
@@ -88,6 +88,15 @@ constexpr bool EnableCustomRules = false;
 // Null-move pruning is a big speed-up, but it is unsound in some variants
 // (e.g. when passing would be good). Turn it off if your rules need that.
 constexpr bool EnableNullMove = true;
+
+// -----------------------------------------------------------------------------
+//  6. SUFFERFISH ROOT PICK
+//
+//  Search the top N moves (MultiPV N) and play the highest-ranked one that is
+//  NOT a capture. If all N are captures, play the best move. 0 = off.
+//  Binds the engine only: the human's legal moves are untouched.
+// -----------------------------------------------------------------------------
+constexpr int QuietPickTopN = 5;
 
 }  // namespace Stockfish::Variant
 

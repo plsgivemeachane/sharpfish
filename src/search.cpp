@@ -256,7 +256,7 @@ void Search::Worker::start_searching() {
     Skill   skill =
       Skill(options["Skill Level"], bool(options["UCI_LimitStrength"]), int(options["UCI_Elo"]));
 
-    if (!limits.depth && !skill.enabled())
+    if (!limits.depth && !skill.enabled() && !Variant::QuietPickTopN)
         bestThread = threads.get_best_thread()->worker.get();
 
     main_manager()->bestPreviousScore        = bestThread->rootMoves[0].score;
@@ -333,6 +333,10 @@ bool Search::Worker::iterative_deepening() {
     // zone scores every legal move, so it can also pick bad ones.
     if (skill.enabled())
         multiPV = std::max(multiPV, skill.beginner() ? rootMoves.size() : usize(4));
+
+    // Sufferfish: search the top N lines so we can pick the best quiet one.
+    if constexpr (Variant::QuietPickTopN > 0)
+        multiPV = std::max(multiPV, usize(Variant::QuietPickTopN));
 
     multiPV = std::min(multiPV, rootMoves.size());
 
@@ -648,6 +652,22 @@ bool Search::Worker::iterative_deepening() {
         std::swap(rootMoves[0],
                   *std::find(rootMoves.begin(), rootMoves.end(),
                              skill.best ? skill.best : skill.pick_best(rootPos, rootMoves, multiPV)));
+
+    // Sufferfish: move the highest-ranked non-capture among the top N to the
+    // front. If all of them capture, keep the best move.
+    if constexpr (Variant::QuietPickTopN > 0)
+    {
+        usize n = std::min(multiPV, usize(Variant::QuietPickTopN));
+        for (usize i = 1; i < n; ++i)
+            if (!rootPos.capture(rootMoves[0].pv[0]))
+                break;
+            else if (!rootPos.capture(rootMoves[i].pv[0]))
+            {
+                std::rotate(rootMoves.begin(), rootMoves.begin() + i, rootMoves.begin() + i + 1);
+                uciPvSent = false;
+                break;
+            }
+    }
 
     return uciPvSent;
 }
