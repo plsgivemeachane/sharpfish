@@ -8,10 +8,19 @@ Sharpfish is a browser chess collection built on Stockfish.js. Play online at
 - **SCP-096** adds an uncapturable piece that blocks lines. After Black moves, it eats one randomly chosen piece that attacks its current square; a king sees adjacent squares. Losing a king to SCP-096 ends the game.
 - **Sufferfish** prefers the best quiet move among its top five choices, but captures when avoiding the best move costs over 30 centipawns or worsens a mate outcome.
 
-Choose a bot and play in your browser. The default think time is two seconds;
-bots take at least 2.1 seconds per move to leave time for premoves. You can
-change the think time, queue premoves while the bot thinks, review moves, and
-copy the game as PGN. The optional evaluation bar uses standard Stockfish; it evaluates the position with SCP-096 removed.
+Choose a bot and play in your browser. Settings control how the bot plays:
+
+- **Think time** is how long the bot searches (default 2 s).
+- **Move delay** is the shortest wait before the bot plays, which leaves time
+  for premoves (default 2 s). Choose *Instant* for bullet-paced games.
+- **Your clock** times your side only (off by default; 1 to 10 minutes, with
+  2 + 1 and 3 + 2 increments). It starts after your first move; if it runs out,
+  you lose on time.
+
+You can also queue premoves while the bot thinks, review moves, and copy the
+game as PGN. The optional evaluation bar uses standard Stockfish (on SCP-096 it
+evaluates the position with SCP-096 removed). The bar on the play page and on
+the analysis page both update live as the search deepens.
 
 For local development, run `./make-web.sh serve`. See [FORKING.md](FORKING.md)
 for variant development and [DEPLOYMENT.md](DEPLOYMENT.md) for building and
