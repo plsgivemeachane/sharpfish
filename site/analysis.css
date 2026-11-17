@@ -70,7 +70,6 @@ button, input, textarea { font: inherit; }
   border-radius: 4px; overflow: hidden; box-shadow: var(--shadow);
   user-select: none; -webkit-user-select: none; touch-action: manipulation;
 }
-.board.drawing { touch-action: none; cursor: crosshair; }
 .sq { position: relative; min-width: 0; min-height: 0; }
 .sq.light { background: var(--sq-light); }
 .sq.dark { background: var(--sq-dark); }
@@ -105,6 +104,7 @@ button, input, textarea { font: inherit; }
 .row.nav .btn svg { width: 14px; height: 14px; }
 .position-label { flex: 1.4; text-align: center; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .board-tools { margin-top: 8px; }
+.alternative-status { margin: 8px 0 0; min-height: 1.45em; }
 .link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 2px 4px; font-size: 12px; font-weight: 600; }
 .link-btn:disabled { color: var(--muted); opacity: 0.6; cursor: default; }
 .hint { color: var(--muted); font-size: 12px; }

@@ -10,7 +10,7 @@
   var BAD = { Inaccuracy: 1, Mistake: 1, Blunder: 1, Disaster: 1, Catastrophe: 1 };
   var FILES = "abcdefgh";
   var PIECE_NAMES = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
-  var SHAPE_COLORS = { blue: "#2589e8", red: "#882020", purple: "#a855f7", yellow: "#e68f00" };
+  var SHAPE_COLORS = { blue: "#2589e8", red: "#882020", purple: "#a855f7", yellow: "#e68f00", green: "#57c7a2" };
   var ANIM_MS = 220, QUICK_MS = 120;
   var motionQuery = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 
@@ -19,7 +19,9 @@
     gradeAnalyzer: null, gradeToken: 0, grading: false, paused: false,
     evalAnalyzer: null, evalToken: 0, evalTimer: 0, evalBusy: false,
     shownKey: null, shownBoard: null, shownRecordId: null, shownFlipped: false, lastNav: 0,
-    shapes: [], drawing: null, drawMode: false
+    shapes: [], drawing: null,
+    alternative: null, alternativeAnalyzer: null, alternativeToken: 0, alternativePending: false,
+    resumeGradingOnRestore: false
   };
 
   // ------------------------------------------------------------ Positions
@@ -29,6 +31,7 @@
     return out;
   }
   function boardAt(record, ply) {
+    if (state.alternative && record === state.record && ply === state.ply) return state.alternative.position.board;
     if (!record) return SFAnalysis.parseBoard(SFAnalysis.START_FEN).board;
     var snap = record.boards && record.boards[ply];
     if (!snap) return ply === 0 ? SFAnalysis.parseBoard(record.startFen || SFAnalysis.START_FEN).board : {};
@@ -110,13 +113,13 @@
   }
 
   function lastMoveSquares() {
-    var move = state.record && state.ply > 0 && state.record.moves[state.ply - 1];
+    var move = state.alternative ? state.alternative.move : state.record && state.ply > 0 && state.record.moves[state.ply - 1];
     return move ? [move.slice(0, 2), move.slice(2, 4)] : [];
   }
   function checkSquare(board) {
-    var snap = state.record && state.record.boards && state.record.boards[state.ply];
+    var snap = state.alternative ? state.alternative.position : state.record && state.record.boards && state.record.boards[state.ply];
     if (!snap || !snap.inCheck) return null;
-    var k = sideAt(state.record, state.ply) === "w" ? "K" : "k";
+    var k = snap.turn === "w" ? "K" : "k";
     return Object.keys(board).find(function (s) { return board[s] === k; }) || null;
   }
 
@@ -124,7 +127,7 @@
   // Grade, evaluation and toggle updates patch overlays in place, so a piece
   // that is sliding keeps sliding and no motion is invented.
   function renderBoard() {
-    var rec = state.record, key = (rec ? rec.id : "start") + "|" + state.ply + "|" + (state.flipped ? "b" : "w");
+    var rec = state.record, key = (rec ? rec.id : "start") + "|" + state.ply + "|" + (state.flipped ? "b" : "w") + "|" + (state.alternative ? state.alternative.move : "played");
     if (key === state.shownKey) { updateOverlay(); drawShapes(); return; }
     var board = boardAt(rec, state.ply), el = $("board");
     var animate = state.shownBoard && !reduceMotion() && state.shownRecordId === (rec && rec.id) && state.shownFlipped === state.flipped;
@@ -161,6 +164,7 @@
   function updateOverlay() {
     var board = $("board");
     board.querySelectorAll(".move-grade-overlay").forEach(function (n) { n.remove(); });
+    if (state.alternative) return;
     var index = state.ply - 1, grade = shownGrade(index), move = state.record && state.record.moves[index];
     if (!grade || !move) return;
     var cell = squareEl(move.slice(2, 4)); if (!cell) return;
@@ -192,8 +196,8 @@
   function drawShapes() {
     var svg = $("shapes"); if (!svg) return;
     var list = state.drawing ? state.shapes.concat(Object.assign({ preview: true }, state.drawing)) : state.shapes;
+    if (state.alternative) list = list.concat({ from: state.alternative.move.slice(0, 2), to: state.alternative.move.slice(2, 4), color: "green" });
     svg.innerHTML = list.map(shapeSvg).join("");
-    $("clear-shapes").disabled = !state.shapes.length;
   }
   function clearShapes() { state.shapes = []; state.drawing = null; drawShapes(); }
   function squareAt(x, y) {
@@ -212,7 +216,7 @@
   boardEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   boardEl.addEventListener("pointerdown", function (e) {
     var cell = e.target.closest(".sq");
-    var draws = e.button === 2 || (e.button === 0 && state.drawMode);
+    var draws = e.button === 2;
     if (draws && cell) {
       e.preventDefault();
       state.drawing = { from: cell.dataset.sq, to: cell.dataset.sq, color: shapeColor(e), button: e.button };
@@ -277,6 +281,7 @@
     if (!state.ply) { detail.textContent = "Select a move to see its analysis."; return; }
     var g = shownGrade(state.ply - 1);
     if (!g) { detail.textContent = "This move has not been graded yet."; return; }
+    if (state.alternative) { detail.textContent = "Stockfish alternative: " + state.alternative.san + ". The saved game is unchanged."; return; }
     var bits = [g.label]; if (g.bestMove) bits.push("best " + g.bestMove); if (g.pv && g.pv.length) bits.push("line " + g.pv.slice(0, 5).join(" "));
     detail.textContent = bits.join(" · ");
   }
@@ -290,16 +295,22 @@
       tag.querySelector(".tag-side").className = "tag-side " + t[1];
       tag.querySelector(".tag-name").textContent = (white ? h.White : h.Black) || (white ? "White" : "Black");
     });
-    $("position-label").textContent = "Position " + state.ply + " / " + n;
+    $("position-label").textContent = (state.alternative ? "Alternative " : "Position ") + state.ply + " / " + n;
     $("first").disabled = $("prev").disabled = !rec || state.ply === 0;
     $("next").disabled = $("last").disabled = !rec || state.ply >= n;
     $("copy").disabled = !rec;
     var supported = isSupported(rec);
     $("grade-toggle").disabled = $("eval-toggle").disabled = $("special-toggle").disabled = !!rec && !supported;
+    var alternativeButton = $("alternative-move");
+    alternativeButton.disabled = state.alternativePending || !state.alternative && !alternativeGrade();
+    alternativeButton.textContent = state.alternativePending ? "Loading alternative…" : state.alternative ? "Played move" : "Alternative move";
+    alternativeButton.setAttribute("aria-pressed", String(!!state.alternative));
+    alternativeButton.title = state.alternative ? "Return to the recorded move" : "Show Stockfish's alternative to the recorded move";
     var remaining = rec && supported && $("grade-toggle").checked && rec.moves.some(function (_, i) { return !shownGrade(i); });
-    var resume = !state.grading && !state.evalBusy && state.paused && remaining;
-    $("cancel").textContent = resume ? "Resume grading" : state.grading ? "Stop grading" : state.evalBusy ? "Stop evaluation" : "Stop";
-    $("cancel").disabled = !(state.grading || state.evalBusy || resume);
+    var evaluating = state.evalBusy || !!state.evalTimer;
+    var resume = !state.grading && !evaluating && state.paused && remaining;
+    $("cancel").textContent = resume ? "Resume grading" : state.grading ? "Stop grading" : evaluating ? "Stop evaluation" : "Stop";
+    $("cancel").disabled = !(state.grading || evaluating || resume);
     document.querySelectorAll("#history-list button").forEach(function (b) { if (rec && b.dataset.id === rec.id) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); });
   }
   function render() { renderBoard(); renderMoves(); renderDetail(); renderControls(); }
@@ -307,16 +318,57 @@
   function goTo(ply) {
     if (!state.record) return;
     ply = Math.max(0, Math.min(moveCount(), ply));
-    if (ply === state.ply) return;
+    if (ply === state.ply && !state.alternative && !state.alternativePending) return;
+    clearAlternative();
     state.ply = ply; state.shapes = []; state.drawing = null;
     render(); scrollMoveIntoView(); scheduleEval();
+  }
+
+  // Preview an engine move on a separate position; never append it to history.
+  function alternativeGrade() {
+    var grade = shownGrade(state.ply - 1), rec = state.record;
+    if (!isSupported(rec) || !grade || ["Best", "Excellent"].includes(grade.label)) return null;
+    var move = rec.moves[state.ply - 1], before = rec.boards && rec.boards[state.ply - 1];
+    return grade.bestMove && grade.bestMove !== move && before && before.legal && before.legal.includes(grade.bestMove) ? grade : null;
+  }
+  function clearAlternative() {
+    state.alternativeToken++;
+    if (state.alternativeAnalyzer) state.alternativeAnalyzer.dispose();
+    state.alternativeAnalyzer = null; state.alternativePending = false; state.alternative = null;
+    $("alternative-status").hidden = true;
+  }
+  async function toggleAlternative() {
+    if (state.alternative) { clearAlternative(); render(); scheduleEval(); return; }
+    var grade = alternativeGrade(); if (!grade || state.alternativePending) return;
+    var rec = state.record, ply = state.ply, move = grade.bestMove, token = ++state.alternativeToken;
+    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+    state.alternativeAnalyzer = analyzer; state.alternativePending = true;
+    $("alternative-status").hidden = false; $("alternative-status").textContent = "Loading Stockfish's alternative…";
+    renderControls();
+    try {
+      var moves = rec.moves.slice(0, ply - 1).concat(move);
+      var position = await analyzer.position(rec.startFen, moves);
+      if (token !== state.alternativeToken || rec !== state.record || ply !== state.ply) return;
+      if (!alternativeGrade() || alternativeGrade().bestMove !== move) { clearAlternative(); renderControls(); return; }
+      var san = SFAnalysis.sanCore(rec.boards[ply - 1], move) + (position.inCheck ? position.legal.length ? "+" : "#" : "");
+      state.alternative = { move: move, position: position, san: san,
+        record: { startFen: rec.startFen, moves: moves, boards: rec.boards.slice(0, ply).concat(position) } };
+      state.shapes = []; state.drawing = null;
+      $("alternative-status").textContent = "Stockfish: " + san + " instead of " + (rec.san[ply - 1] || rec.moves[ply - 1]) + ".";
+      render(); scheduleEval(true);
+    } catch (err) {
+      if (token === state.alternativeToken && err.name !== "AbortError") $("alternative-status").textContent = "Could not load the alternative. Try again.";
+    } finally {
+      analyzer.dispose();
+      if (token === state.alternativeToken) { state.alternativeAnalyzer = null; state.alternativePending = false; renderControls(); }
+    }
   }
 
   // ------------------------------------------------------------ Evaluation
   function evalOn() { return !!state.record && isSupported(state.record) && $("eval-toggle").checked && !!window.SFAnalysis; }
   function showEval(visible) { $("evalbar").classList.toggle("off", !visible); $("eval-readout").classList.toggle("off", !visible); }
   function stopEval() {
-    clearTimeout(state.evalTimer); state.evalToken++;
+    clearTimeout(state.evalTimer); state.evalTimer = 0; state.evalToken++;
     if (state.evalBusy && state.evalAnalyzer) state.evalAnalyzer.cancel();
     state.evalBusy = false;
   }
@@ -325,7 +377,8 @@
     if (!evalOn()) { showEval(false); renderControls(); return; }
     showEval(true);
     $("eval-readout").classList.add("pending"); $("eval-label").textContent = "…"; $("eval-detail").textContent = "Evaluating";
-    state.evalTimer = setTimeout(evaluatePosition, immediate ? 0 : 140); // let rapid replay settle
+    state.evalTimer = setTimeout(function () { state.evalTimer = 0; evaluatePosition(); }, immediate ? 0 : 140); // let rapid replay settle
+    renderControls();
   }
   async function evaluatePosition() {
     if (!evalOn()) return;
@@ -333,7 +386,7 @@
     if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
     state.evalBusy = true; renderControls();
     try {
-      var e = await state.evalAnalyzer.evaluate(state.record, ply, { movetime: 2000 });
+      var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: 2000 });
       if (token !== state.evalToken || epoch !== state.epoch) return;
       var cp = e.cp == null ? (e.mateWinner === "w" ? 10000 : e.mateWinner === "b" ? -10000 : 0) : e.cp;
       var share = 1 / (1 + Math.exp(-0.00368208 * cp));
@@ -357,6 +410,7 @@
     state.gradeAnalyzer = null; state.grading = false; state.paused = !!paused;
   }
   function onGradeChanged(index) {
+    if (index === state.ply - 1 && state.alternative && (!alternativeGrade() || alternativeGrade().bestMove !== state.alternative.move)) { clearAlternative(); render(); scheduleEval(); return; }
     renderMoves(); renderDetail(); renderControls();
     if (index === state.ply - 1) updateOverlay(); // never rebuilds squares
   }
@@ -398,7 +452,7 @@
 
   // ------------------------------------------------------------ Games
   async function openRecord(record) {
-    state.epoch++; stopGrading(false); stopEval();
+    state.epoch++; stopGrading(false); stopEval(); clearAlternative();
     state.record = record; state.ply = 0; state.shapes = []; state.drawing = null; setError("");
     var supported = isSupported(record);
     $("grade-toggle").checked = $("eval-toggle").checked = supported; // supported games start analyzed
@@ -456,10 +510,12 @@
   $("analyze").onclick = async function () { setError(""); try { await importPgn($("pgn-input").value); } catch (e) { setError(e.message || "Could not read PGN."); $("progress").textContent = ""; } };
   $("pgn-file").onchange = function () { var file = this.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { $("pgn-input").value = reader.result; }; reader.readAsText(file); };
   $("grade-toggle").onchange = function () {
+    var wasAlternative = !!state.alternative; clearAlternative(); if (wasAlternative) scheduleEval();
     if (this.checked) { render(); gradeAll(); }
     else { stopGrading(false); $("progress").textContent = "Grading off."; render(); }
   };
   $("special-toggle").onchange = function () {
+    var wasAlternative = !!state.alternative; clearAlternative(); if (wasAlternative) scheduleEval();
     try { localStorage.setItem(SPECIAL_KEY, this.checked ? "1" : "0"); } catch (_) { /* storage blocked */ }
     stopGrading(false); // the in-flight grade used the old setting
     render();
@@ -467,7 +523,7 @@
   };
   $("eval-toggle").onchange = function () { scheduleEval(true); };
   $("cancel").onclick = function () {
-    if (state.grading || state.evalBusy) {
+    if (state.grading || state.evalBusy || state.evalTimer) {
       var wasGrading = state.grading; stopEval(); $("eval-label").textContent = "–"; $("eval-detail").textContent = "Stopped";
       if (wasGrading) { stopGrading(true); $("progress").textContent = "Grading stopped."; }
       renderControls();
@@ -478,8 +534,7 @@
   $("next").onclick = function () { goTo(state.ply + 1); };
   $("last").onclick = function () { goTo(moveCount()); };
   $("flip").onclick = function () { state.flipped = !state.flipped; render(); };
-  $("draw-mode").onclick = function () { state.drawMode = !state.drawMode; this.setAttribute("aria-pressed", String(state.drawMode)); boardEl.classList.toggle("drawing", state.drawMode); };
-  $("clear-shapes").onclick = clearShapes;
+  $("alternative-move").onclick = toggleAlternative;
   $("next-mistake").onclick = function () {
     for (var i = state.ply; i < moveCount(); i++) { var g = shownGrade(i); if (g && BAD[g.label]) { goTo(i + 1); return; } }
   };
@@ -493,7 +548,19 @@
     e.preventDefault();
     goTo(step === Infinity ? moveCount() : step === -Infinity ? 0 : state.ply + step);
   });
-  window.addEventListener("pagehide", function () { stopGrading(false); stopEval(); if (state.evalAnalyzer) state.evalAnalyzer.dispose(); });
+  window.addEventListener("pagehide", function () {
+    state.resumeGradingOnRestore = state.grading;
+    stopGrading(state.paused); stopEval(); clearAlternative();
+    if (state.evalAnalyzer) state.evalAnalyzer.dispose();
+    state.evalAnalyzer = null;
+  });
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+    render();
+    if (state.resumeGradingOnRestore && $("grade-toggle").checked) gradeAll();
+    state.resumeGradingOnRestore = false;
+    scheduleEval(true);
+  });
 
   (async function start() {
     render();
