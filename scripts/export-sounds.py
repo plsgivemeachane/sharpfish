@@ -35,7 +35,8 @@ def main():
                 '-i', 'pipe:0', '-map_metadata', '-1', '-ac', '1', '-ar', '44100',
                 '-codec:a', 'libmp3lame', '-b:a', '96k', str(output / (name + '.mp3')),
             ], input=pack.read('Audio/' + original + '.ogg'), check=True)
-        (output / 'License.txt').write_bytes(pack.read('License.txt'))
+        license_text = '\n'.join(line.rstrip() for line in pack.read('License.txt').decode('utf-8').splitlines()).strip() + '\n'
+        (output / 'License.txt').write_text(license_text)
 
 
 if __name__ == '__main__':
