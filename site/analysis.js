@@ -346,9 +346,14 @@
     if (!state.record) return;
     ply = Math.max(0, Math.min(moveCount(), ply));
     if (ply === state.ply && !state.alternative && !state.alternativePending) return;
+    var previous = state.ply;
     clearAlternative();
     state.ply = ply; state.shapes = []; state.drawing = null;
     render(); scrollMoveIntoView(); scheduleEval();
+    if (window.SFSound && ply !== previous) {
+      if (ply > previous) SFSound.move(state.record.boards[ply - 1], state.record.moves[ply - 1], state.record.boards[ply], ply === moveCount() && ["1-0", "0-1", "1/2-1/2"].includes(state.record.result));
+      else SFSound.play("move");
+    }
   }
 
   // Preview an engine move on a separate position; never append it to history.
@@ -383,6 +388,7 @@
       state.shapes = []; state.drawing = null;
       $("alternative-status").textContent = "Stockfish: " + san + " instead of " + (rec.san[ply - 1] || rec.moves[ply - 1]) + ".";
       render(); scheduleEval(true);
+      if (window.SFSound) SFSound.move(rec.boards[ply - 1], move, position);
     } catch (err) {
       if (token === state.alternativeToken && err.name !== "AbortError") $("alternative-status").textContent = "Could not load the alternative. Try again.";
     } finally {
@@ -488,6 +494,7 @@
 
   // ------------------------------------------------------------ Games
   async function openRecord(record) {
+    if (window.SFSound) SFSound.stop();
     state.epoch++; stopGrading(false); stopEval(); clearAlternative();
     state.record = record; state.ply = 0; state.shapes = []; state.drawing = null; setError("");
     var supported = isSupported(record);
@@ -542,6 +549,7 @@
   }
 
   // ------------------------------------------------------------ Controls
+  if (window.SFSound) SFSound.bindToggle($("sound-toggle"));
   try { $("special-toggle").checked = localStorage.getItem(SPECIAL_KEY) !== "0"; } catch (_) { /* storage blocked */ }
   try { var savedTime = localStorage.getItem(TIME_KEY); if (["1000", "2000", "5000", "10000", "30000"].includes(savedTime)) $("analysis-time").value = savedTime; } catch (_) { /* storage blocked */ }
   $("analysis-time").onchange = function () {
