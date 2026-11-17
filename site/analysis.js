@@ -166,6 +166,7 @@
   function updateOverlay() {
     var board = $("board");
     board.querySelectorAll(".move-grade-overlay").forEach(function (n) { n.remove(); });
+    delete board.dataset.grade;
     if (state.alternative) return;
     var index = state.ply - 1, grade = shownGrade(index), move = state.record && state.record.moves[index];
     if (!grade || !move) return;
@@ -174,6 +175,7 @@
     badge.className = "move-grade-overlay grade-" + key; badge.src = BADGE_ROOT + key + ".png";
     badge.alt = grade.label; badge.title = grade.label; badge.setAttribute("aria-label", grade.label);
     cell.appendChild(badge);
+    board.dataset.grade = key;
   }
 
   // ------------------------------------------------------------ Annotations
