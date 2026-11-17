@@ -30,14 +30,18 @@ class CollectionTest(unittest.TestCase):
         self.git('config', 'user.email', 'fixture@example.test')
         shutil.copytree(PROJECT / 'collection-server', self.root / 'collection-server')
         (self.root / 'site').mkdir()
-        (self.root / 'site/index.html').write_text('<html><body><a id="source-link" href="old">Source</a></body></html>')
+        (self.root / 'site/index.html').write_text('<html><link href="style.css"><body><a id="source-link" href="old">Source</a><script src="engine-file.js"></script><script src="bots.js"></script><script src="app.js"></script></body></html>')
         (self.root / 'site/favicon.svg').write_text('<svg/>')
+        (self.root / 'site/badges').mkdir()
+        (self.root / 'site/badges/best.png').write_bytes(b'approved badge')
+        (self.root / 'site/sounds').mkdir()
+        (self.root / 'site/sounds/move.mp3').write_bytes(b'piece click')
         for name in ('Copying.txt', 'AUTHORS'):
             (self.root / name).write_text(name)
         (self.root / '.gitignore').write_text('/deploy/\n/.collection-*/\n')
         (self.root / 'make-web.sh').write_text(
             'set -eu\n[ "$1" = test ]\nmkdir -p site/engine\n'
-            'echo built > site/engine/mock.wasm\necho built > site/engine-file.js\n')
+            'echo built > site/engine/mock.wasm\necho \'window.ENGINE_FILE = "engine/mock.js";\' > site/engine-file.js\n')
         manifest = dict(source_url='https://github.com/example/chess', variants=[dict(
             branch='fixture', slug='one', title='One <two>', description='Chess & more')])
         (self.root / 'variants.json').write_text(json.dumps(manifest))
@@ -63,6 +67,12 @@ class CollectionTest(unittest.TestCase):
         self.assertIn('One &lt;two&gt;', page)
         self.assertIn(self.git('rev-parse', 'HEAD'), page)
         self.assertIn('Download engine source', page)
+        commit = self.git('rev-parse', 'HEAD')
+        for asset in ('style.css', 'engine-file.js', 'bots.js', 'app.js'):
+            self.assertIn(asset + '?v=' + commit, page)
+        self.assertIn('assets/' + commit + '/engine/mock.js',
+                      (output / 'variants/one/engine-file.js').read_text())
+        self.assertTrue((output / 'variants/one/assets' / commit / 'engine/mock.wasm').is_file())
         self.assertTrue((output / 'variants/one/source.tar.gz').is_file())
         self.assertTrue((output / 'variants/one/engine/mock.wasm').is_file())
         self.assertEqual(self.git('status', '--porcelain'), before)
@@ -77,6 +87,27 @@ class CollectionTest(unittest.TestCase):
         self.assertEqual(len(list((output / 'variants').iterdir())), 5)
         self.assertIn('variants/variant-5/', (output / 'index.html').read_text())
 
+    def test_analysis_page_links_assets_and_variant_identity(self):
+        (self.root / 'site/analysis.html').write_text(
+            '<html><link href="analysis.css"><body><a id="source-link" href="old">Source</a>'
+            '<script src="engine-file.js"></script><script src="analysis-core.js"></script>'
+            '<script src="game-history.js"></script><script src="analysis.js"></script></body></html>')
+        self.git('add', 'site/analysis.html')
+        self.git('commit', '-qm', 'analysis page')
+        self.build()
+        target = self.root / 'deploy/site/variants/one'
+        page = (target / 'analysis.html').read_text()
+        commit = self.git('rev-parse', 'HEAD')
+        self.assertIn('href="../../"', page)
+        self.assertIn('Download engine source', page)
+        self.assertIn('/tree/' + commit, page)
+        for asset in ('analysis.css', 'engine-file.js', 'analysis-core.js', 'game-history.js', 'analysis.js'):
+            self.assertIn(asset + '?v=' + commit, page)
+        selector = (target / 'engine-file.js').read_text()
+        self.assertIn('window.SHARPFISH_VARIANT', selector)
+        self.assertIn('"slug": "one"', selector)
+        self.assertIn('"supported": false', selector)
+
     def test_failed_build_preserves_previous_output(self):
         self.build()
         before = (self.root / 'deploy/site/build-info.json').read_bytes()
@@ -87,6 +118,40 @@ class CollectionTest(unittest.TestCase):
             self.build()
         self.assertEqual((self.root / 'deploy/site/build-info.json').read_bytes(), before)
         self.assertEqual(list(self.root.glob('.collection-*')), [])
+
+    def test_badge_urls_change_between_releases(self):
+        self.build()
+        first = self.git('rev-parse', 'HEAD')
+        target = self.root / 'deploy/site/variants/one'
+        badge = 'assets/' + first + '/badges/best.png'
+        self.assertTrue((target / badge).is_file())
+        self.assertIn('"badgePath": "assets/' + first + '/badges/"',
+                      (target / 'engine-file.js').read_text())
+        (self.root / 'site/badges/best.png').write_bytes(b'next approved badge')
+        self.git('add', 'site/badges/best.png')
+        self.git('commit', '-qm', 'replace artwork')
+        self.build()
+        second = self.git('rev-parse', 'HEAD')
+        self.assertNotEqual(first, second)
+        self.assertEqual((target / 'assets' / second / 'badges/best.png').read_bytes(),
+                         b'next approved badge')
+        self.assertIn('"badgePath": "assets/' + second + '/badges/"',
+                      (target / 'engine-file.js').read_text())
+
+    def test_sound_urls_follow_the_frozen_release(self):
+        self.build()
+        first = self.git('rev-parse', 'HEAD')
+        target = self.root / 'deploy/site/variants/one'
+        self.assertEqual((target / 'assets' / first / 'sounds/move.mp3').read_bytes(), b'piece click')
+        self.assertIn('"soundPath": "assets/' + first + '/sounds/"', (target / 'engine-file.js').read_text())
+        (self.root / 'site/sounds/move.mp3').write_bytes(b'updated click')
+        self.git('add', 'site/sounds/move.mp3')
+        self.git('commit', '-qm', 'update sound')
+        self.build()
+        second = self.git('rev-parse', 'HEAD')
+        self.assertNotEqual(first, second)
+        self.assertEqual((target / 'assets' / second / 'sounds/move.mp3').read_bytes(), b'updated click')
+        self.assertIn('"soundPath": "assets/' + second + '/sounds/"', (target / 'engine-file.js').read_text())
 
     def test_reject_invalid_duplicate_or_missing_branch(self):
         for branch, slug in [('fixture', '../escape'), ('fixture', 'one'), ('absent', 'new')]:

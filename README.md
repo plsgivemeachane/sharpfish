@@ -163,7 +163,7 @@ are cached with the settings that produced them, so revisiting a game is instant
   collection is built and published. Pushing a branch does not deploy the site.
 - [DESIGN.md](DESIGN.md) records the design decisions behind the interface.
 
-Each variant lives on its own branch. `elo-ladder` holds the collection tooling
+Each variant lives on its own branch. `main` also holds the collection tooling
 and `variants.json`.
 
 ## Thanks

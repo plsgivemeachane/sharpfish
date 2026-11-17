@@ -66,8 +66,8 @@ leaving a browser pointed at an old engine.
 
 The intended public repository is `plsgivemeachane/sharpfish`. Preserve the
 upstream Stockfish.js remote as `upstream`, add the new repository as `origin`,
-push the four initial branches, and keep `main` as the default branch. The
-collection tooling lives on `elo-ladder`, so check that branch out before building:
+push the four initial branches, and keep `main` as the default branch. `main`
+also holds the collection tooling:
 
 ```sh
 git remote rename origin upstream

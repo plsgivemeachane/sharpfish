@@ -4,9 +4,9 @@
 
 - Public repository: https://github.com/plsgivemeachane/sharpfish (`origin`).
 - Original Stockfish.js repository is `upstream`; do not push project changes there.
-- `main` is GitHub's default branch (the Classic variant and the public README). `elo-ladder` owns collection tooling and deployment configuration; clone or check it out (`git clone -b elo-ladder …`) before running collection commands.
+- `main` is the default branch: the Classic variant plus the collection tooling and deployment configuration. `elo-ladder` is kept in sync with `main` for older links.
 - Each variant keeps its own engine and play UI on its branch. Do not merge all variants together.
-- `variants.json` on `elo-ladder` registers deployed branches and stable URL slugs.
+- `variants.json` on `main` registers deployed branches and stable URL slugs.
 - Production: SSH alias `kietvnmhomeserver`, directory `/opt/sharpfish`, Docker Compose service `sharpfish`, HTTP port **8096**.
 - Cloudflare Tunnel forwards the public HTTPS hostname to `http://localhost:8096` on that server. Ordinary updates do not require Cloudflare changes.
 - `deploy/` is an ignored, generated archive. Never hand-edit it or commit it; rebuild it from source.
@@ -16,21 +16,21 @@
 
 | Change | Source of truth |
 | --- | --- |
-| Collection homepage | `collection-server/index.html`, `collection-server/collection.css` on `elo-ladder` |
-| Variant names, descriptions, ordering, registration | `variants.json` on `elo-ladder` |
+| Collection homepage | `collection-server/index.html`, `collection-server/collection.css` on `main` |
+| Variant names, descriptions, ordering, registration | `variants.json` on `main` |
 | A variant's play page, images, bot roster | `site/` on that variant's branch |
 | A variant's engine or rules | `src/` on that variant's branch; see `FORKING.md` |
-| Export process, injected return/source links | `scripts/collection.py` on `elo-ladder` |
-| Container, port, HTTP behavior | `collection-server/Dockerfile`, `compose.yaml`, `nginx.conf` on `elo-ladder` |
+| Export process, injected return/source links | `scripts/collection.py` on `main` |
+| Container, port, HTTP behavior | `collection-server/Dockerfile`, `compose.yaml`, `nginx.conf` on `main` |
 
-Initial branches: `main` → `/variants/classic/`, `elo-ladder` → `/variants/elo-ladder/`,
+Initial branches: `main` → `/variants/classic/`, `elo-ladder` (now merged into Classic),
 `alternating-colors` → `/variants/alternating-colors/`, `scp-096` → `/variants/scp-096/`.
 
 ## Safe branch workflow
 
 1. Inspect `git status` before editing. Preserve unrelated changes; never reset, stash, or commit someone else's work without authorization.
 2. Make variant-specific changes on their own branch. Commit shared UI improvements separately, then cherry-pick that commit onto each intended variant and resolve differences individually. SCP-096 has custom pieces and intentionally disables stock evaluation; preserve those differences.
-3. For a dirty checkout or a different active branch, use a separate Git worktree instead of switching underneath existing edits. Collection commands must run from an `elo-ladder` checkout that contains the tooling.
+3. For a dirty checkout or a different active branch, use a separate Git worktree instead of switching underneath existing edits. Collection commands must run from a `main` checkout that contains the tooling.
 4. Commit and push the intended source changes before publishing their binaries, so exported source links resolve publicly. Do not force-push.
 5. Fetch before building: `git fetch origin`. The builder prefers a local branch over `origin/<branch>`; fetching alone does **not** update existing local branches. Fast-forward each registered local branch when appropriate, or intentionally build its local committed version. Stop and inspect divergent history rather than discarding it.
 
@@ -44,7 +44,7 @@ Create the variant branch from an appropriate existing branch, implement and com
 git push -u origin my-variant
 ```
 
-From the `elo-ladder` collection checkout:
+From the `main` collection checkout:
 
 ```sh
 python3 scripts/collection.py add my-variant \
@@ -52,7 +52,7 @@ python3 scripts/collection.py add my-variant \
   --description "A short explanation of its gameplay."
 git add variants.json
 git commit -m "Register my-variant in the collection"
-git push origin elo-ladder
+git push origin main
 ```
 
 Choose a unique lowercase, hyphenated slug; keep published slugs stable. To change an existing entry, edit `variants.json` directly; `add` only registers new entries. New branches must retain the `make-web.sh test` interface, a complete playable `site/`, and the `source-link` anchor expected by the exporter. Registration does not deploy anything until the collection is rebuilt.
@@ -86,7 +86,7 @@ node scripts/collection-browser-test.js /path/to/playwright-tools http://localho
 docker compose -f deploy/compose.yaml -p sharpfish-preview down
 ```
 
-The browser check covers homepage navigation, mobile overflow, each human move and bot reply, variant-specific evaluation, WASM MIME/cache headers, source downloads, and missing routes. Also inspect the homepage visually for design changes; `DESIGN.md` records its design decisions. Run relevant gameplay regressions when changing gameplay (for example `node scripts/premove-test.js` on `elo-ladder`). Do not claim browser validation if Playwright was unavailable.
+The browser check covers homepage navigation, mobile overflow, each human move and bot reply, variant-specific evaluation, WASM MIME/cache headers, source downloads, and missing routes. Also inspect the homepage visually for design changes; `DESIGN.md` records its design decisions. Run relevant gameplay regressions when changing gameplay (for example `node scripts/premove-test.js` on `main`). Do not claim browser validation if Playwright was unavailable.
 
 ## Deploy the verified archive
 

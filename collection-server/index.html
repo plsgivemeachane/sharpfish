@@ -3,19 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Explore Sharpfish chess variants and play against them in your browser.">
+  <meta name="description" content="Play Sharpfish chess variants or analyze a game with Stockfish in your browser.">
+  <meta name="theme-color" content="#04162b">
   <title>Sharpfish — choose your game</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="collection.css">
+  <link rel="stylesheet" href="collection.css?v={{STYLE_VERSION}}">
 </head>
 <body>
-  <header><a class="brand" href="./"><img src="favicon.svg" width="36" height="36" alt="">Sharpfish</a><span>Chess with a different instinct.</span></header>
+  <header class="site-header">
+    <a class="brand" href="./"><img src="favicon.svg" width="36" height="36" alt="">Sharpfish</a>
+    <nav aria-label="Site"><a href="#variants">Variants</a><a href="variants/classic/analysis.html">Analysis</a><a href="{{SOURCE_URL}}">Source</a></nav>
+  </header>
   <main>
-    <p class="eyebrow">THE COLLECTION</p>
-    <h1>Same board.<br>A different game.</h1>
-    <p class="intro">A familiar opponent, a fresh set of rules, or something a little stranger. Choose a variant and make your first move.</p>
-    <section aria-label="Variants"><div class="variants">{{CARDS}}</div></section>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Chess with a different instinct</p>
+        <h1 id="hero-title">Same board.<br><span>A different game.</span></h1>
+        <p class="intro">Play a familiar opponent, try a fresh set of rules, or take a closer look at your last game. Everything runs in your browser — no account, no setup.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="variants/classic/">Play Classic</a>
+          <a class="button" href="#variants">Browse variants</a>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="board-art"></div>
+        <img class="knight" src="favicon.svg" alt="" width="128" height="128">
+      </div>
+    </section>
+
+    <section id="variants" class="collection" aria-labelledby="collection-title">
+      <div class="section-head">
+        <h2 id="collection-title">Choose your game</h2>
+        <p>Each variant is Stockfish with one rule changed. You always play normal chess.</p>
+      </div>
+      <div class="variants">
+        <a class="collection-card analysis-card" href="variants/classic/analysis.html">
+          <span class="card-top"><span class="number">Analyze</span><span class="arrow" aria-hidden="true">→</span></span>
+          <h3>Game analysis</h3>
+          <p>Import a PGN or revisit a saved game. Review every move with Stockfish.</p>
+          <span class="play">Analyze a game</span>
+        </a>
+        {{CARDS}}
+        <a class="collection-card build-card" href="{{SOURCE_URL}}/blob/elo-ladder/FORKING.md">
+          <span class="card-top"><span class="number">Your idea</span><span class="arrow" aria-hidden="true">→</span></span>
+          <h3>Make a variant</h3>
+          <p>Fork the engine, change one rule, and add your own “Stockfish but…” to the collection.</p>
+          <span class="play">Read the guide</span>
+        </a>
+      </div>
+    </section>
   </main>
-  <footer><span>Powered by Stockfish. Played in your browser.</span><a href="{{SOURCE_URL}}">Source code &amp; credits</a></footer>
+  <footer class="site-footer"><span>Powered by Stockfish. Played in your browser.</span><a href="{{SOURCE_URL}}">Source code &amp; credits</a></footer>
 </body>
 </html>

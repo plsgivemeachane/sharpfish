@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import gzip
+import hashlib
 import html
 import json
 from pathlib import Path
@@ -64,34 +65,48 @@ def add(args):
     print(f'Registered {args.slug}. Commit the manifest, then rebuild.')
 
 
-def export_page(path, title, source_url):
+def export_page(path, title, source_url, commit):
     content = path.read_text()
     if content.count('<body>') != 1:
         raise ValueError(f'{path}: expected one <body> navigation insertion point')
-    nav = ('<nav aria-label="Collection" style="padding:12px 16px;display:flex;'
-           'gap:20px;flex-wrap:wrap">'
+    # Self-contained styles: the strip must look right on every branch's page.
+    nav = ('<style>.sf-collection-nav{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;'
+           'padding:6px 12px;font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+           'background:rgba(2,10,23,.55);border-bottom:1px solid rgba(120,180,225,.16);color:#8fb0c9}'
+           '.sf-collection-nav a{color:#8fb0c9;text-decoration:none;border-radius:6px;padding:4px 8px}'
+           '.sf-collection-nav a:hover{color:#e3f0fa;background:rgba(120,180,225,.1)}'
+           '.sf-collection-nav a:focus-visible{outline:2px solid #34bfd3;outline-offset:1px}'
+           '.sf-collection-nav .sf-current{color:#e3f0fa;font-weight:600}'
+           '.sf-collection-nav .sf-source{margin-left:auto}</style>'
+           '<nav class="sf-collection-nav" aria-label="Collection">'
            '<a href="../../">← All variants</a>'
-           f'<span>{html.escape(title)}</span>'
-           '<a href="source.tar.gz">Download engine source</a></nav>')
+           f'<span class="sf-current">{html.escape(title)}</span>'
+           '<a class="sf-source" href="source.tar.gz">Download engine source</a></nav>')
     content = content.replace('<body>', '<body>\n' + nav, 1)
     content, count = re.subn(r'(<a\s+id="source-link"\s+href=")[^"]*(")',
                             lambda m: m[1] + html.escape(source_url, quote=True) + m[2], content)
     if count != 1:
         raise ValueError(f'{path}: expected one source-link')
+    # Cloudflare may override cache headers; stable URLs can mix releases.
+    content = re.sub(r'((?:src|href)="(?!https?://|//)[^"?#]+\.(?:js|css))(")',
+                     lambda m: m[1] + '?v=' + commit + m[2], content)
     path.write_text(content)
 
 
 def homepage(site, data):
     cards = []
     for number, entry in enumerate(data['variants'], 1):
-        cards.append(f'<a class="variant" href="variants/{entry["slug"]}/">'
-                     f'<span class="number">{number:02d}</span>'
+        cards.append(f'<a class="collection-card variant" href="variants/{entry["slug"]}/">'
+                     f'<span class="card-top"><span class="number">{number:02d}</span>'
+                     '<span class="arrow" aria-hidden="true">→</span></span>'
                      f'<h3>{html.escape(entry["title"])}</h3>'
                      f'<p>{html.escape(entry["description"])}</p>'
-                     '<span class="play">Play variant →</span></a>')
+                     '<span class="play">Play variant</span></a>')
     template = (ROOT / 'collection-server/index.html').read_text()
+    style_version = hashlib.sha256((ROOT / 'collection-server/collection.css').read_bytes()).hexdigest()[:16]
     (site / 'index.html').write_text(template.replace('{{CARDS}}', '\n'.join(cards))
-                                   .replace('{{SOURCE_URL}}', data['source_url']))
+                                   .replace('{{SOURCE_URL}}', data['source_url'])
+                                   .replace('{{STYLE_VERSION}}', style_version))
     shutil.copy2(ROOT / 'collection-server/collection.css', site)
     shutil.copy2(ROOT / 'site/favicon.svg', site)
 
@@ -122,8 +137,36 @@ def build():
                 shutil.copyfileobj(src, dest)
             for filename in ('Copying.txt', 'AUTHORS'):
                 shutil.copy2(snapshot / filename, target)
-            export_page(target / 'index.html', entry['title'],
-                        data['source_url'] + '/tree/' + entry['commit'])
+            # Workers derive their WASM URL from their own path, so version both
+            # together rather than only adding a query string to the worker.
+            versioned = target / 'assets' / entry['commit']
+            for engine_dir in ('engine', 'stock-engine'):
+                if (target / engine_dir).is_dir():
+                    shutil.copytree(target / engine_dir, versioned / engine_dir)
+            # Media caches may outlive a deployment despite origin no-cache.
+            # Give badges and sounds the same release identity as the UI.
+            for media_dir in ('badges', 'sounds'):
+                if (target / media_dir).is_dir():
+                    shutil.copytree(target / media_dir, versioned / media_dir)
+            selector = target / 'engine-file.js'
+            if selector.exists():
+                content = selector.read_text()
+                for engine_dir in ('engine', 'stock-engine'):
+                    content = content.replace('\"' + engine_dir + '/',
+                                              '\"assets/' + entry['commit'] + '/' + engine_dir + '/')
+                content += '\nwindow.SHARPFISH_VARIANT = ' + json.dumps(dict(
+                    slug=entry['slug'], title=entry['title'],
+                    path='/variants/' + entry['slug'] + '/',
+                    badgePath='assets/' + entry['commit'] + '/badges/',
+                    soundPath='assets/' + entry['commit'] + '/sounds/',
+                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish'),
+                    analysisMode='standard-snapshot' if entry['slug'] in ('alternating-colors', 'scp-096') else 'standard-line',
+                    revision=entry['commit'])) + ';\n'
+                selector.write_text(content)
+            for page_name in ('index.html', 'analysis.html'):
+                if (target / page_name).exists():
+                    export_page(target / page_name, entry['title'],
+                                data['source_url'] + '/tree/' + entry['commit'], entry['commit'])
             shutil.rmtree(snapshot)
             archive.unlink()
         homepage(site, data)
