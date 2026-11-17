@@ -79,7 +79,7 @@ def export_page(path, title, source_url, commit):
     if count != 1:
         raise ValueError(f'{path}: expected one source-link')
     # Cloudflare may override cache headers; stable URLs can mix releases.
-    content = re.sub(r'((?:src|href)="(?:engine-file\.js|bots\.js|app\.js|style\.css))(")',
+    content = re.sub(r'((?:src|href)="(?!https?://|//)[^"?#]+\.(?:js|css))(")',
                      lambda m: m[1] + '?v=' + commit + m[2], content)
     path.write_text(content)
 
@@ -137,9 +137,16 @@ def build():
                 for engine_dir in ('engine', 'stock-engine'):
                     content = content.replace('\"' + engine_dir + '/',
                                               '\"assets/' + entry['commit'] + '/' + engine_dir + '/')
+                content += '\nwindow.SHARPFISH_VARIANT = ' + json.dumps(dict(
+                    slug=entry['slug'], title=entry['title'],
+                    path='/variants/' + entry['slug'] + '/',
+                    supported=entry['slug'] in ('classic', 'elo-ladder'),
+                    revision=entry['commit'])) + ';\n'
                 selector.write_text(content)
-            export_page(target / 'index.html', entry['title'],
-                        data['source_url'] + '/tree/' + entry['commit'], entry['commit'])
+            for page_name in ('index.html', 'analysis.html'):
+                if (target / page_name).exists():
+                    export_page(target / page_name, entry['title'],
+                                data['source_url'] + '/tree/' + entry['commit'], entry['commit'])
             shutil.rmtree(snapshot)
             archive.unlink()
         homepage(site, data)

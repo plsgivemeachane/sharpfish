@@ -83,6 +83,27 @@ class CollectionTest(unittest.TestCase):
         self.assertEqual(len(list((output / 'variants').iterdir())), 5)
         self.assertIn('variants/variant-5/', (output / 'index.html').read_text())
 
+    def test_analysis_page_links_assets_and_variant_identity(self):
+        (self.root / 'site/analysis.html').write_text(
+            '<html><link href="analysis.css"><body><a id="source-link" href="old">Source</a>'
+            '<script src="engine-file.js"></script><script src="analysis-core.js"></script>'
+            '<script src="game-history.js"></script><script src="analysis.js"></script></body></html>')
+        self.git('add', 'site/analysis.html')
+        self.git('commit', '-qm', 'analysis page')
+        self.build()
+        target = self.root / 'deploy/site/variants/one'
+        page = (target / 'analysis.html').read_text()
+        commit = self.git('rev-parse', 'HEAD')
+        self.assertIn('href="../../"', page)
+        self.assertIn('Download engine source', page)
+        self.assertIn('/tree/' + commit, page)
+        for asset in ('analysis.css', 'engine-file.js', 'analysis-core.js', 'game-history.js', 'analysis.js'):
+            self.assertIn(asset + '?v=' + commit, page)
+        selector = (target / 'engine-file.js').read_text()
+        self.assertIn('window.SHARPFISH_VARIANT', selector)
+        self.assertIn('"slug": "one"', selector)
+        self.assertIn('"supported": false', selector)
+
     def test_failed_build_preserves_previous_output(self):
         self.build()
         before = (self.root / 'deploy/site/build-info.json').read_bytes()
