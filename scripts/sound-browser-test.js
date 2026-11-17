@@ -81,7 +81,7 @@ const base = (process.argv[3] || "http://localhost:8096").replace(/\/$/, "");
     await page.locator("#sound-toggle").uncheck(); await page.locator("#next").click();
     assert.equal(await count(), 6);
     await page.reload(); assert.equal(await page.locator("#sound-toggle").isChecked(), false);
-    for (const slug of ["alternating-colors", "scp-096"]) {
+    for (const slug of ["alternating-colors", "scp-096", "sufferfish"]) {
       await page.goto(`${base}/variants/${slug}/`); await ready();
       assert.equal(await page.locator("#chk-sound").isChecked(), false, "mute follows variants");
       await page.locator("#chk-sound").check();

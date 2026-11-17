@@ -13,7 +13,7 @@
     analyzer = null; running = null;
   }
   function drain() {
-    if (running || !enabled || !current || current.variant && current.variant.supported === false || !root.SFAnalysis) return;
+    if (running || !enabled || !current || !root.SFAnalysis || !root.STOCK_ENGINE_FILE || !root.SFAnalysis.supportsRecord(current)) return;
     var record = current;
     var index = -1, retry = -1, unavailable = 0;
     for (var i = record.moves.length - 1; i >= 0; i--) {
@@ -24,7 +24,10 @@
       else if (attempts >= 2) unavailable++;
     }
     if (index < 0) index = retry;
-    if (index < 0) { status(unavailable ? unavailable + (unavailable === 1 ? " move" : " moves") + " could not be graded after retrying. Toggle grading to retry." : "Moves graded"); return; }
+    if (index < 0) {
+      var incompatible = Object.keys(record.grades || {}).filter(function (i) { return valid(record.grades[i], record, +i) && record.grades[i].unavailable; }).length;
+      status(unavailable ? unavailable + (unavailable === 1 ? " move" : " moves") + " could not be graded after retrying. Toggle grading to retry." : incompatible ? "Moves graded; " + incompatible + " unavailable in ordinary chess." : "Moves graded"); return;
+    }
     if (!analyzer) analyzer = new root.SFAnalysis.Analyzer(root.STOCK_ENGINE_FILE);
     var job = { epoch: epoch, id: record.id, index: index, key: root.SFAnalysis.historyKey(record, index + 1) };
     running = job; status((failed[job.key] ? "Retrying move " : "Grading move ") + (index + 1) + "…");

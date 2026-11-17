@@ -6,7 +6,7 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.3.0";
+  var VERSION = "1.4.0";
   var GRADE_TIME_MS = 2000;
   function gradeTime(value) { return Number.isFinite(value) ? Math.max(1000, Math.min(30000, Math.floor(value))) : GRADE_TIME_MS; }
   function now() { return typeof performance === "object" ? performance.now() : Date.now(); }
@@ -276,12 +276,14 @@
     var result = { w: empty(), b: empty(), minDecisions: 5 }, sums = { w: { accuracy: 0, loss: 0 }, b: { accuracy: 0, loss: 0 } };
     var initial = record && record.startFen ? parseBoard(record.startFen).turn : "w";
     ((record && record.moves) || []).forEach(function (_, index) {
-      var pos = record.boards && record.boards[index], side = pos && pos.turn || (index % 2 ? initial === "w" ? "b" : "w" : initial);
-      var player = result[side], loss = performanceLoss(grades && grades[index]);
+      var pos = record.boards && record.boards[index], grade = grades && grades[index];
+      var side = grade && grade.side || pos && pos.turn || (index % 2 ? initial === "w" ? "b" : "w" : initial);
+      var player = result[side], loss = performanceLoss(grade);
       player.total++;
       if (loss == null) return;
       player.analyzed++; sums[side].accuracy += 100 * Math.exp(-loss / 200);
-      if (pos && Array.isArray(pos.legal) && pos.legal.length > 1) { player.decisions++; sums[side].loss += loss; }
+      var choices = grade && Number.isInteger(grade.legalMoveCount) ? grade.legalMoveCount : pos && Array.isArray(pos.legal) ? pos.legal.length : 0;
+      if (choices > 1) { player.decisions++; sums[side].loss += loss; }
     });
     ["w", "b"].forEach(function (side) {
       var player = result[side];
@@ -347,14 +349,54 @@
     }
     return false;
   }
+  function supportsRecord(record) {
+    var variant = record && record.variant;
+    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish"].includes(variant.slug) || variant.supported !== false);
+  }
+  function snapshotAnalysis(record) {
+    var variant = record && record.variant;
+    return !!variant && (["alternating-colors", "scp-096"].includes(variant.slug) || variant.analysisMode === "standard-snapshot");
+  }
+  function unavailable(message) {
+    var error = new Error(message); error.name = "AnalysisUnavailableError"; return error;
+  }
+  // Replay owns the original variant snapshots. Only this validated projection
+  // reaches ordinary Stockfish; automatic SCP captures are never replayed as moves.
+  function analysisFen(record, ply) {
+    var snapshot = record.boards && record.boards[ply], fen = snapshot && snapshot.fen;
+    if (!fen) throw unavailable("This position has no saved board for ordinary chess analysis.");
+    var fields = String(fen).trim().split(/\s+/), originalRights = fields[2], ep = fields[3];
+    if (record.variant && record.variant.slug === "scp-096") {
+      fields[0] = fields[0].replace(/\*/g, "1").replace(/[1-8]+/g, function (run) {
+        return String(Array.from(run).reduce(function (sum, digit) { return sum + Number(digit); }, 0));
+      });
+    }
+    try {
+      fields[2] = fields[3] = "-";
+      var parsed = parseBoard(fields.join(" ")), board = parsed.board;
+      var rights = { K: ["e1", "K", "h1", "R"], Q: ["e1", "K", "a1", "R"], k: ["e8", "k", "h8", "r"], q: ["e8", "k", "a8", "r"] };
+      fields[2] = Object.keys(rights).filter(function (right) {
+        var required = rights[right];
+        return String(originalRights).includes(right) && board[required[0]] === required[1] && board[required[2]] === required[3];
+      }).join("") || "-";
+      fields[3] = ep;
+      try { parseBoard(fields.join(" ")); } catch (_) { fields[3] = "-"; }
+      return parseBoard(fields.join(" ")).fen;
+    } catch (error) { throw unavailable("Unavailable in ordinary chess: " + error.message); }
+  }
   function positionCommand(record, ply, extra) {
+    if (snapshotAnalysis(record)) return "position fen " + analysisFen(record, ply) + (extra && extra.length ? " moves " + extra.join(" ") : "");
     var moves = record.moves.slice(0, ply).concat(extra || []);
     return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
   }
-  function historyKey(record, ply) { return (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" "); }
+  function historyKey(record, ply) {
+    var key = (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" ");
+    if (snapshotAnalysis(record)) key += "|standard-snapshot-v1|" + ((record.boards && record.boards[ply - 1] || {}).fen || "missing");
+    return key;
+  }
   function isValidGrade(grade, record, index, engine, specialMoves, movetime) {
     return !!(grade && record && record.moves && index >= 0 && index < record.moves.length &&
-      grade.version === VERSION && grade.model === "centipawn" && grade.depth > 0 &&
+      grade.version === VERSION && grade.model === "centipawn" && (grade.depth > 0 || grade.unavailable === true) &&
       grade.config && grade.config.model === "centipawn" && grade.config.movetime === gradeTime(movetime) &&
       grade.config.specialMoves === (specialMoves !== false) &&
       grade.config.engine === engine && grade.historyKey === historyKey(record, index + 1));
@@ -420,6 +462,7 @@
       return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check };
     }
     async function recordPosition(record, ply, token, timeout) {
+      if (snapshotAnalysis(record)) return position(record, ply, token, null, timeout);
       var cached = record.boards && record.boards[ply];
       if (cached && cached.fen && cached.legal) return cached;
       return position(record, ply, token, null, timeout);
@@ -448,6 +491,7 @@
       return info;
     }
     this.position = function (fen, moves) { return run(function (token) { return position({ startFen: fen, moves: moves || [] }, (moves || []).length, token); }); };
+    this.recordPosition = function (record, ply) { return run(function (token) { return recordPosition(record, ply, token); }); };
     this.replay = function (text) {
       var parsed;
       try { parsed = parsePgn(text); } catch (error) { return Promise.reject(error); }
@@ -472,11 +516,18 @@
     this.evaluate = function (record, ply, options) { return run(function (token) { return evaluate(record, ply, options, token); }); };
     this.grade = function (record, index, options) {
       options = options || {};
+      var originalRecord = record, originalIndex = index;
       return run(async function (token) {
         var budget = gradeTime(options.movetime), scale = budget / GRADE_TIME_MS;
         var started = now(), deadline = started + budget;
         var pos = await recordPosition(record, index, token, budget + 200), move = record.moves[index];
-        if (!pos.legal.includes(move)) throw new Error("No legal move at requested index");
+        if (!pos.legal.includes(move)) {
+          if (snapshotAnalysis(record)) throw unavailable("The recorded move is unavailable in ordinary chess when custom rules are ignored.");
+          throw new Error("No legal move at requested index");
+        }
+        if (snapshotAnalysis(record)) {
+          record = { startFen: pos.fen, moves: [move], boards: [pos] }; index = 0;
+        }
         async function search(ply, quota, settings) {
           var remaining = Math.floor(deadline - now());
           if (remaining < 10) return null;
@@ -568,9 +619,15 @@
           mateEvidence: mateEvidence, great: great, brilliant: brilliant });
         return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv,
           depth: Math.min(best.depth, played.depth), elapsedMs: Math.round(now() - started), raw: raw,
-          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1),
+          side: pos.turn, legalMoveCount: pos.legal.length, analysisLegalMoves: pos.legal.slice(), beforeFen: pos.fen,
+          specialEvidence: specialEvidence, historyKey: historyKey(originalRecord, originalIndex + 1),
           config: { model: "centipawn", movetime: budget, specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION },
           configKey: VERSION + "|movetime=" + budget + "|specialMoves=" + (options.specialMoves !== false) + "|engine=" + workerFile });
+      }).catch(function (error) {
+        if (error.name !== "AnalysisUnavailableError") throw error;
+        return { unavailable: true, reason: error.message, version: VERSION, model: "centipawn", depth: 0,
+          historyKey: historyKey(originalRecord, originalIndex + 1),
+          config: { model: "centipawn", movetime: gradeTime(options.movetime), specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION } };
       });
     };
     this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
@@ -579,5 +636,5 @@
   return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
     objectiveLabel: objectiveLabel, centipawnLoss: centipawnLoss, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey, isValidGrade: isValidGrade,
     attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, sanCore: sanCore,
-    performanceSummary: performanceSummary, Analyzer: Analyzer };
+    performanceSummary: performanceSummary, supportsRecord: supportsRecord, snapshotAnalysis: snapshotAnalysis, analysisFen: analysisFen, Analyzer: Analyzer };
 }));
