@@ -131,6 +131,10 @@ def build():
             for engine_dir in ('engine', 'stock-engine'):
                 if (target / engine_dir).is_dir():
                     shutil.copytree(target / engine_dir, versioned / engine_dir)
+            # Image caches may outlive a deployment despite origin no-cache.
+            # Give dynamic badge images the same release identity as the UI.
+            if (target / 'badges').is_dir():
+                shutil.copytree(target / 'badges', versioned / 'badges')
             selector = target / 'engine-file.js'
             if selector.exists():
                 content = selector.read_text()
@@ -140,6 +144,7 @@ def build():
                 content += '\nwindow.SHARPFISH_VARIANT = ' + json.dumps(dict(
                     slug=entry['slug'], title=entry['title'],
                     path='/variants/' + entry['slug'] + '/',
+                    badgePath='assets/' + entry['commit'] + '/badges/',
                     supported=entry['slug'] in ('classic', 'elo-ladder'),
                     revision=entry['commit'])) + ';\n'
                 selector.write_text(content)

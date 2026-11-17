@@ -32,6 +32,8 @@ class CollectionTest(unittest.TestCase):
         (self.root / 'site').mkdir()
         (self.root / 'site/index.html').write_text('<html><link href="style.css"><body><a id="source-link" href="old">Source</a><script src="engine-file.js"></script><script src="bots.js"></script><script src="app.js"></script></body></html>')
         (self.root / 'site/favicon.svg').write_text('<svg/>')
+        (self.root / 'site/badges').mkdir()
+        (self.root / 'site/badges/best.png').write_bytes(b'approved badge')
         for name in ('Copying.txt', 'AUTHORS'):
             (self.root / name).write_text(name)
         (self.root / '.gitignore').write_text('/deploy/\n/.collection-*/\n')
@@ -114,6 +116,25 @@ class CollectionTest(unittest.TestCase):
             self.build()
         self.assertEqual((self.root / 'deploy/site/build-info.json').read_bytes(), before)
         self.assertEqual(list(self.root.glob('.collection-*')), [])
+
+    def test_badge_urls_change_between_releases(self):
+        self.build()
+        first = self.git('rev-parse', 'HEAD')
+        target = self.root / 'deploy/site/variants/one'
+        badge = 'assets/' + first + '/badges/best.png'
+        self.assertTrue((target / badge).is_file())
+        self.assertIn('"badgePath": "assets/' + first + '/badges/"',
+                      (target / 'engine-file.js').read_text())
+        (self.root / 'site/badges/best.png').write_bytes(b'next approved badge')
+        self.git('add', 'site/badges/best.png')
+        self.git('commit', '-qm', 'replace artwork')
+        self.build()
+        second = self.git('rev-parse', 'HEAD')
+        self.assertNotEqual(first, second)
+        self.assertEqual((target / 'assets' / second / 'badges/best.png').read_bytes(),
+                         b'next approved badge')
+        self.assertIn('"badgePath": "assets/' + second + '/badges/"',
+                      (target / 'engine-file.js').read_text())
 
     def test_reject_invalid_duplicate_or_missing_branch(self):
         for branch, slug in [('fixture', '../escape'), ('fixture', 'one'), ('absent', 'new')]:
