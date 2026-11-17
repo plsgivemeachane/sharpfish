@@ -248,7 +248,9 @@ function formatScore(info, turn) {
   return (n > 0 ? "+" : "") + (n / 100).toFixed(2);
 }
 
-var MIN_BOT_MOVE_MS = 2100; // leave a little more than two seconds for premoves
+// The shortest wait before a bot plays (Settings → Move delay), which leaves
+// time to set up premoves. "Instant" plays as soon as the search ends.
+function minBotMoveMs() { return Number($("sel-delay").value) || 0; }
 
 function engineMove() {
   var token = game.token;
@@ -272,7 +274,7 @@ function engineMove() {
     // A fast search still leaves time to plan. This wait does not occupy the
     // engine request queue; a new game/takeback can start immediately.
     await new Promise(function (resolve) {
-      setTimeout(resolve, Math.max(0, MIN_BOT_MOVE_MS - (performance.now() - started)));
+      setTimeout(resolve, Math.max(0, minBotMoveMs() - (performance.now() - started)));
     });
     if (token !== game.token) return;
     thinking = false;
