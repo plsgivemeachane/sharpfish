@@ -94,6 +94,20 @@ const core = require("../site/analysis-core.js");
     assert(!["Brilliant", "Great"].includes(ordinarySacrifice.label));
     assert.equal(ordinarySacrifice.specialEvidence, null, "disabling special grades skips sacrifice verification");
     assert.equal(ordinarySacrifice.config.specialMoves, false);
+    const clearance = await analyzer.replay('1. e4 c5 2. Nf3 d6 3. c4 e6 4. Nc3 Nf6 5. Bd3 Nc6 6. O-O Nd4 7. Nxd4 cxd4 8. Nb5 e5 9. b3 a6 10. Bb2 axb5 11. cxb5 Bd7 12. Rc1 Rc8 13. Rxc8 Qxc8 14. Qf3 Qd8 15. b6 Ng4 16. h3 h5 17. hxg4 hxg4 18. Qg3 Be7 19. Be2 Bh4 20. Qh2 Bxf2+ 21. Rxf2 Rxh2 22. Kxh2 Qh4+ 23. Kg1 g3 24. Rf1 Qh2# 0-1');
+    for (const movetime of [2000, 5000]) {
+      const clearanceGrade = await timedGrade(clearance, 39, { movetime });
+      assert.equal(clearanceGrade.label, "Brilliant", "Bxf2+ is a sound bishop offer even though Rxh2 immediately wins a queen");
+      assert.deepEqual(clearanceGrade.specialEvidence.acceptances.map(a => a.reply).sort(), ["f1f2", "g1f2"], "both rook and king captures must be verified");
+      assert(clearanceGrade.specialEvidence.acceptances.every(a => a.offeredMaterialChange === -230 && a.materialChange === 670), "measure the offered bishop separately from the queen won back");
+    }
+    const exchange = await analyzer.replay('1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 *');
+    assert.notEqual((await timedGrade(exchange, 6)).label, "Brilliant", "an ordinary bishop-for-knight trade is not a sacrifice");
+    const surplusOffer = await analyzer.replay('[FEN "r2qk2r/pp1b1pp1/1P1p4/4p3/3pP1pb/1P6/PB1PBPPQ/5RK1 b k - 5 20"]\n20... Bxf2+ *');
+    const surplusOfferGrade = await timedGrade(surplusOffer, 0);
+    assert(["Best", "Excellent"].includes(surplusOfferGrade.objectiveLabel), "the bishop offer remains strong with an extra rook");
+    assert.notEqual(surplusOfferGrade.label, "Brilliant", "giving material back while already more than a rook ahead is excluded");
+    assert.equal(surplusOfferGrade.specialEvidence, null, "surplus material skips sacrifice verification");
     const winningSurplus = await analyzer.replay('[FEN "rnbbk1nr/3p1p2/7p/ppP1N3/4P3/6B1/PPP2PPP/RN1QKB1R w KQkq - 0 10"]\n10. Qf3 *');
     const surplusGrade = await timedGrade(winningSurplus, 0);
     assert(surplusGrade.raw.played.cp > 1000);

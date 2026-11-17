@@ -89,13 +89,20 @@ moves* switch if you only want the ordinary grades.
     the alternative scores < +1).
 - **Brilliant** is a sound sacrifice. The played move is Best or Excellent, and
   the player is not in check and not already losing. It offers a piece worth at
-  least a minor piece, on the destination square or undefended.
+  least a minor piece, on the destination square or undefended. Other winning
+  moves do not disqualify it, but the player cannot already be more than a rook
+  ahead in material.
 
   Sharpfish then searches **every** way of taking that piece. Each capture must
   leave the sacrificing side with full compensation: no worse than −0.5, within
-  half a pawn of the move's own score, and still mating if the move mated. The
-  sacrifice must also be real: after the capture and the best reply, the player
-  is at least two pawns down in material.
+  50 quality points of the move's own score using the ordinary grading scale,
+  and still mating if the move mated. Near equality, 50 quality points is half
+  a pawn; large winning advantages use the same compressed scale as Best/Excellent. The
+  sacrifice must also be real: at least one capture must temporarily cost the
+  player at least 1.5 pawns of material relative to before the move, measured
+  before their reply. This includes rook-for-minor exchanges and combinations
+  that immediately win material back, such as offering a bishop to open a rook's
+  attack on the queen. Ordinary equal-value trades do not qualify.
 
 ### Practical considerations
 
