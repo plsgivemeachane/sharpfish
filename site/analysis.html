@@ -36,9 +36,9 @@
     </div>
     <div class="row board-tools" aria-label="Board tools">
       <button id="flip" class="btn" type="button" title="Flip board (F)" aria-pressed="false">Flip board</button>
-      <button id="draw-mode" class="btn" type="button" aria-pressed="false" title="Tap a square for a circle, drag for an arrow">Draw</button>
-      <button id="clear-shapes" class="btn" type="button" disabled>Clear drawings</button>
+      <button id="alternative-move" class="btn" type="button" aria-pressed="false" disabled>Alternative move</button>
     </div>
+    <p id="alternative-status" class="hint alternative-status" role="status" hidden></p>
   </section>
 
   <aside class="panel">
@@ -61,7 +61,7 @@
       <label class="field">Eval bar (stock Stockfish) <input id="eval-toggle" type="checkbox" checked></label>
       <div id="progress" class="hint" role="status"></div>
       <div class="row"><button id="cancel" class="btn" type="button" disabled>Stop</button><button id="copy" class="btn" type="button" disabled title="Copy the moves in PGN format">Copy PGN</button></div>
-      <div class="hint">Right-click a square to circle it, right-drag to draw an arrow. Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. On touch screens, turn on Draw.</div>
+      <div class="hint">Right-click a square to circle it, right-drag to draw an arrow. Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears drawings.</div>
     </section>
 
     <section class="card import-card" aria-labelledby="import-heading">

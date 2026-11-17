@@ -18,6 +18,14 @@ async function assertBadgeAssets(page) {
     .every(img => img.complete && img.naturalWidth > 0));
 }
 
+async function assertCornerBadge(page) {
+  const box = await page.locator(".move-grade-overlay").evaluate(img => {
+    const badge = img.getBoundingClientRect(), square = img.parentElement.getBoundingClientRect();
+    return { dx: badge.x + badge.width / 2 - square.right, dy: badge.y + badge.height / 2 - square.top };
+  });
+  assert(Math.abs(box.dx) < 1 && Math.abs(box.dy) < 1, "badge is centred on the square's top-right corner");
+}
+
 (async () => {
   const browser = await chromium.launch(), context = await browser.newContext(), page = await context.newPage();
   try {
@@ -44,6 +52,7 @@ async function assertBadgeAssets(page) {
     assert.equal(await page.locator(".move-grade-overlay").count(), 1);
     assert.equal(await page.locator(".move-grade-overlay").getAttribute("aria-label"), "Catastrophe");
     await assertBadgeAssets(page);
+    await assertCornerBadge(page);
     const alignment = await page.locator("#moves li").evaluateAll(rows => rows.map(row => {
       const slot = row.querySelector(".move-grade-slot"), san = row.querySelector("span:nth-child(3)");
       return { slot: slot.getBoundingClientRect().x, san: san.getBoundingClientRect().x };
@@ -51,6 +60,7 @@ async function assertBadgeAssets(page) {
     assert(alignment.every(row => row.slot === alignment[0].slot), "grade slots stay fixed");
     assert(alignment.every(row => row.san === alignment[0].san), "SAN stays fixed when labels differ");
     await page.setViewportSize({ width: 320, height: 800 });
+    await assertCornerBadge(page);
     const mobileReview = await page.locator("#moves li").nth(6).evaluate(row => {
       const slot = row.children[1].getBoundingClientRect(), san = row.children[2].getBoundingClientRect(), label = row.children[3].getBoundingClientRect();
       return { slotRight: slot.right, sanLeft: san.left, sanRight: san.right, labelLeft: label.left };
@@ -86,6 +96,7 @@ async function assertBadgeAssets(page) {
     await live.waitForSelector('.move-grade-overlay[src*="good.png"]');
     assert.equal(await live.locator(".move-grade-overlay").getAttribute("aria-label"), "Good");
     await assertBadgeAssets(live);
+    await assertCornerBadge(live);
     const afterGood = await liveCell.evaluate(el => ({ x: el.getBoundingClientRect().x, slot: el.querySelector(".move-grade-slot").getBoundingClientRect().right }));
     assert.deepEqual(afterGood, beforeGrade, "live SAN stays fixed when a grade arrives");
     await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Catastrophe", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
@@ -99,7 +110,8 @@ async function assertBadgeAssets(page) {
     await live.setViewportSize({ width: 320, height: 800 });
     const mobileBadge = await live.locator('.move-grade-overlay').boundingBox();
     const mobileBoard = await live.locator('#board').boundingBox();
-    assert(mobileBadge.x + mobileBadge.width <= mobileBoard.x + mobileBoard.width + 1, "mobile badge stays on board");
+    await assertCornerBadge(live);
+    assert(mobileBadge.x + mobileBadge.width <= 320, "mobile corner badge stays inside the viewport");
     await live.locator("#btn-first").click();
     assert.equal(await live.locator(".move-grade-overlay").count(), 0, "start position has no badge");
     await live.locator("#btn-last").click();
