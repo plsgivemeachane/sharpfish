@@ -6,8 +6,9 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.1.0";
-  var GRADE_DEPTH = 20, VERIFY_DEPTH = 22;
+  var VERSION = "1.2.0";
+  var GRADE_TIME_MS = 2000;
+  function now() { return typeof performance === "object" ? performance.now() : Date.now(); }
   var START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   var RESULT = { "1-0": true, "0-1": true, "1/2-1/2": true, "*": true };
   var FILES = "abcdefgh";
@@ -206,7 +207,7 @@
     if (worsensShortMate(input.best, input.played, input.side) && mate && mate.winner === opponent &&
         Number.isInteger(mate.distance) && mate.distance >= 1 && mate.distance <= 5 &&
         (input.best.mateWinner !== opponent || Math.abs(input.best.mate) > mate.distance) &&
-        mate.depth >= VERIFY_DEPTH && mate.bestDepth >= VERIFY_DEPTH) objective = "Catastrophe";
+        mate.confirmed === true && mate.depth > 0 && mate.bestDepth > 0) objective = "Catastrophe";
     var idx = LABELS.indexOf(objective), d = input.difficulty || {};
     var discovery = d.discoverability === "very-hard" ? 2 : d.discoverability === "hard" ? 1 : 0;
     var natural = d.naturalness === "very-unnatural" ? 2 : d.naturalness === "unnatural" ? 1 : 0;
@@ -309,10 +310,11 @@
     return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
   }
   function historyKey(record, ply) { return (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" "); }
-  function isValidGrade(grade, record, index, engine) {
+  function isValidGrade(grade, record, index, engine, specialMoves) {
     return !!(grade && record && record.moves && index >= 0 && index < record.moves.length &&
-      grade.version === VERSION && grade.model === "centipawn" && grade.depth >= GRADE_DEPTH &&
-      grade.config && grade.config.model === "centipawn" && grade.config.depth >= GRADE_DEPTH &&
+      grade.version === VERSION && grade.model === "centipawn" && grade.depth > 0 &&
+      grade.config && grade.config.model === "centipawn" && grade.config.movetime === GRADE_TIME_MS &&
+      grade.config.specialMoves === (specialMoves !== false) &&
       grade.config.engine === engine && grade.historyKey === historyKey(record, index + 1));
   }
   function abortError() { var error = new Error("Analysis cancelled"); error.name = "AbortError"; return error; }
@@ -362,9 +364,9 @@
       queue = job.catch(function () {});
       return job;
     }
-    async function position(record, ply, token, extra) {
+    async function position(record, ply, token, extra, timeout) {
       assertActive(token);
-      var lines = await request([positionCommand(record, ply, extra), "d", "go perft 1", "isready"], function (line) { return line === "readyok"; }, token);
+      var lines = await request([positionCommand(record, ply, extra), "d", "go perft 1", "isready"], function (line) { return line === "readyok"; }, token, timeout);
       var fen = "", check = false, legal = [];
       lines.forEach(function (line) {
         if (line.indexOf("Fen: ") === 0) fen = line.slice(5).trim();
@@ -375,26 +377,32 @@
       var parsed = parseBoard(fen);
       return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check };
     }
-    async function recordPosition(record, ply, token) {
+    async function recordPosition(record, ply, token, timeout) {
       var cached = record.boards && record.boards[ply];
       if (cached && cached.fen && cached.legal) return cached;
-      return position(record, ply, token);
+      return position(record, ply, token, null, timeout);
     }
     async function evaluate(record, ply, options, token) {
       options = options || {}; assertActive(token);
-      var pos = await recordPosition(record, ply, token);
+      var pos = await recordPosition(record, ply, token, options.timeout);
       if (!pos.legal.length) {
         var winner = pos.inCheck ? (pos.turn === "w" ? "b" : "w") : null;
         return { cp: winner ? null : 0, mate: winner ? 0 : null, mateWinner: winner, wdl: winner === "w" ? [1000, 0, 0] : winner === "b" ? [0, 0, 1000] : [0, 1000, 0], depth: 0, pv: [], alternatives: [], scoreText: winner ? "Checkmate" : "Draw" };
       }
-      var depth = options.depth || 12, forced = options.searchmoves;
-      if (forced && !pos.legal.includes(forced)) throw new Error("Cannot evaluate an illegal move");
-      var count = forced ? 1 : Math.min(options.multiPV || 2, pos.legal.length);
-      var lines = await request(["setoption name Clear Hash", "setoption name MultiPV value " + count,
-        positionCommand(record, ply), "go depth " + depth + (forced ? " searchmoves " + forced : "")], function (line) { return /^bestmove\b/.test(line); }, token, options.timeout || 120000);
+      var timed = Number.isFinite(options.movetime), depth = options.depth || (timed ? null : 12);
+      var forced = options.searchmoves ? [].concat(options.searchmoves) : null;
+      if (forced && forced.some(function (move) { return !pos.legal.includes(move); })) throw new Error("Cannot evaluate an illegal move");
+      var count = Math.min(options.multiPV || 2, forced ? forced.length : pos.legal.length);
+      var limit = (timed ? "movetime " + Math.max(1, Math.floor(options.movetime)) : "") +
+        (depth ? (timed ? " " : "") + "depth " + depth : "");
+      var commands = options.keepHash ? [] : ["setoption name Clear Hash"];
+      commands.push("setoption name MultiPV value " + count, positionCommand(record, ply),
+        "go " + limit + (forced ? " searchmoves " + forced.join(" ") : ""));
+      var lines = await request(commands, function (line) { return /^bestmove\b/.test(line); }, token,
+        options.timeout || (timed ? options.movetime + 2000 : 120000));
       assertActive(token);
       var info = parseInfo(lines, pos.turn, count);
-      if (info.depth < depth) throw new Error("Search stopped before the requested depth");
+      if (!timed && info.depth < depth) throw new Error("Search stopped before the requested depth");
       return info;
     }
     this.position = function (fen, moves) { return run(function (token) { return position({ startFen: fen, moves: moves || [] }, (moves || []).length, token); }); };
@@ -423,107 +431,103 @@
     this.grade = function (record, index, options) {
       options = options || {};
       return run(async function (token) {
-        var pos = await recordPosition(record, index, token), move = record.moves[index];
-        var baseDepth = Math.max(GRADE_DEPTH, options.depth || GRADE_DEPTH), depth = baseDepth;
+        var started = now(), deadline = started + GRADE_TIME_MS;
+        var pos = await recordPosition(record, index, token, GRADE_TIME_MS + 200), move = record.moves[index];
         if (!pos.legal.includes(move)) throw new Error("No legal move at requested index");
-        var best, played;
-        for (var attempt = 0; attempt < 4; attempt++) {
-          best = await evaluate(record, index, { depth: depth, multiPV: 2 }, token);
+        async function search(ply, quota, settings) {
+          var remaining = Math.floor(deadline - now());
+          if (remaining < 10) return null;
+          return evaluate(record, ply, Object.assign({}, settings, { movetime: Math.min(quota, remaining), timeout: remaining + 200 }), token);
+        }
+        var root = await search(index, 800, { multiPV: 2 });
+        if (!root) throw new Error("Analysis budget expired before the position was evaluated");
+        var best = root, played = root.alternatives.find(function (line) { return line.pv[0] === move; });
+        if (!played) {
+          // Compare both candidates in the same completed MultiPV iteration.
+          // Separate forced searches can disagree even at the same depth.
+          best = await search(index, 600, { multiPV: 2, searchmoves: [root.pv[0], move], keepHash: true });
+          if (!best) throw new Error("Analysis budget expired before the played move was evaluated");
           played = best.alternatives.find(function (line) { return line.pv[0] === move; });
-          if (!played) played = await evaluate(record, index, { depth: depth, searchmoves: move }, token);
-          if (!scoresConflict(best, played, pos.turn, 10)) break;
-          depth += 2;
         }
-        if (scoresConflict(best, played, pos.turn)) throw new Error("Conflicting evaluations; try deeper analysis");
-        var mateEvidence = null, mateConfirmation = null;
-        var opponent = pos.turn === "w" ? "b" : "w";
-        if (worsensShortMate(best, played, pos.turn)) {
-          // Recheck both the safe alternative and the actual resulting position.
-          var mateDepth = Math.max(VERIFY_DEPTH, depth);
-          best = await evaluate(record, index, { depth: mateDepth, multiPV: 2 }, token);
-          played = best.alternatives.find(function (line) { return line.pv[0] === move; }) ||
-            await evaluate(record, index, { depth: mateDepth, searchmoves: move }, token);
-          mateConfirmation = await evaluate(record, index + 1, { depth: mateDepth, multiPV: 1 }, token);
-          if (scoresConflict(best, played, pos.turn)) throw new Error("Conflicting evaluations; try deeper analysis");
-          if (mateConfirmation.mateWinner === opponent && Number.isFinite(mateConfirmation.mate)) {
-            mateEvidence = { winner: opponent, distance: Math.abs(mateConfirmation.mate),
-              depth: mateConfirmation.depth, bestDepth: best.depth };
+        if (!played) throw new Error("Engine did not evaluate the played move");
+        var raw = { best: best, played: played, root: root };
+        var provisional = classify({ best: best, played: played, side: pos.turn });
+        var afterPos = await recordPosition(record, index + 1, token, Math.max(1, deadline - now()) + 200);
+        var mateEvidence = null, difficulty = {}, opponent = pos.turn === "w" ? "b" : "w";
+        if (provisional.objectiveLabel !== "Best" && afterPos.legal.length) {
+          var deep = await search(index + 1, 300, { multiPV: 1 });
+          if (deep && worsensShortMate(best, played, pos.turn)) {
+            raw.mateConfirmation = deep;
+            if (deep.mateWinner === opponent && Number.isFinite(deep.mate)) {
+              mateEvidence = { winner: opponent, distance: Math.abs(deep.mate),
+                depth: deep.depth, bestDepth: best.depth, confirmed: true };
+            }
           }
-        }
-        if (best.depth < baseDepth || played.depth < baseDepth) throw new Error("Engine did not complete the requested grading depth");
-        var provisional = classify({ best: best, played: played, side: pos.turn, mateEvidence: mateEvidence });
-        var difficulty = {}, raw = { best: best, played: played };
-        if (mateConfirmation) raw.mateConfirmation = mateConfirmation;
-        if (provisional.objectiveLabel !== "Best") {
-          var nextPos = await recordPosition(record, index + 1, token);
-          if (nextPos.legal.length) {
-            var shallow = await evaluate(record, index + 1, { depth: 4, multiPV: 1 }, token);
-            var medium = await evaluate(record, index + 1, { depth: 7, multiPV: 1 }, token);
-            var deep = await evaluate(record, index + 1, { depth: Math.max(10, depth - 1), multiPV: 1 }, token);
-            var unseen = centipawnLoss(deep, shallow, nextPos.turn);
-            var mediumGap = centipawnLoss(deep, medium, nextPos.turn);
-            var same = shallow.pv[0] === deep.pv[0] && medium.pv[0] === deep.pv[0];
-            // Seeing the same winning reply counts as discovery even if the
-            // shallow search has not yet proved the exact mate distance.
-            var recognized = same && moverScore(shallow, nextPos.turn) >= 200 && moverScore(medium, nextPos.turn) >= 200;
-            var hiddenMate = deep.mateWinner === nextPos.turn && shallow.mateWinner !== nextPos.turn && !recognized;
-            var stable = unseen != null && Math.abs(unseen) < 25 || deep.mateWinner === shallow.mateWinner && deep.mate === shallow.mate || recognized;
-            var natural = naturalness(nextPos, deep.pv[0]);
-            if (hiddenMate && medium.mateWinner !== nextPos.turn || unseen > 150 && mediumGap > 60) difficulty.discoverability = "very-hard";
-            else if (hiddenMate || unseen > 60 || mediumGap > 40) difficulty.discoverability = "hard";
-            else difficulty.discoverability = same && stable ? "very-easy" : "normal";
-            difficulty.naturalness = natural.category;
-            if (natural.quiet && difficulty.discoverability === "very-hard") difficulty.naturalness = "unnatural";
-            difficulty.delayed = difficulty.discoverability !== "very-easy" && delayedPayoff(nextPos, deep.pv);
-            difficulty.immediate = natural.obvious || deep.mate != null && Math.abs(deep.mate) === 1 && natural.check;
-            if (difficulty.immediate && natural.check && deep.mate != null) difficulty.naturalness = "very-natural";
-            difficulty.evidence = { shallowDepth: shallow.depth, mediumDepth: medium.depth, deepDepth: deep.depth, shallowReply: shallow.pv[0], mediumReply: medium.pv[0], deepReply: deep.pv[0], unseenGain: unseen, mediumGap: mediumGap, natural: natural };
-            raw.probes = { shallow: shallow, medium: medium, deep: deep };
+          if (deep && options.difficulty !== false) {
+            var shallow = await search(index + 1, 20, { depth: 4, multiPV: 1 });
+            var medium = await search(index + 1, 40, { depth: 7, multiPV: 1 });
+            // A diagnostic that did not finish below the main reply depth
+            // cannot establish that a reply is hard for a human to discover.
+            if (shallow && medium && deep.depth > medium.depth && medium.depth >= shallow.depth) {
+              var unseen = centipawnLoss(deep, shallow, afterPos.turn);
+              var mediumGap = centipawnLoss(deep, medium, afterPos.turn);
+              var same = shallow.pv[0] === deep.pv[0] && medium.pv[0] === deep.pv[0];
+              var recognized = same && moverScore(shallow, afterPos.turn) >= 200 && moverScore(medium, afterPos.turn) >= 200;
+              var hiddenMate = deep.mateWinner === afterPos.turn && shallow.mateWinner !== afterPos.turn && !recognized;
+              var stable = unseen != null && Math.abs(unseen) < 25 || deep.mateWinner === shallow.mateWinner && deep.mate === shallow.mate || recognized;
+              var natural = naturalness(afterPos, deep.pv[0]);
+              if (hiddenMate && medium.mateWinner !== afterPos.turn || unseen > 150 && mediumGap > 60) difficulty.discoverability = "very-hard";
+              else if (hiddenMate || unseen > 60 || mediumGap > 40) difficulty.discoverability = "hard";
+              else difficulty.discoverability = same && stable ? "very-easy" : "normal";
+              difficulty.naturalness = natural.category;
+              if (natural.quiet && difficulty.discoverability === "very-hard") difficulty.naturalness = "unnatural";
+              difficulty.delayed = difficulty.discoverability !== "very-easy" && delayedPayoff(afterPos, deep.pv);
+              difficulty.immediate = natural.obvious || deep.mate != null && Math.abs(deep.mate) === 1 && natural.check;
+              if (difficulty.immediate && natural.check && deep.mate != null) difficulty.naturalness = "very-natural";
+              difficulty.evidence = { shallowDepth: shallow.depth, mediumDepth: medium.depth, deepDepth: deep.depth, shallowReply: shallow.pv[0], mediumReply: medium.pv[0], deepReply: deep.pv[0], unseenGain: unseen, mediumGap: mediumGap, natural: natural };
+              raw.probes = { shallow: shallow, medium: medium, deep: deep };
+            }
           }
         }
         var great = false, brilliant = false, specialEvidence = null;
-        var alternative = best.alternatives[1];
-        var gap = alternative ? moverScore(best, pos.turn) - moverScore(alternative, pos.turn) : 0;
-        var afterPos = await recordPosition(record, index + 1, token);
-        var accepts = afterPos.legal.filter(function (reply) {
-          var square = reply.slice(2, 4), offered = afterPos.board[square];
-          return offered && VALUE[offered.toUpperCase()] >= 300 &&
-            (square === move.slice(2, 4) || !attacked(pos.board, square, pos.turn === "b"));
-        });
-        var offer = accepts.length > 0 && !pos.inCheck;
-        var trivialWin = alternative && moverScore(alternative, pos.turn) >= 500;
-        if (["Best", "Excellent"].includes(provisional.objectiveLabel) && pos.legal.length > 1 && (gap >= 125 || offer && !trivialWin)) {
-          var verifiedBest = await evaluate(record, index, { depth: Math.max(VERIFY_DEPTH, depth), multiPV: 2 }, token);
-          var verifiedPlayed = verifiedBest.alternatives.find(function (line) { return line.pv[0] === move; }) || await evaluate(record, index, { depth: Math.max(VERIFY_DEPTH, depth), searchmoves: move }, token);
-          var vb = moverScore(verifiedBest, pos.turn), vp = moverScore(verifiedPlayed, pos.turn), alt = verifiedBest.alternatives[1];
-          var verifiedGrade = classify({ best: verifiedBest, played: verifiedPlayed, side: pos.turn });
-          if (["Best", "Excellent"].includes(verifiedGrade.objectiveLabel)) {
-            best = verifiedBest; played = verifiedPlayed; raw.best = best; raw.played = played;
-            var altScore = alt ? moverScore(alt, pos.turn) : null;
-            great = !!alt && vb - altScore >= 125 && (vb >= -50 && altScore < -150 || vb >= 200 && altScore < 100);
-            if (offer && vb >= -50 && alt && altScore < 500) {
-              var accepted = [], sound = true, meaningful = false;
-              for (var ai = 0; ai < accepts.length; ai++) {
-                var reply = accepts[ai];
-                var acceptance = await evaluate(record, index + 1, { depth: Math.max(VERIFY_DEPTH, depth), searchmoves: reply }, token);
-                var compensation = moverScore(acceptance, pos.turn);
-                var afterCapture = await position(record, index + 1, token, [reply]);
-                var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
-                var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
-                accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, materialChange: deficit, depth: acceptance.depth });
-                if (compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && vp - compensation > 50 || vp === Infinity && compensation !== Infinity) sound = false;
-                if (deficit <= -200) meaningful = true;
-              }
-              brilliant = sound && meaningful;
-              specialEvidence = { verifiedDepth: verifiedBest.depth, acceptances: accepted };
+        // Special labels require an unrestricted root comparison, rather than
+        // treating a two-candidate recheck as the complete field of alternatives.
+        var alternative = root.alternatives.find(function (line) { return line.pv[0] !== move; });
+        var rootPlayed = root.alternatives.find(function (line) { return line.pv[0] === move; });
+        if (options.specialMoves !== false && rootPlayed && ["Best", "Excellent"].includes(provisional.objectiveLabel) && pos.legal.length > 1) {
+          var vb = moverScore(best, pos.turn), vp = moverScore(played, pos.turn);
+          var altScore = alternative ? moverScore(alternative, pos.turn) : null;
+          great = !!alternative && vb - altScore >= 125 && (vb >= -50 && altScore < -150 || vb >= 200 && altScore < 100);
+          var accepts = !pos.inCheck && vb >= -50 && alternative && altScore < 500 ? afterPos.legal.filter(function (reply) {
+            var square = reply.slice(2, 4), offered = afterPos.board[square];
+            return offered && VALUE[offered.toUpperCase()] >= 300 &&
+              (square === move.slice(2, 4) || !attacked(pos.board, square, pos.turn === "b"));
+          }) : [];
+          if (accepts.length) {
+            var accepted = [], sound = true, meaningful = false;
+            for (var ai = 0; ai < accepts.length; ai++) {
+              var reply = accepts[ai], quota = Math.min(400, Math.floor((deadline - now()) / (accepts.length - ai)));
+              var acceptance = await search(index + 1, quota, { searchmoves: reply, multiPV: 1 });
+              if (!acceptance) { sound = false; break; }
+              var compensation = moverScore(acceptance, pos.turn);
+              var afterCapture = await position(record, index + 1, token, [reply], Math.max(1, deadline - now()) + 200);
+              var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
+              var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
+              accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, materialChange: deficit, depth: acceptance.depth });
+              if (compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && vp - compensation > 50 || vp === Infinity && compensation !== Infinity) sound = false;
+              if (deficit <= -200) meaningful = true;
             }
+            brilliant = sound && meaningful && accepted.length === accepts.length;
+            specialEvidence = { verifiedDepth: best.depth, acceptances: accepted };
           }
         }
         var result = classify({ best: best, played: played, side: pos.turn, difficulty: difficulty,
           mateEvidence: mateEvidence, great: great, brilliant: brilliant });
-        return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv, depth: Math.min(best.depth, played.depth), raw: raw,
-          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1), config: { model: "centipawn", depth: baseDepth, engine: workerFile, version: VERSION },
-          configKey: VERSION + "|depth=" + baseDepth + "|engine=" + workerFile });
+        return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv,
+          depth: Math.min(best.depth, played.depth), elapsedMs: Math.round(now() - started), raw: raw,
+          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1),
+          config: { model: "centipawn", movetime: GRADE_TIME_MS, specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION },
+          configKey: VERSION + "|movetime=" + GRADE_TIME_MS + "|specialMoves=" + (options.specialMoves !== false) + "|engine=" + workerFile });
       });
     };
     this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
