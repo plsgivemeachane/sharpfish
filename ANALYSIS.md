@@ -58,7 +58,7 @@ Performance model v1 is an explicit Sharpfish heuristic, not CAPS2, a Lichess sc
 - Elo uses average effective loss `L` over positions with more than one legal move. The rule is `clamp(2800 - 700 × ln(1 + L / 10), 100, 2800)`, rounded to the nearest 50. At least five such decisions and complete analysis of that player's moves are required. Forced moves cannot supply rating evidence. The scale and constants are policy choices, not a fit to a rated dataset.
 - The footer says: “Estimated Elo is always a rough estimate for this single match only.” These estimates are independent of account ratings and do not accumulate into a player rating.
 
-A failed live grade is retried once on a fresh worker after new moves are handled; a persistent failure is reported instead of looping. Failed attempts are keyed to the actual move sequence, so undoing and changing a move cannot inherit a failure at the same index. Review also retries a failed search once before pausing with an error.
+A failed live grade is retried once on a fresh worker after new moves are handled; a persistent failure is reported instead of looping. Failed attempts are keyed to the actual move sequence, so undoing and changing a move cannot inherit a failure at the same index. A completed grade carried across a concurrent move/save is delivered to the newer UI revision and saved again, preventing a permanent blank despite the queue considering it complete. Review also retries a failed search once before pausing with an error.
 
 ## Variant boundary
 
