@@ -989,7 +989,7 @@ function render() {
         var grade = game.grades && game.grades[moveIndex];
         var record = game.historyId ? historyRecord() : null;
         var gradeVisible = !projecting && !pos.pending && displayedMove && $("chk-grade").checked && grade &&
-          window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE);
+          window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE, window.SFLive ? SFLive.specialMoves() : true);
         if (gradeVisible) {
           var gradeKey = String(grade.label || grade.objectiveLabel || "").toLowerCase().replace(/[^a-z]+/g, "-");
           html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="' + BADGE_ROOT + gradeKey + '.png" alt="' +
@@ -1059,7 +1059,7 @@ function renderMoves() {
   function validLiveGrade(index) {
     var grade = game.grades && game.grades[index];
     if (!$("chk-grade").checked || !window.SFAnalysis || !game.historyId) return null;
-    return window.SFAnalysis.isValidGrade(grade, historyRecord(), index, window.STOCK_ENGINE_FILE) ? grade : null;
+    return window.SFAnalysis.isValidGrade(grade, historyRecord(), index, window.STOCK_ENGINE_FILE, window.SFLive ? SFLive.specialMoves() : true) ? grade : null;
   }
   function cell(j) {
     if (j >= game.san.length) return "<td></td>";
@@ -1158,6 +1158,11 @@ if (!variantInfo().supported) {
   $("chk-grade").checked = false; $("chk-grade").disabled = true;
   $("grade-status").textContent = "Move grading is available for standard chess.";
 }
+// Great/Brilliant needs extra engine evidence; its own switch (persisted by
+// SFLive) cancels the in-flight grade and regrades with the new setting.
+$("chk-special-grades").checked = window.SFLive ? SFLive.specialMoves() : true;
+$("chk-special-grades").disabled = !variantInfo().supported;
+$("chk-special-grades").onchange = function () { if (window.SFLive) SFLive.setSpecialMoves(this.checked); render(); };
 $("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); render(); };
 
 (function start() {
