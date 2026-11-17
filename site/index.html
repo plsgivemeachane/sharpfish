@@ -117,7 +117,19 @@
             <option value="5000">5 s</option>
           </select>
         </label>
-        <div class="hint">Bots take at least 2.1 seconds per move, even when their search finishes sooner.</div>
+        <div class="hint">How long the bot searches for its move.</div>
+      </div>
+      <div class="setting">
+        <label class="field">Move delay
+          <select id="sel-delay">
+            <option value="0">Instant</option>
+            <option value="500">0.5 s</option>
+            <option value="1000">1 s</option>
+            <option value="2000" selected>2 s</option>
+            <option value="3000">3 s</option>
+          </select>
+        </label>
+        <div class="hint">Shortest time before the bot plays, even when its search finishes sooner. Lower it for bullet-paced games.</div>
       </div>
       <label class="field switch">Sound effects
         <input type="checkbox" id="chk-sound" checked>
