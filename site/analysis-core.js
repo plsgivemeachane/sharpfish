@@ -6,7 +6,7 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.4.0";
+  var VERSION = "1.5.0";
   var GRADE_TIME_MS = 2000;
   function gradeTime(value) { return Number.isFinite(value) ? Math.max(1000, Math.min(30000, Math.floor(value))) : GRADE_TIME_MS; }
   function now() { return typeof performance === "object" ? performance.now() : Date.now(); }
@@ -601,7 +601,9 @@
           var vb = moverScore(best, pos.turn), vp = moverScore(played, pos.turn);
           var altScore = alternative ? moverScore(alternative, pos.turn) : null;
           great = !!alternative && vb - altScore >= 125 && (vb >= -50 && altScore < -150 || vb >= 200 && altScore < 100);
-          var accepts = !pos.inCheck && vb >= -50 && alternative && altScore < 500 ? afterPos.legal.filter(function (reply) {
+          // A winning alternative does not make a sound tactical offer ordinary.
+          // Exclude surplus-material giveaways using the actual starting material.
+          var accepts = !pos.inCheck && vb >= -50 && material(pos.board, pos.turn) <= 500 ? afterPos.legal.filter(function (reply) {
             var square = reply.slice(2, 4), offered = afterPos.board[square];
             return offered && VALUE[offered.toUpperCase()] >= 300 &&
               (square === move.slice(2, 4) || !attacked(pos.board, square, pos.turn === "b"));
@@ -614,11 +616,15 @@
               if (!acceptance) { sound = false; break; }
               var compensation = moverScore(acceptance, pos.turn);
               var afterCapture = await position(record, index + 1, token, [reply], Math.max(1, deadline - now()) + 200);
+              // Measure what was offered before counting compensation such as
+              // winning a queen on the next move. Equal trades do not qualify;
+              // the 150cp floor includes rook-for-minor exchange sacrifices.
+              var offeredDeficit = material(afterCapture.board, pos.turn) - material(pos.board, pos.turn);
               var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
               var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
-              accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, materialChange: deficit, depth: acceptance.depth });
-              if (compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && vp - compensation > 50 || vp === Infinity && compensation !== Infinity) sound = false;
-              if (deficit <= -200) meaningful = true;
+              accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, offeredMaterialChange: offeredDeficit, materialChange: deficit, depth: acceptance.depth });
+              if (compensation == null || compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && qualityScore(vp) - qualityScore(compensation) > 50 || vp === Infinity && compensation !== Infinity) sound = false;
+              if (offeredDeficit <= -150) meaningful = true;
             }
             brilliant = sound && meaningful && accepted.length === accepts.length;
             specialEvidence = { verifiedDepth: best.depth, acceptances: accepted };
