@@ -39,7 +39,11 @@ The number of punishing replies is not a difficulty input. Upgrades are easier t
 
 This is a Sharpfish heuristic. Advantage-loss bands and shallow-search recognition require calibration against human examples; they do not estimate player Elo. Engine evaluations are search-dependent and not literal material counts. Results depend on engine version, analysis budget, and classifier version; incompatible cached results need recalculation. Search depth varies with the position and device. Optional special-grade or difficulty evidence may be unavailable within two seconds; missing evidence never manufactures a special label or difficulty adjustment. Browser grading can lag rapid play, and a pending or interrupted search must not be shown as a completed grade.
 
-The current move's grade also appears at the top-right of its destination piece in play and replay. Move lists reserve an icon slot before SAN so receiving a grade does not shift move text. Badges are original metallic coin artwork exported as transparent PNGs and scalable SVGs.
+The current move's grade also appears centred on the top-right corner of its destination square, overlapping the neighbouring squares in play and replay. Move lists reserve an icon slot before SAN so receiving a grade does not shift move text. Badges are original metallic coin artwork exported as transparent PNGs and scalable SVGs.
+
+The **Alternative move** button is available for a selected graded move other than Best or Excellent. It previews the cached engine recommendation from the preceding position, shows a green arrow and evaluates that alternative. Missing, illegal or identical recommendations are also unavailable. Select **Played move** or navigate to return to the recorded line. Previewing never changes the saved moves, result or PGN. Mouse arrows and circles remain available; left-click clears drawings.
+
+Evaluation cancels obsolete searches during rapid replay and creates a fresh worker when a cached analysis page is restored through browser history. Pending evaluation can be stopped before its search begins.
 
 ## Variant boundary
 

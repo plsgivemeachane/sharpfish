@@ -535,5 +535,5 @@
   }
   return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
     objectiveLabel: objectiveLabel, centipawnLoss: centipawnLoss, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey, isValidGrade: isValidGrade,
-    attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, Analyzer: Analyzer };
+    attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, sanCore: sanCore, Analyzer: Analyzer };
 }));
