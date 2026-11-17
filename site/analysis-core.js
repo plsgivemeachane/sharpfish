@@ -6,7 +6,7 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.5.0";
+  var VERSION = "1.5.1";
   var GRADE_TIME_MS = 2000;
   function gradeTime(value) { return Number.isFinite(value) ? Math.max(1000, Math.min(30000, Math.floor(value))) : GRADE_TIME_MS; }
   function now() { return typeof performance === "object" ? performance.now() : Date.now(); }
@@ -620,11 +620,18 @@
               // winning a queen on the next move. Equal trades do not qualify;
               // the 150cp floor includes rook-for-minor exchange sacrifices.
               var offeredDeficit = material(afterCapture.board, pos.turn) - material(pos.board, pos.turn);
+              // A protected piece is not an offer if recapturing on its square
+              // already restores the material (e.g. Qxh4 Rxh4). Compensation
+              // elsewhere, such as Rxf2 Rxh2 winning a queen, remains eligible.
+              var recaptureDeficit = afterCapture.legal.reduce(function (change, candidate) {
+                if (candidate.slice(2, 4) !== reply.slice(2, 4)) return change;
+                return Math.max(change, material(applyBoard(afterCapture.board, candidate), pos.turn) - material(pos.board, pos.turn));
+              }, offeredDeficit);
               var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
               var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
-              accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, offeredMaterialChange: offeredDeficit, materialChange: deficit, depth: acceptance.depth });
+              accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, offeredMaterialChange: offeredDeficit, recaptureMaterialChange: recaptureDeficit, materialChange: deficit, depth: acceptance.depth });
               if (compensation == null || compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && qualityScore(vp) - qualityScore(compensation) > 50 || vp === Infinity && compensation !== Infinity) sound = false;
-              if (offeredDeficit <= -150) meaningful = true;
+              if (offeredDeficit <= -150 && recaptureDeficit <= -150) meaningful = true;
             }
             brilliant = sound && meaningful && accepted.length === accepts.length;
             specialEvidence = { verifiedDepth: best.depth, acceptances: accepted };
