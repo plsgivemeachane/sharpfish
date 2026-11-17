@@ -1,143 +1,170 @@
-# Stockfish.js
+# Sharpfish
 
-> **Multi-variant hosting:** see [DEPLOYMENT.md](DEPLOYMENT.md) to register branches,
-> build the ignored `deploy/` archive, and serve the collection with Docker on port 8096.
->
-> **This fork** is set up for making engine variants: edit `src/variant/config.h`
-> (piece values, move rating, rules), run `./make-web.sh serve`, and play your
-> engine in the browser from `site/`. See **[FORKING.md](FORKING.md)**.
+Sharpfish is a browser chess collection: Stockfish variants that you can play,
+review, and analyze without installing anything. Play online at
+[sharpfish.yuzukateam.io.vn](https://sharpfish.yuzukateam.io.vn/).
 
-[Stockfish.js](https://github.com/nmrugg/stockfish.js) is a WASM implementation by Nathan Rugg of the [Stockfish](https://github.com/official-stockfish/Stockfish) chess engine. It is written for [Chess.com's](https://www.chess.com/analysis) in-browser engine and is maintained as a general purpose project.
+Everything runs in your browser. The engines are WebAssembly builds of
+[Stockfish](https://github.com/official-stockfish/Stockfish) (through
+[Stockfish.js](https://github.com/nmrugg/stockfish.js)), and your games are
+stored only on your device.
 
-Stockfish.js is currently updated to Stockfish 19.
+## Variants
 
-Prebuilt engines are published to [npm](https://www.npmjs.com/package/stockfish) and to the [releases page](https://github.com/nmrugg/stockfish.js/releases). Please file bugs on the [issue tracker](https://github.com/nmrugg/stockfish.js/issues).
+Each variant has its own engine. Your moves follow the normal rules of chess.
 
-## The Engines
-
-This edition of Stockfish.js comes in five flavors:
-
-| Engine | Size (js + wasm) | Threads | Needs cross-origin isolation | Files |
-| --- | --- | --- | --- | --- |
-| Full | ≈94MB | Yes | Yes | [`stockfish-19.js`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19.js) and [`stockfish-19.wasm`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19.wasm) |
-| Full, single-threaded | ≈94MB | No | No | [`stockfish-19-single.js`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-single.js) and [`stockfish-19-single.wasm`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-single.wasm) |
-| Lite | ≈1.6MB | Yes | Yes | [`stockfish-19-lite.js`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-lite.js) and [`stockfish-19-lite.wasm`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-lite.wasm) |
-| Lite, single-threaded | ≈1.7MB | No | No | [`stockfish-19-lite-single.js`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-lite-single.js) and [`stockfish-19-lite-single.wasm`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-lite-single.wasm) |
-| ASM-JS | ≈3MB | No | No | [`stockfish-19-asm.js`](https://github.com/nmrugg/stockfish.js/releases/download/v19.0.1/stockfish-19-asm.js) |
-
-A few notes on the table:
-
- * The multi-threaded engines need the page to be [cross-origin isolated](https://web.dev/articles/cross-origin-isolation-guide) so that `SharedArrayBuffer` is available. The server must send both `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. You can check the current page with `crossOriginIsolated` in the browser console. The demo server in `examples/` sends these headers automatically.
- * The single-threaded engines run without those headers, but the UCI command `setoption name Threads` has no effect on them.
- * The lite engines use a much smaller neural network, so they are far smaller and quite a bit weaker.
- * The ASM-JS engine is compiled to JavaScript, not WASM. It runs in essentially any browser or runtime that supports JavaScript. It is very slow and weak, and it is larger than the lite WASM engines. Use it only as a last resort.
-
-### Which engine should I use?
-
-It depends on your project, but most likely, you should use the `lite single-threaded` engine because it is fast and does not require any complicated setup. Although the full engine is objectively stronger, the lite engine is still far stronger than any human will ever be, and the full engine is so large that it can be very slow to load, which would cause a poor user experience.
-
-The WASM Stockfish engines will run on all modern browsers (e.g., Chrome/Edge/Firefox/Opera/Safari) on supported systems (Windows 10+/macOS 11+/iOS 16+/Linux/Android), as well as currently supported versions of Node.js. Node.js 14 through 18 need `--experimental-wasm-threads --experimental-wasm-simd` for the multi-threaded engines. For slightly older browsers, see the [Stockfish.js 16 branch](../../tree/Stockfish16). The ASM-JS engine will run in essentially any browser/runtime that supports JavaScript. For an engine that supports chess variants (like three-check and crazyhouse), see the [Stockfish.js 11 branch](../../tree/Stockfish11).
-
-## How do I use stockfish.js?
-
-Stockfish.js is a raw engine. It speaks the UCI chess engine protocol over stdin and stdout in Node.js, and over `postMessage` in the browser. You need to bring the rest of the parts to make it into a working vehicle.
-
-### Node.js (npm)
-
-The engines are published to npm as [`stockfish`](https://www.npmjs.com/package/stockfish), and the package contains all five flavors.
-
-```bash
-npm install stockfish
-```
-
-The package also provides a `stockfish` command, so you can install it globally and use the engine interactively:
-
-```bash
-npm install -g stockfish
-stockfish
-```
-
-To use the engine from a script, `require()` it as a CommonJS module:
-
-```js
-var stockfish = require("stockfish")("lite-single", function onMessage(line) {
-    console.log("STDOUT:", line);
-    if (/bestmove \S+/.test(line)) {
-        console.log("The best move is " + line.match(/bestmove (\S+)/)[1] + ".");
-        stockfish.terminate();
-    }
-});
-
-stockfish.processCommand("uci");
-stockfish.processCommand("go depth 10");
-```
-
-The first argument selects which engine to load. It can be a keyword (`"full"`, `"lite"`, `"single"`, `"lite-single"`, `"asm"`) or a path to any stockfish.js engine file. If you leave it out, the full engine is used. Call `terminate()` when you are done so the process exits.
-
-If you would rather spawn the engine yourself, `findEngine()` gives you the path to the engine file:
-
-```js
-var enginePath = require("stockfish").findEngine("lite-single");
-var child = require("child_process").spawn(process.execPath, [enginePath], {stdio: "pipe"});
-```
-
-### Browser
-
-```js
-var worker = new Worker("stockfish-19-lite-single.js");
-
-worker.onmessage = function (ev) {
-    console.log(ev.data);
-};
-
-worker.postMessage("uci");
-worker.postMessage("position startpos");
-worker.postMessage("go depth 10");
-```
-
-The `.js` file expects the matching `.wasm` file to sit next to it, and both files must be served with the correct MIME types (`text/javascript` and `application/wasm`). The `lite single-threaded` engine works on any static host with no special configuration.
-
-### The loadEngine abstraction
-
-`examples/loadEngine.js` is a small abstraction layer that works in both Node.js and the browser. It queues commands, matches output back to the command that produced it, streams `info` lines, reports engine download progress, and works with any UCI compatible engine, including native binaries.
-
-The [examples folder](https://github.com/nmrugg/stockfish.js/tree/master/examples) and `examples/README.md` show it in use.
-
-## How do I compile the engine?
-
-You only need to compile the engine if you want to make changes to the engine itself.
-
-In order to compile the engine, you need to have [emscripten `6.0.9`](https://emscripten.org/docs/getting_started/downloads.html) installed and in your path. `build.js` checks your version and warns if it does not match. Add `--skip-em-check` to bypass the check, or `--strict-em-check` to turn a mismatch (or an unconfirmed version) into an error.
-
-Then you can compile Stockfish.js with the build script:
-
-```bash
-./build.js --help     # every option, with examples
-./build.js            # the multi-threaded WASM engine
-./build.js --all      # all five flavors
-./build.js --bin      # a native (non-WASM) Stockfish binary
-```
-
-Built files are written to `src/`, which you can change with `--output-dir=dir`. The npm scripts mirror the most common flavors: `npm run build`, `npm run build-lite`, `npm run build-single`, `npm run build-single-lite`.
-
-A few things worth knowing:
-
- * Syzygy tablebase probing is stripped from the WASM builds by default. Add `--keep-syzygy` to include it.
- * `--split=6` splits the WASM file into several parts, which can help browsers and CDNs that are slow with very large files. `--no-split` disables splitting.
- * `--hash` appends a content hash to the generated file names, and `--version=` changes the version number used in them.
-
-## Repository layout
-
-| Path | Description |
+| Variant | What the bot does differently |
 | --- | --- |
-| `src/` | The Stockfish C++ source, the emscripten glue code in `src/emscripten/`, and everything `build.js` produces |
-| `build.js` | The build script (see `./build.js --help`) |
-| `index.js` | The Node.js interface that the npm package exposes, `require("stockfish")` |
-| `scripts/findEngine.js` | Resolves an engine keyword or path to an engine file |
-| `scripts/cli.js` | Implements the `stockfish` command |
-| `scripts/prepack.js` | Builds all flavors and copies them into `bin/` before packaging (`bin/` is not in git) |
-| `examples/` | Web and Node.js examples, plus the demo server |
-| `tests/`, `tester.js` | Simple engine tests |
+| **Classic** | Plays standard chess, with a roster of opponents from beginner to full strength. |
+| **Alternating colors** | Its moves must alternate between light and dark destination squares, except when it is in check. |
+| **SCP-096** | Plays alongside an uncapturable piece that blocks lines. After Black moves, SCP-096 eats one randomly chosen piece that attacks its square (a king sees adjacent squares). Losing a king to it ends the game. |
+| **Sufferfish** | Plays near-perfect chess but avoids captures. It takes the best quiet move among its top five, and captures only when avoiding one costs over 30 centipawns or worsens a mate outcome. |
+
+## Playing
+
+- **Opponents.** Bots are grouped by strength (Beginner, Novice, Intermediate,
+  Advanced, Engine). *Custom strength* sets any Elo from 0 to 3150, or full strength.
+- **Bot vs bot.** Pick two bots and watch them play.
+- **Think time** sets how long the bot searches (default 2 s).
+- **Move delay** sets the shortest wait before the bot plays (default 2 s).
+  It gives you time to queue premoves. Choose *Instant* for bullet-paced games.
+- **Your clock** times your side only: 1, 3, 5 or 10 minutes, or 2 + 1 and 3 + 2
+  with increments. It starts after your first move, and you lose if it runs out.
+- **Premoves.** While the bot thinks, queue several moves, even consecutive moves
+  with the same piece. Clear them with a middle-click, Esc, or *Cancel premoves*.
+- **Arrows and circles.** Right-click a square to circle it, or right-drag to draw
+  an arrow. Hold Shift, Alt/Ctrl, or both to change the color.
+- Take back moves, flip the board, step through the game, copy the PGN, and
+  toggle sound effects.
+- **Live eval bar** (optional). It moves as the search deepens instead of waiting
+  for the search to finish. The analysis page uses the same live bar.
+
+## Move grading
+
+Turn on *Real-time move grading* to have every move graded as you play, or review
+a finished game on the analysis page. Each graded move gets a badge on the board
+and in the move list.
+
+Grading always uses **stock Stockfish**, not the variant engine. That way a grade
+measures the chess, not the variant's quirks.
+
+### The grades
+
+A move is graded by how much winning chance it gives up compared with the
+engine's best move. This is the *quality loss*, in centipawns (100 = one pawn):
+
+| Grade | Quality loss |
+| --- | --- |
+| **Best** | ≤ 10 |
+| **Excellent** | ≤ 25 |
+| **Good** | ≤ 50 |
+| **OK** | ≤ 75 |
+| **Inaccuracy** | ≤ 125 |
+| **Mistake** | ≤ 250 |
+| **Blunder** | ≤ 500 |
+| **Disaster** | > 500 |
+| **Catastrophe** | Allows a confirmed forced mate in 1–5, or speeds one up |
+
+There are also two special grades. Turn them off with the *Great / Brilliant
+moves* switch if you only want the ordinary grades.
+
+- **Great** is the only good move. The played move is Best or Excellent, and it
+  beats the second-best move by at least 1.25 pawns. It must also either:
+  - hold a position that every other move loses (the best move scores ≥ −0.5 and
+    the alternative scores < −1.5), or
+  - keep a win that every other move throws away (the best move scores ≥ +2 and
+    the alternative scores < +1).
+- **Brilliant** is a sound sacrifice. The played move is Best or Excellent, and
+  the player is not in check and not already losing. It offers a piece worth at
+  least a minor piece, on the destination square or undefended.
+
+  Sharpfish then searches **every** way of taking that piece. Each capture must
+  leave the sacrificing side with full compensation: no worse than −0.5, within
+  half a pawn of the move's own score, and still mating if the move mated. The
+  sacrifice must also be real: after the capture and the best reply, the player
+  is at least two pawns down in material.
+
+### Practical considerations
+
+Engine numbers alone are harsh on humans, and sometimes too lenient. Sharpfish
+adjusts grades for how hard a mistake is to see.
+
+**Big wins are compressed.** Evaluations up to +3 count linearly. Above that,
+they are compressed logarithmically. Dropping from +12 to +8 is still a crushing
+win, so it is not graded like dropping from +4 to 0.
+
+**Mates are handled as outcomes, not numbers:**
+
+- When both moves mate for the same side, matching the fastest mate is Best.
+  A slower mate of your own is Good. Letting the opponent's mate come closer is
+  a Blunder.
+- Walking into a forced mate is a Disaster, or a Catastrophe when the mate is
+  short and confirmed.
+- Missing your own forced mate is graded by what is left: still winning by
+  3+ pawns is an Inaccuracy, still ahead is a Mistake, roughly level is a Blunder,
+  and losing is a Disaster.
+
+**Difficulty of the punishment.** Sharpfish looks at the opponent's best reply
+to your mistake. It searches that reply at depths 4 and 7 as well as with the
+full search, and asks three questions:
+
+1. **Discoverability.** Would a shallow search find the refutation? A hidden
+   mate, or a gain that only appears deeper, makes the reply *hard* or *very hard*.
+2. **Naturalness.** Is the reply a natural move, such as a safe capture of a
+   valuable piece or a check? Or is it a quiet move or a sacrifice that a player
+   would not look at first?
+3. **Delayed payoff.** Does the punishment start with a quiet move and win
+   material only five or more plies later?
+
+These scores add up. A hard-to-see refutation softens the grade by one step, and
+a very well-hidden one by two. For example, a Mistake that loses only to a deep
+quiet manoeuvre becomes an Inaccuracy.
+
+The adjustment also works the other way. If the punishment is an obvious, immediate
+capture or a mate in one, a costly move is graded one step **harsher**. Hanging
+a queen to a one-move capture is worse than losing the same amount to a deep combination.
+
+Best is never adjusted. A softened grade never reaches Best, and only a
+confirmed short mate can reach Catastrophe.
+
+### Accuracy and estimated Elo
+
+The analysis page summarizes each side's play:
+
+- **Accuracy** averages `100 × e^(−loss / 200)` over the analyzed moves.
+  A perfect move scores 100, and a one-pawn loss scores about 61.
+- **Estimated Elo** comes from the average loss per real decision. Forced moves
+  (only one legal move) are not counted. It is shown once every move is analyzed
+  and the side has made at least 5 decisions. It ranges from 100 to 2800, in
+  steps of 50.
+
+Each grade has a time budget (2 s by default, adjustable from 1 to 30 s). Grades
+are cached with the settings that produced them, so revisiting a game is instant.
+[ANALYSIS.md](ANALYSIS.md) documents the policy in full.
+
+## Analysis page and history
+
+- Every game is saved to your browser's local game history as you play.
+  *Analyze this game* opens the current game.
+- Import a PGN: one game of standard chess. Starting positions from
+  `FEN`/`SetUp` tags are supported, and variations are skipped.
+- Step through the moves with a live eval bar and grade badges. *Next issue*
+  jumps to the next inaccuracy or worse, and *Alternative move* shows what the
+  engine preferred.
+- **Custom-rule variants** (Alternating colors, SCP-096) are analyzed position by
+  position as ordinary chess. A move that would be illegal in ordinary chess is
+  marked *unavailable* and is not graded.
+
+## Development
+
+- `./make-web.sh serve` builds the current branch's engine and serves its site locally.
+- [FORKING.md](FORKING.md) explains how to make a new engine variant.
+- [DEPLOYMENT.md](DEPLOYMENT.md) and [AGENTS.md](AGENTS.md) explain how the
+  collection is built and published. Pushing a branch does not deploy the site.
+- [DESIGN.md](DESIGN.md) records the design decisions behind the interface.
+
+Each variant lives on its own branch. `elo-ladder` holds the collection tooling
+and `variants.json`.
 
 ## Thanks
 
