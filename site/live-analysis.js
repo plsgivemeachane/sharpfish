@@ -15,15 +15,23 @@
   function drain() {
     if (running || !enabled || !current || current.variant && current.variant.supported === false || !root.SFAnalysis) return;
     var record = current;
-    var index = record.moves.length - 1;
-    while (index >= 0 && (failed[index] || valid(record.grades && record.grades[index], record, index))) index--;
-    if (index < 0) { status(Object.keys(failed).length ? "Some moves need another analysis attempt. Toggle grading to retry." : "Moves graded"); return; }
+    var index = -1, retry = -1, unavailable = 0;
+    for (var i = record.moves.length - 1; i >= 0; i--) {
+      if (valid(record.grades && record.grades[i], record, i)) continue;
+      var attempts = failed[root.SFAnalysis.historyKey(record, i + 1)] || 0;
+      if (!attempts) { index = i; break; }
+      if (attempts < 2 && retry < 0) retry = i;
+      else if (attempts >= 2) unavailable++;
+    }
+    if (index < 0) index = retry;
+    if (index < 0) { status(unavailable ? unavailable + (unavailable === 1 ? " move" : " moves") + " could not be graded after retrying. Toggle grading to retry." : "Moves graded"); return; }
     if (!analyzer) analyzer = new root.SFAnalysis.Analyzer(root.STOCK_ENGINE_FILE);
     var job = { epoch: epoch, id: record.id, index: index, key: root.SFAnalysis.historyKey(record, index + 1) };
-    running = job; status("Grading move " + (index + 1) + "…");
+    running = job; status((failed[job.key] ? "Retrying move " : "Grading move ") + (index + 1) + "…");
     analyzer.grade(record, index, { specialMoves: specialMoves }).then(async function (grade) {
       if (!enabled || epoch !== job.epoch || !current || current.id !== job.id || root.SFAnalysis.historyKey(current, index + 1) !== job.key) return;
       current.grades = current.grades || {}; current.grades[index] = grade;
+      delete failed[job.key];
       var patch = {}; patch[index] = grade;
       try { await root.SFHistory.updateGrades(current.id, current.revision, patch); }
       catch (_) { status("Grade ready; local saving failed."); }
@@ -31,9 +39,11 @@
         root.SFAppHooks.setGrade(index, grade, current.id, current.revision);
       }
     }).catch(function (error) {
-      if (job.epoch !== epoch || error.name === "AbortError") return;
-      failed[index] = true;
-      if (root.SFAppHooks && root.SFAppHooks.onGradeError) root.SFAppHooks.onGradeError(error);
+      if (job.epoch !== epoch) return;
+      failed[job.key] = (failed[job.key] || 0) + 1;
+      if (analyzer) analyzer.dispose();
+      analyzer = null;
+      if (failed[job.key] >= 2 && root.SFAppHooks && root.SFAppHooks.onGradeError) root.SFAppHooks.onGradeError(error);
     }).then(function () { if (running === job) { running = null; drain(); } });
   }
   function schedule(record) {
