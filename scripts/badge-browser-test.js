@@ -6,9 +6,23 @@ const path = require("node:path");
 const { chromium } = require(path.resolve(process.argv[2], "node_modules/playwright"));
 const origin = (process.argv[3] || "http://localhost:8096/variants/classic").replace(/\/$/, "");
 
+async function assertBadgeAssets(page) {
+  const assets = await page.evaluate(() => ({
+    revision: (window.SHARPFISH_VARIANT || {}).revision,
+    images: [...document.querySelectorAll(".move-grade-overlay, .move-grade-list-icon")].map(img => img.src)
+  }));
+  assert(assets.images.length > 0, "badges are displayed");
+  if (assets.revision) assert(assets.images.every(src => src.includes("/assets/" + assets.revision + "/badges/")),
+    "list and board badges use the displayed release, bypassing stale image caches");
+  await page.waitForFunction(() => [...document.querySelectorAll(".move-grade-overlay, .move-grade-list-icon")]
+    .every(img => img.complete && img.naturalWidth > 0));
+}
+
 (async () => {
   const browser = await chromium.launch(), context = await browser.newContext(), page = await context.newPage();
   try {
+    // Old stable image URLs must not be needed by a collection release.
+    await context.route(/\/variants\/[^/]+\/badges\/[^/]+\.png(?:\?.*)?$/, route => route.abort());
     await page.goto(`${origin}/analysis.html`);
     await page.locator("#pgn-input").fill("1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O *");
     await page.locator("#analyze").click();
@@ -27,6 +41,7 @@ const origin = (process.argv[3] || "http://localhost:8096/variants/classic").rep
     await page.waitForSelector('.move-grade-overlay[src*="catastrophe.png"]');
     assert.equal(await page.locator(".move-grade-overlay").count(), 1);
     assert.equal(await page.locator(".move-grade-overlay").getAttribute("aria-label"), "Catastrophe");
+    await assertBadgeAssets(page);
     const alignment = await page.locator("#moves li").evaluateAll(rows => rows.map(row => {
       const slot = row.querySelector(".move-grade-slot"), san = row.querySelector("span:nth-child(3)");
       return { slot: slot.getBoundingClientRect().x, san: san.getBoundingClientRect().x };
@@ -68,6 +83,7 @@ const origin = (process.argv[3] || "http://localhost:8096/variants/classic").rep
     await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Good", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", depth: 20, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
     await live.waitForSelector('.move-grade-overlay[src*="good.png"]');
     assert.equal(await live.locator(".move-grade-overlay").getAttribute("aria-label"), "Good");
+    await assertBadgeAssets(live);
     const afterGood = await liveCell.evaluate(el => ({ x: el.getBoundingClientRect().x, slot: el.querySelector(".move-grade-slot").getBoundingClientRect().right }));
     assert.deepEqual(afterGood, beforeGrade, "live SAN stays fixed when a grade arrives");
     await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Catastrophe", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", depth: 20, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
@@ -92,6 +108,6 @@ const origin = (process.argv[3] || "http://localhost:8096/variants/classic").rep
     await live.locator("#btn-new-white").click();
     assert.equal(await live.locator(".move-grade-overlay").count(), 0, "new game clears stale badge");
     await live.close();
-    console.log("PASS review/live board badge overlays, fixed icon/SAN columns, toggle-off and start-position clearing");
+    console.log("PASS review/live release-versioned badge images, board overlays, fixed icon/SAN columns, toggle-off and start-position clearing");
   } finally { await context.close(); await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
