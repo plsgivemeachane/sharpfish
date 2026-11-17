@@ -344,16 +344,22 @@ function snapshot(p, lastMove) {
 function viewPly(ply) {
   var live = game.boards.length - 1;
   ply = Math.max(0, Math.min(ply, live));
+  var previous = shownPly();
   clearPremoves();
   game.view = ply === live ? null : ply;
   selected = null;
   render();
+  if (window.SFSound && ply !== previous) {
+    if (ply > previous) SFSound.move(game.boards[ply - 1], game.moves[ply - 1], game.boards[ply], ply === live && !!game.over);
+    else SFSound.play("move");
+  }
 }
 function shownPly() { return game.view === null ? game.boards.length - 1 : game.view; }
 
 function playMove(uci) {
   $("promo").hidden = true;
   var token = game.token;
+  var before = pos;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
   game.san.push(toSan(pos, uci));
   game.moves.push(uci);
@@ -373,6 +379,7 @@ function playMove(uci) {
     else if (next.inCheck) game.san[i] += "+";
 
     checkGameOver();
+    if (window.SFSound && game.view === null) SFSound.move(before, uci, next, !!game.over);
     persistGame();
     if (game.over) clearPremoves();
     if (runPremove()) return;
@@ -400,8 +407,9 @@ function maybeEngineTurn() {
   if (pos && !pos.pending && !thinking && !game.over && (game.botMatch || pos.turn !== game.playerColor)) engineMove();
 }
 
-function newGame(color, botMatch) {
+function newGame(color, botMatch, silent) {
   clearPremoves();
+  if (window.SFSound) SFSound.stop();
   var token = ++game.token;
   pos = null;
   if (thinking) engine.stop();
@@ -425,6 +433,7 @@ function newGame(color, botMatch) {
     game.repKeys = [p.repKey];
     game.boards = [snapshot(p, null)];
     render();
+    if (window.SFSound && !silent) SFSound.play("start");
     maybeEngineTurn();
   });
 }
@@ -433,6 +442,7 @@ function takeBack() {
   if (game.botMatch) return;
   clearPremoves();
   if (!game.moves.length) return;
+  if (window.SFSound) SFSound.stop();
   var token = ++game.token;
   pos = Object.assign({}, pos, { pending: true });
   if (thinking) engine.stop();
@@ -453,6 +463,7 @@ function takeBack() {
     p.lastMove = game.moves[game.moves.length - 1];
     pos = p;
     render();
+    if (window.SFSound) SFSound.play("move");
     persistGame();
     maybeEngineTurn();
   });
@@ -1153,6 +1164,7 @@ boardEl.addEventListener("pointerdown", function (e) {
   viewPly(Infinity);
 }, true);
 $("chk-eval").onchange = toggleEval;
+if (window.SFSound) SFSound.bindToggle($("chk-sound"));
 $("chk-grade").checked = window.SFLive ? window.SFLive.init() : false;
 if (!variantInfo().supported) {
   $("chk-grade").checked = false; $("chk-grade").disabled = true;
@@ -1191,5 +1203,5 @@ $("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(
     render();
   });
   setStrength();
-  newGame("w");
+  newGame("w", false, true);
 })();

@@ -73,6 +73,7 @@
       <label class="field">Real-time move grading <input id="grade-toggle" type="checkbox" checked></label>
       <label class="field sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves <input id="special-toggle" type="checkbox" checked></label>
       <label class="field">Eval bar (stock Stockfish) <input id="eval-toggle" type="checkbox" checked></label>
+      <label class="field">Sound effects <input id="sound-toggle" type="checkbox" checked></label>
       <div id="progress" class="hint" role="status"></div>
       <div class="row"><button id="cancel" class="btn" type="button" disabled>Stop</button><button id="copy" class="btn" type="button" disabled title="Copy the moves in PGN format">Copy PGN</button></div>
       <div class="hint">Right-click a square to circle it, right-drag to draw an arrow. Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears drawings.</div>
@@ -94,9 +95,10 @@
   </aside>
 </main>
 
-<footer class="foot"><p id="elo-estimate-note">Estimated Elo is always a rough estimate for this single match only.</p><a id="source-link" href="https://github.com/plsgivemeachane/sharpfish">Source code</a> · Stockfish analysis runs locally in your browser.</footer>
+<footer class="foot"><p id="elo-estimate-note">Estimated Elo is always a rough estimate for this single match only.</p><a id="source-link" href="https://github.com/plsgivemeachane/sharpfish">Source code</a> · Stockfish analysis runs locally in your browser. Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).</footer>
 <script src="analysis-core.js"></script>
 <script src="game-history.js"></script>
+<script src="sound.js"></script>
 <script src="analysis.js"></script>
 </body>
 </html>
