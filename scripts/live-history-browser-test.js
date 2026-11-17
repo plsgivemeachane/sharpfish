@@ -9,7 +9,12 @@ const origin = (process.argv[3] || "http://localhost:8080").replace(/\/$/, "");
   const browser = await chromium.launch(), context = await browser.newContext(), page = await context.newPage();
   const errors = [], failed = [];
   page.on("pageerror", e => errors.push(e.message));
-  page.on("response", r => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
+  page.on("response", r => {
+    // Cloudflare may decline optional Speed Brain prefetches with 503.
+    if (r.status() === 503 && r.headers().server === "cloudflare" &&
+        r.request().headers()["sec-purpose"] === "prefetch" && !r.request().isNavigationRequest()) return;
+    if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`);
+  });
   try {
     await page.goto(`${origin}/`);
     await page.waitForFunction(() => window.pos && !window.pos.pending, null, { timeout: 30000 });

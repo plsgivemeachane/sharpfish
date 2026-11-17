@@ -15,6 +15,9 @@ const base = process.argv[3] || "http://localhost:8096";
     page.on("pageerror", error => errors.push(error.message));
     const failed = [];
     page.on("response", response => {
+      // Cloudflare may decline optional Speed Brain prefetches with 503.
+      if (response.status() === 503 && response.headers().server === "cloudflare" &&
+          response.request().headers()["sec-purpose"] === "prefetch" && !response.request().isNavigationRequest()) return;
       if (response.status() >= 400) failed.push(response.url());
     });
     await page.goto(base);
