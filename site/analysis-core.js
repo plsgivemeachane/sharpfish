@@ -1,0 +1,451 @@
+/* Sharpfish analysis core. Browser UMD module with no dependencies. */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  if (root) root.SFAnalysis = api;
+}(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var VERSION = "1.0.0";
+  var START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  var RESULT = { "1-0": true, "0-1": true, "1/2-1/2": true, "*": true };
+  var FILES = "abcdefgh";
+  var PIECES = "pnbrqkPNBRQK";
+
+  function fail(message, index) {
+    var e = new Error(message + (index == null ? "" : " (at token " + index + ")"));
+    e.code = "PGN_ERROR";
+    e.index = index;
+    throw e;
+  }
+  function cleanTag(v) { return String(v).replace(/\\([\\"])/g, "$1"); }
+  function normalizeSan(s) {
+    return String(s).trim().replace(/[!?]+$/g, "").replace(/[+#]+$/g, "").replace(/0/g, "O").replace(/e\.p\.?$/i, "");
+  }
+  function parseBoard(fen) {
+    var p = String(fen).trim().split(/\s+/);
+    if (p.length < 4 || p.length > 6 || !/^[wb]$/.test(p[1])) fail("Invalid FEN");
+    var board = {};
+    var ranks = p[0].split("/");
+    if (ranks.length !== 8) fail("Invalid FEN: expected 8 ranks");
+    ranks.forEach(function (row, ri) {
+      var file = 0;
+      for (var i = 0; i < row.length; ++i) {
+        var c = row[i];
+        if (/^[1-8]$/.test(c)) file += +c;
+        else if (PIECES.indexOf(c) >= 0 && file < 8) board[FILES[file++] + (8 - ri)] = c;
+        else fail("Invalid FEN board");
+      }
+      if (file !== 8) fail("Invalid FEN rank");
+    });
+    var squares = Object.keys(board);
+    if (squares.filter(function (sq) { return board[sq] === "K"; }).length !== 1 || squares.filter(function (sq) { return board[sq] === "k"; }).length !== 1) fail("FEN must contain exactly one king per side");
+    var wk = squares.filter(function (sq) { return board[sq] === "K"; })[0], bk = squares.filter(function (sq) { return board[sq] === "k"; })[0];
+    if (Math.abs(FILES.indexOf(wk[0]) - FILES.indexOf(bk[0])) <= 1 && Math.abs(+wk[1] - +bk[1]) <= 1) fail("FEN kings may not be adjacent");
+    if (p[2] !== "-" && (!/^[KQkq]+$/.test(p[2]) || /(.).*\1/.test(p[2]))) fail("Invalid FEN castling rights");
+    if (p[3] !== "-" && !/^[a-h][36]$/.test(p[3])) fail("Invalid FEN en-passant square");
+    if (p.length >= 5 && (!/^\d+$/.test(p[4]) || +p[4] < 0)) fail("Invalid FEN halfmove clock");
+    if (p.length >= 6 && (!/^\d+$/.test(p[5]) || +p[5] < 1)) fail("Invalid FEN fullmove number");
+    if (squares.some(function (sq) { return /[pP]/.test(board[sq]) && /[18]/.test(sq[1]); })) fail("FEN pawn on promotion rank");
+    if (+p[4] > 100000 || +p[5] > 100000) fail("FEN move clock is too large");
+    var rights = { K: ["e1", "K", "h1", "R"], Q: ["e1", "K", "a1", "R"], k: ["e8", "k", "h8", "r"], q: ["e8", "k", "a8", "r"] };
+    if (p[2] !== "-") p[2].split("").forEach(function (right) {
+      var required = rights[right];
+      if (board[required[0]] !== required[1] || board[required[2]] !== required[3]) fail("FEN castling rights require the king and rook");
+    });
+    if (p[3] !== "-") {
+      if (p[3][1] !== (p[1] === "w" ? "6" : "3") || board[p[3]] || board[p[3][0] + (p[1] === "w" ? "5" : "4")] !== (p[1] === "w" ? "p" : "P")) fail("Invalid FEN en-passant state");
+    }
+    if (attacked(board, p[1] === "w" ? bk : wk, p[1] === "w")) fail("FEN side not to move is in check");
+    p[4] = p[4] || "0"; p[5] = p[5] || "1";
+    return { fen: p.join(" "), board: board, turn: p[1], halfmove: +(p[4] || 0), fullmove: +(p[5] || 1), castling: p[2], ep: p[3] };
+  }
+  function boardFromFen(fen) { return parseBoard(fen).board; }
+  function sanCore(pos, uci) {
+    var from = uci.slice(0, 2), to = uci.slice(2, 4), promo = uci[4];
+    var piece = pos.board[from];
+    if (!piece) return "";
+    var type = piece.toUpperCase();
+    var dx = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
+    if (type === "K" && Math.abs(dx) === 2) return dx > 0 ? "O-O" : "O-O-O";
+    var capture = !!pos.board[to] || (type === "P" && dx !== 0);
+    if (type === "P") return (capture ? from[0] + "x" : "") + to + (promo ? "=" + promo.toUpperCase() : "");
+    var san = type;
+    var rivals = (pos.legal || []).filter(function (m) { return m !== uci && m.slice(2, 4) === to && pos.board[m.slice(0, 2)] === piece; }).map(function (m) { return m.slice(0, 2); });
+    if (rivals.length) {
+      var file = rivals.some(function (s) { return s[0] === from[0]; });
+      var rank = rivals.some(function (s) { return s[1] === from[1]; });
+      san += !file ? from[0] : !rank ? from[1] : from;
+    }
+    return san + (capture ? "x" : "") + to;
+  }
+  function tokenize(text) {
+    text = String(text || "").replace(/\r/g, "");
+    var tags = Object.create(null), body = text, tokens = [], i = 0, started = false;
+    while (i < body.length) {
+      if (/\s/.test(body[i])) { ++i; continue; }
+      if (body[i] === "[") {
+        if (started) fail("Only one game per import is supported");
+        var tag = body.slice(i).match(/^\[\s*([A-Za-z0-9_]+)\s+"((?:\\[\\"]|[^"\\])*)"\s*\]/);
+        if (!tag || Object.prototype.hasOwnProperty.call(tags, tag[1])) fail("Invalid or duplicate PGN tag");
+        tags[tag[1]] = cleanTag(tag[2]); i += tag[0].length; continue;
+      }
+      if (body[i] === "{") { var end = body.indexOf("}", i + 1); if (end < 0) fail("Unclosed PGN comment"); i = end + 1; continue; }
+      if (body[i] === ";") { var nl = body.indexOf("\n", i + 1); i = nl < 0 ? body.length : nl + 1; continue; }
+      if (body[i] === "(") { tokens.push("("); ++i; continue; }
+      if (body[i] === ")") { tokens.push(")"); ++i; continue; }
+      if (body[i] === "}") fail("Unexpected PGN comment close");
+      started = true;
+      var j = i;
+      while (j < body.length && !/[\s{}();]/.test(body[j])) ++j;
+      tokens.push(body.slice(i, j)); i = j;
+    }
+    return { tags: tags, tokens: tokens };
+  }
+  function parsePgn(text, limits) {
+    limits = limits || {};
+    if (String(text || "").length > (limits.maxBytes || 1024 * 1024)) fail("PGN is too large");
+    var data = tokenize(text), tokens = data.tokens, main = [], depth = 0, variations = 0, result = data.tags.Result || "*";
+    if (!RESULT[result]) fail("Invalid PGN result");
+    var sawResult = false;
+    for (var i = 0; i < tokens.length; ++i) {
+      var t = tokens[i];
+      if (t === "(") { if (++depth > (limits.maxVariationDepth || 8)) fail("PGN variation nesting is too deep", i); ++variations; continue; }
+      if (t === ")") { if (!depth--) fail("Unexpected variation close", i); continue; }
+      if (depth) continue;
+      var compact = t.match(/^(\d+)\.(\.\.)?(.+)$/);
+      if (compact) { t = compact[3]; if (!t) continue; }
+      if (/^\$\d+$/.test(t) || /^\d+\.(\.\.)?$/.test(t) || /^\.+$/.test(t)) continue;
+      if (RESULT[t]) { if (sawResult) fail("Only one game per import is supported", i); if (result !== "*" && result !== t) fail("Conflicting PGN result", i); result = t; sawResult = true; continue; }
+      if (/^[!?+#=]+$/.test(t)) continue;
+      if (sawResult) fail("Moves found after PGN result", i);
+      if (!/^(?:O-O(?:-O)?|0-0(?:-0)?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?)[+#]?[!?]*$/.test(t)) fail("Invalid SAN token: " + t, i);
+      main.push(t);
+      if (main.length > (limits.maxMoves || 4000)) fail("PGN has too many moves", i);
+    }
+    if (depth) fail("Unclosed PGN variation");
+    if (data.tags.SetUp === "1" && !data.tags.FEN) fail("SetUp tag requires FEN");
+    if (data.tags.SetUp && data.tags.SetUp !== "0" && data.tags.SetUp !== "1") fail("Invalid SetUp tag");
+    if (data.tags.SetUp === "0" && data.tags.FEN) fail("FEN conflicts with SetUp tag");
+    if (data.tags.Variant && data.tags.Variant.toLowerCase() !== "standard") fail("Unsupported PGN variant");
+    var start = data.tags.FEN ? parseBoard(data.tags.FEN).fen : null;
+    return { headers: data.tags, tokens: main, result: result, variationCount: variations, startFen: start };
+  }
+
+  function expectedScore(ev, side) {
+    if (!ev) return null;
+    var white;
+    if (ev.mateWinner) white = ev.mateWinner === "w" ? 1 : 0;
+    else if (ev.mate != null) white = ev.mate > 0 ? 1 : 0;
+    else if (ev.wdl && ev.wdl.length === 3) white = (ev.wdl[0] + ev.wdl[1] / 2) / 1000;
+    else if (ev.cp != null && Number.isFinite(ev.cp)) white = 1 / (1 + Math.exp(-0.00368208 * ev.cp));
+    else return null;
+    return side === "b" ? 1 - white : white;
+  }
+  var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder"];
+  function objectiveLabel(loss) {
+    if (!Number.isFinite(loss) || loss < 0) throw new Error("Invalid expected-score loss");
+    if (loss <= 0.005) return "Best";
+    if (loss <= 0.02) return "Excellent";
+    if (loss <= 0.05) return "Good";
+    if (loss <= 0.075) return "OK";
+    if (loss <= 0.10) return "Inaccuracy";
+    if (loss <= 0.20) return "Mistake";
+    return "Blunder";
+  }
+  function classify(input) {
+    input = input || {};
+    var a = expectedScore(input.best, input.side), b = expectedScore(input.played, input.side);
+    var loss = a == null || b == null ? input.loss : a - b;
+    if (!Number.isFinite(loss)) throw new Error("Cannot classify an incomplete engine score");
+    if (loss < -0.015) throw new Error("Played move score conflicts with best score; deeper analysis needed");
+    loss = Math.max(0, loss);
+    var objective = objectiveLabel(loss), idx = LABELS.indexOf(objective), d = input.difficulty || {};
+    var discovery = d.discoverability === "very-hard" ? 2 : d.discoverability === "hard" ? 1 : 0;
+    var natural = d.naturalness === "very-unnatural" ? 2 : d.naturalness === "unnatural" ? 1 : 0;
+    var hard = discovery + natural + (d.delayed ? 1 : 0), adjustment = 0;
+    // A moderate, evidenced obstacle earns forgiveness. Downgrades require all ease signals.
+    if (hard >= 1) adjustment = hard >= 4 ? 2 : 1;
+    if (!hard && d.discoverability === "very-easy" && d.naturalness === "very-natural" && d.immediate === true && loss >= 0.025) adjustment = -1;
+    var finalIdx = objective === "Best" ? 0 : Math.max(1, Math.min(6, idx - adjustment));
+    var label = LABELS[finalIdx];
+    if (input.brilliant === true && loss <= 0.02) label = "Brilliant";
+    else if (input.great === true && loss <= 0.02) label = "Great";
+    return { label: label, key: label.toLowerCase(), objectiveLabel: objective, adjustment: idx - finalIdx,
+      loss: loss, expectedBest: a, expectedPlayed: b, difficulty: d, version: VERSION };
+  }
+
+  function parseInfo(lines, turn, count) {
+    var depths = {};
+    lines.forEach(function (line) {
+      if (!/^info depth\b/.test(line) || /\b(?:lowerbound|upperbound)\b/.test(line)) return;
+      var depth = line.match(/\bdepth (\d+)/), score = line.match(/\bscore (cp|mate) (-?\d+)/);
+      if (!depth || !score) return;
+      var mpv = +(line.match(/\bmultipv (\d+)/) || [0, 1])[1];
+      var pv = line.match(/\bpv\s+(.+)$/), wdl = line.match(/\bwdl (\d+) (\d+) (\d+)/);
+      var n = +score[2] * (turn === "w" ? 1 : -1);
+      var row = { cp: score[1] === "cp" ? n : null, mate: score[1] === "mate" ? n : null,
+        depth: +depth[1], pv: pv ? pv[1].trim().split(/\s+/) : [], wdl: null };
+      if (row.mate != null) row.mateWinner = +score[2] === 0 ? (turn === "w" ? "b" : "w") : n > 0 ? "w" : "b";
+      if (wdl) row.wdl = turn === "w" ? [+wdl[1], +wdl[2], +wdl[3]] : [+wdl[3], +wdl[2], +wdl[1]];
+      (depths[row.depth] || (depths[row.depth] = {}))[mpv] = row;
+    });
+    var completed = Object.keys(depths).map(Number).sort(function (a, b) { return b - a; }).find(function (depth) {
+      for (var i = 1; i <= count; i++) if (!depths[depth][i]) return false;
+      return true;
+    });
+    if (completed == null) throw new Error("Engine returned no completed exact evaluation");
+    var result = Object.assign({}, depths[completed][1]);
+    result.alternatives = [];
+    for (var i = 1; i <= count; i++) result.alternatives.push(depths[completed][i]);
+    result.scoreText = result.mate != null ? (result.mateWinner === "b" ? "−M" : "M") + Math.abs(result.mate) :
+      (result.cp >= 0 ? "+" : "") + (result.cp / 100).toFixed(2);
+    return result;
+  }
+
+  var VALUE = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000 };
+  function white(piece) { return !!piece && piece === piece.toUpperCase(); }
+  function attacked(board, square, byWhite) {
+    var tx = FILES.indexOf(square[0]), ty = +square[1];
+    return Object.keys(board).some(function (from) {
+      var piece = board[from]; if (white(piece) !== byWhite) return false;
+      var x = FILES.indexOf(from[0]), y = +from[1], dx = tx - x, dy = ty - y, ax = Math.abs(dx), ay = Math.abs(dy), type = piece.toUpperCase();
+      if (!ax && !ay) return false;
+      if (type === "P") return ax === 1 && dy === (byWhite ? 1 : -1);
+      if (type === "N") return ax * ay === 2;
+      if (type === "K") return Math.max(ax, ay) === 1;
+      if (!(type === "B" && ax === ay || type === "R" && (!dx || !dy) || type === "Q" && (ax === ay || !dx || !dy))) return false;
+      var sx = Math.sign(dx), sy = Math.sign(dy); x += sx; y += sy;
+      while (x !== tx || y !== ty) { if (board[FILES[x] + y]) return false; x += sx; y += sy; }
+      return true;
+    });
+  }
+  function applyBoard(board, move) {
+    var next = Object.assign({}, board), from = move.slice(0, 2), to = move.slice(2, 4), piece = next[from];
+    if (!piece) return null;
+    if (piece.toUpperCase() === "P" && from[0] !== to[0] && !next[to]) delete next[to[0] + from[1]];
+    delete next[from]; next[to] = move[4] ? (white(piece) ? move[4].toUpperCase() : move[4]) : piece;
+    if (piece.toUpperCase() === "K" && Math.abs(FILES.indexOf(from[0]) - FILES.indexOf(to[0])) === 2) {
+      var rookFrom = (to[0] === "g" ? "h" : "a") + from[1], rookTo = (to[0] === "g" ? "f" : "d") + from[1];
+      next[rookTo] = next[rookFrom]; delete next[rookFrom];
+    }
+    return next;
+  }
+  function material(board, side) {
+    return Object.keys(board).reduce(function (sum, sq) {
+      var piece = board[sq], v = VALUE[piece.toUpperCase()] || 0;
+      return sum + (white(piece) === (side === "w") ? v : -v);
+    }, 0);
+  }
+  function naturalness(pos, move) {
+    var piece = pos.board[move.slice(0, 2)], target = pos.board[move.slice(2, 4)], next = applyBoard(pos.board, move);
+    if (!piece || !next) return { category: "unknown", check: false, obvious: false, capture: false };
+    var sideWhite = white(piece), king = Object.keys(next).find(function (sq) { return next[sq] === (sideWhite ? "k" : "K"); });
+    var check = !!king && attacked(next, king, sideWhite), capture = !!target || piece.toUpperCase() === "P" && move[0] !== move[2];
+    var safe = !attacked(next, move.slice(2, 4), !sideWhite), sacrifice = !safe && (!target || VALUE[target.toUpperCase()] < VALUE[piece.toUpperCase()] - 150);
+    var obvious = capture && safe && target && VALUE[target.toUpperCase()] >= 300;
+    return { category: obvious ? "very-natural" : sacrifice ? "unnatural" : capture || check ? "natural" : "neutral",
+      check: check, obvious: !!obvious, capture: capture, sacrifice: sacrifice, quiet: !check && !capture };
+  }
+  function delayedPayoff(pos, pv) {
+    var board = pos.board, side = pos.turn, initial = material(board, side), first = pv[0] && naturalness(pos, pv[0]);
+    if (!first || !first.quiet) return false;
+    for (var i = 0; i < Math.min(8, pv.length); i++) {
+      board = applyBoard(board, pv[i]); if (!board) return false;
+      if (material(board, side) - initial >= 200) return i >= 4;
+    }
+    return false;
+  }
+  function positionCommand(record, ply, extra) {
+    var moves = record.moves.slice(0, ply).concat(extra || []);
+    return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
+  }
+  function historyKey(record, ply) { return (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" "); }
+  function abortError() { var error = new Error("Analysis cancelled"); error.name = "AbortError"; return error; }
+
+  function Analyzer(workerFile) {
+    var self = this, worker = null, active = null, ready = null, disposed = false, generation = 0, queue = Promise.resolve();
+    function assertActive(token) { if (disposed || token !== generation) throw abortError(); }
+    function stopWorker(error) {
+      if (active) active.reject(error || abortError());
+      if (worker) worker.terminate();
+      worker = null; ready = null;
+    }
+    function request(commands, done, token, timeout) {
+      assertActive(token);
+      return new Promise(function (resolve, reject) {
+        var lines = [], currentWorker = worker;
+        var timer = setTimeout(function () { stopWorker(new Error("Engine timed out; try again")); }, timeout || 25000);
+        function finish(error) {
+          if (active !== item) return;
+          clearTimeout(timer); active = null;
+          if (error) reject(error); else resolve(lines);
+        }
+        var item = { reject: finish, line: function (line) { lines.push(line); if (done(line)) finish(); } };
+        active = item;
+        try { commands.forEach(function (command) { currentWorker.postMessage(command); }); } catch (error) { finish(error); }
+      });
+    }
+    function ensureReady(token) {
+      assertActive(token);
+      if (ready) return ready;
+      worker = new Worker(workerFile);
+      var created = worker;
+      created.onmessage = function (event) {
+        if (worker !== created || !active) return;
+        String(event.data).split("\n").forEach(function (line) { if (active) active.line(line); });
+      };
+      created.onerror = function (event) { if (event.preventDefault) event.preventDefault(); if (worker === created) stopWorker(new Error("Engine failed to load: " + (event.message || "unknown error"))); };
+      ready = (async function () {
+        await request(["uci"], function (line) { return line === "uciok"; }, token, 15000);
+        await request(["setoption name UCI_LimitStrength value false", "setoption name Skill Level value 20", "setoption name UCI_ShowWDL value true", "isready"], function (line) { return line === "readyok"; }, token);
+      }());
+      return ready;
+    }
+    function run(operation) {
+      var token = generation;
+      var job = queue.then(async function () { assertActive(token); await ensureReady(token); assertActive(token); return operation(token); });
+      queue = job.catch(function () {});
+      return job;
+    }
+    async function position(record, ply, token, extra) {
+      assertActive(token);
+      var lines = await request([positionCommand(record, ply, extra), "d", "go perft 1", "isready"], function (line) { return line === "readyok"; }, token);
+      var fen = "", check = false, legal = [];
+      lines.forEach(function (line) {
+        if (line.indexOf("Fen: ") === 0) fen = line.slice(5).trim();
+        else if (line.indexOf("Checkers:") === 0) check = !!line.slice(9).trim();
+        else { var m = line.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/); if (m) legal.push(m[1]); }
+      });
+      if (!fen) throw new Error("Engine did not return a position");
+      var parsed = parseBoard(fen);
+      return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check };
+    }
+    async function recordPosition(record, ply, token) {
+      var cached = record.boards && record.boards[ply];
+      if (cached && cached.fen && cached.legal) return cached;
+      return position(record, ply, token);
+    }
+    async function evaluate(record, ply, options, token) {
+      options = options || {}; assertActive(token);
+      var pos = await recordPosition(record, ply, token);
+      if (!pos.legal.length) {
+        var winner = pos.inCheck ? (pos.turn === "w" ? "b" : "w") : null;
+        return { cp: winner ? null : 0, mate: winner ? 0 : null, mateWinner: winner, wdl: winner === "w" ? [1000, 0, 0] : winner === "b" ? [0, 0, 1000] : [0, 1000, 0], depth: 0, pv: [], alternatives: [], scoreText: winner ? "Checkmate" : "Draw" };
+      }
+      var depth = options.depth || 12, forced = options.searchmoves;
+      if (forced && !pos.legal.includes(forced)) throw new Error("Cannot evaluate an illegal move");
+      var count = forced ? 1 : Math.min(options.multiPV || 2, pos.legal.length);
+      var lines = await request(["setoption name Clear Hash", "setoption name MultiPV value " + count,
+        positionCommand(record, ply), "go depth " + depth + (forced ? " searchmoves " + forced : "")], function (line) { return /^bestmove\b/.test(line); }, token, options.timeout || 25000);
+      assertActive(token);
+      var info = parseInfo(lines, pos.turn, count);
+      if (info.depth < depth && info.mate == null) throw new Error("Search stopped before the requested depth");
+      return info;
+    }
+    this.position = function (fen, moves) { return run(function (token) { return position({ startFen: fen, moves: moves || [] }, (moves || []).length, token); }); };
+    this.replay = function (text) {
+      var parsed;
+      try { parsed = parsePgn(text); } catch (error) { return Promise.reject(error); }
+      return run(async function (token) {
+        var record = { startFen: parsed.startFen, moves: [], san: [], boards: [], headers: parsed.headers, result: parsed.result, variationCount: parsed.variationCount };
+        record.boards.push(await position(record, 0, token));
+        for (var i = 0; i < parsed.tokens.length; i++) {
+          assertActive(token);
+          var pos = record.boards[i], wanted = normalizeSan(parsed.tokens[i]);
+          var candidates = pos.legal.filter(function (move) { return normalizeSan(sanCore(pos, move)) === wanted; });
+          if (candidates.length !== 1) fail((candidates.length ? "Ambiguous" : "Illegal") + " SAN: " + parsed.tokens[i], i + 1);
+          record.moves.push(candidates[0]);
+          var next = await position(record, i + 1, token);
+          if (/#/.test(parsed.tokens[i]) && !(next.inCheck && !next.legal.length)) fail("Checkmate suffix does not match position", i + 1);
+          if (/\+/.test(parsed.tokens[i]) && !next.inCheck) fail("Check suffix does not match position", i + 1);
+          record.san.push(sanCore(pos, candidates[0]) + (next.inCheck ? next.legal.length ? "+" : "#" : ""));
+          record.boards.push(next);
+        }
+        return record;
+      });
+    };
+    this.evaluate = function (record, ply, options) { return run(function (token) { return evaluate(record, ply, options, token); }); };
+    this.grade = function (record, index, options) {
+      options = options || {};
+      return run(async function (token) {
+        var pos = await recordPosition(record, index, token), move = record.moves[index], depth = options.depth || 12;
+        if (!pos.legal.includes(move)) throw new Error("No legal move at requested index");
+        var best, played;
+        for (var attempt = 0; attempt < 4; attempt++) {
+          best = await evaluate(record, index, { depth: depth, multiPV: 2 }, token);
+          played = best.alternatives.find(function (line) { return line.pv[0] === move; });
+          if (!played) played = await evaluate(record, index, { depth: depth, searchmoves: move }, token);
+          if (expectedScore(played, pos.turn) <= expectedScore(best, pos.turn) + 0.005) break;
+          depth += 2;
+        }
+        var before = expectedScore(best, pos.turn), after = expectedScore(played, pos.turn);
+        if (after > before + 0.015) throw new Error("Conflicting evaluations; try deeper analysis");
+        var loss = Math.max(0, before - after), difficulty = {}, raw = { best: best, played: played };
+        if (loss > 0.005) {
+          var nextPos = await recordPosition(record, index + 1, token);
+          if (nextPos.legal.length) {
+            var shallow = await evaluate(record, index + 1, { depth: 4, multiPV: 1 }, token);
+            var medium = await evaluate(record, index + 1, { depth: 7, multiPV: 1 }, token);
+            var deep = await evaluate(record, index + 1, { depth: Math.max(10, depth - 1), multiPV: 1 }, token);
+            var unseen = expectedScore(deep, nextPos.turn) - expectedScore(shallow, nextPos.turn);
+            var mediumGap = expectedScore(deep, nextPos.turn) - expectedScore(medium, nextPos.turn);
+            var same = shallow.pv[0] === deep.pv[0] && medium.pv[0] === deep.pv[0];
+            var natural = naturalness(nextPos, deep.pv[0]);
+            difficulty.discoverability = unseen > 0.15 && mediumGap > 0.06 ? "very-hard" : unseen > 0.06 || mediumGap > 0.04 ? "hard" : same && Math.abs(unseen) < 0.025 ? "very-easy" : "normal";
+            difficulty.naturalness = natural.category;
+            if (natural.quiet && difficulty.discoverability === "very-hard") difficulty.naturalness = "unnatural";
+            difficulty.delayed = difficulty.discoverability !== "very-easy" && delayedPayoff(nextPos, deep.pv);
+            difficulty.immediate = natural.obvious || deep.mate != null && Math.abs(deep.mate) === 1 && natural.check;
+            if (difficulty.immediate && natural.check && deep.mate != null) difficulty.naturalness = "very-natural";
+            difficulty.evidence = { shallowDepth: shallow.depth, mediumDepth: medium.depth, deepDepth: deep.depth, shallowReply: shallow.pv[0], mediumReply: medium.pv[0], deepReply: deep.pv[0], unseenGain: unseen, mediumGap: mediumGap, natural: natural };
+            raw.probes = { shallow: shallow, medium: medium, deep: deep };
+          }
+        }
+        var great = false, brilliant = false, specialEvidence = null;
+        var alternative = best.alternatives[1], gap = alternative ? before - expectedScore(alternative, pos.turn) : 0;
+        var afterPos = await recordPosition(record, index + 1, token);
+        var accepts = afterPos.legal.filter(function (reply) {
+          var square = reply.slice(2, 4), offered = afterPos.board[square];
+          return offered && VALUE[offered.toUpperCase()] >= 300 &&
+            (square === move.slice(2, 4) || !attacked(pos.board, square, pos.turn === "b"));
+        });
+        var offer = accepts.length > 0 && !pos.inCheck;
+        var trivialWin = alternative && expectedScore(alternative, pos.turn) >= 0.85;
+        if (loss <= 0.02 && pos.legal.length > 1 && (gap > 0.10 || offer && !trivialWin)) {
+          var verifiedBest = await evaluate(record, index, { depth: Math.max(16, depth), multiPV: 2 }, token);
+          var verifiedPlayed = verifiedBest.alternatives.find(function (line) { return line.pv[0] === move; }) || await evaluate(record, index, { depth: Math.max(16, depth), searchmoves: move }, token);
+          var vb = expectedScore(verifiedBest, pos.turn), vp = expectedScore(verifiedPlayed, pos.turn), alt = verifiedBest.alternatives[1];
+          if (vb - vp <= 0.02 && vp - vb <= 0.015) {
+            great = !!alt && vb - expectedScore(alt, pos.turn) >= 0.12 && (vb >= 0.45 && expectedScore(alt, pos.turn) < 0.40 || vb >= 0.75 && expectedScore(alt, pos.turn) < 0.65);
+            if (offer && vb >= 0.48 && alt && expectedScore(alt, pos.turn) < 0.85) {
+              var accepted = [], sound = true, meaningful = false;
+              for (var ai = 0; ai < accepts.length; ai++) {
+                var reply = accepts[ai];
+                var acceptance = await evaluate(record, index + 1, { depth: Math.max(16, depth), searchmoves: reply }, token);
+                var compensation = expectedScore(acceptance, pos.turn);
+                var afterCapture = await position(record, index + 1, token, [reply]);
+                var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
+                var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
+                accepted.push({ reply: reply, expected: compensation, materialChange: deficit, depth: acceptance.depth });
+                if (compensation < 0.46 || compensation < vp - 0.04) sound = false;
+                if (deficit <= -200) meaningful = true;
+              }
+              brilliant = sound && meaningful;
+              specialEvidence = { verifiedDepth: verifiedBest.depth, acceptances: accepted };
+            }
+          }
+        }
+        var result = classify({ best: best, played: played, side: pos.turn, difficulty: difficulty, great: great, brilliant: brilliant });
+        return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv, depth: Math.min(best.depth, played.depth), raw: raw,
+          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1), config: { depth: options.depth || 12, engine: workerFile, version: VERSION },
+          configKey: VERSION + "|depth=" + (options.depth || 12) + "|engine=" + workerFile });
+      });
+    };
+    this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
+    this.dispose = function () { disposed = true; self.cancel(); };
+  }
+  return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
+    objectiveLabel: objectiveLabel, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey,
+    attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, Analyzer: Analyzer };
+}));
