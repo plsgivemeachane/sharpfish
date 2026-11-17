@@ -8,7 +8,7 @@ Games save after accepted moves and takebacks, including unfinished games and bo
 
 The ordinary ladder is **Best → Excellent → Good → OK → Inaccuracy → Mistake → Blunder → Disaster → Catastrophe**. Each move displays one final label. Great and Brilliant require separate contextual evidence.
 
-Full-strength Stockfish (Skill Level 20, strength limiting disabled) compares the played move with the best alternative within one shared **2000 ms budget per grade**. There is no minimum depth and no depth-escalating retry loop. All root, reply, difficulty and sacrifice searches share that budget; optional evidence is skipped when time is exhausted. The actual completed depth is retained as diagnostic metadata. The playing bot's strength never limits the analysis worker. When the played move is outside the initial top alternatives, it and the strongest candidate are compared in the same completed MultiPV iteration to avoid inconsistent independent scores.
+Full-strength Stockfish (Skill Level 20, strength limiting disabled) compares the played move with the best alternative within one shared thinking budget per grade: **2000 ms by default**, configurable in review. There is no minimum depth and no depth-escalating retry loop. All root, reply, difficulty and sacrifice searches share that budget; optional evidence is skipped when time is exhausted. A failed attempt may retry once with a fresh worker and the same budget. The actual completed depth is retained as diagnostic metadata. The playing bot's strength never limits the analysis worker. When the played move is outside the initial top alternatives, it and the strongest candidate are compared in the same completed MultiPV iteration to avoid inconsistent independent scores.
 
 **Great / Brilliant** can be switched off independently of ordinary move grading, in live play and review. This skips special-grade verification and persists the preference locally. Cached grades include the time budget and special-grade setting. Live grading prioritizes the newest move, then fills the older backlog. Loading the engine and waiting behind another grade are separate from its thinking budget; a stalled grading worker is terminated at the deadline with a small transport allowance.
 
@@ -25,7 +25,9 @@ The default objective model is **centipawn loss**, normalized to the mover: `(be
 | >2.50–5.00 | Blunder |
 | >5.00 | Disaster |
 
-These are Sharpfish policy thresholds, not published Chess.com, Lichess, or WintrChess thresholds. Unlike a probability curve, a change from +15 to +6 or −6 to −15 remains a nine-point loss.
+These are Sharpfish policy thresholds, not published Chess.com, Lichess, or WintrChess thresholds. Raw score loss remains recorded. For CP positions, scores from the mover's perspective use `U(x) = x` up to +300cp and `U(x) = 300 + 100 × ln(1 + (x - 300) / 100)` above that. Objective quality loss is `max(0, U(best) - U(played))`. This scale and its slope are continuous at +3 points. It compresses the surplus of an already large win: +24 to +12 is about 79cp of quality loss (Inaccuracy), and the reported +30.98 to +18.19 Qf3 is about 58cp (OK), before difficulty adjustments. +24 to 0 still loses about 609cp of quality (Disaster). Losing positions stay linear: −6 to −15 remains a nine-point loss. Mate outcomes retain their separate rules. Version 1.3.0 invalidates earlier cached grades.
+
+Review has a persistent **Thinking time / move** setting: 1, 2 (default), 5, 10 or 30 seconds. It controls both grading and the eval bar. The grading budget is shared across its searches; main/root/reply search allocations scale with the selected time, allowing greater search depth. Diagnostic depth-4/depth-7 probes remain bounded for difficulty comparison. Changing time cancels old jobs, restarts enabled analysis and rejects cached grades from a different budget. Live play keeps the two-second default.
 
 Mate is a separate ordered outcome and is never converted into a large invented centipawn number. Preserving the best known forced-mate distance can earn Best; accelerating the opponent's mate is an error, and delaying one's own forced mate earns Good. Missing a forced win is graded according to the remaining advantage. **Catastrophe** requires both the root played-move search and an independent time-bounded search of the resulting position to confirm opponent mate in 1–5, newly allowed or faster than the best defense. M6 does not qualify. Practical ease cannot manufacture this tier without mate evidence. The recorded `mateChange` and `mateEvidence` explain the comparison; numerical loss fields are null for mate transitions.
 
@@ -44,6 +46,19 @@ The current move's grade also appears centred on the top-right corner of its des
 The **Alternative move** button is available for a selected graded move other than Best or Excellent. It previews the cached engine recommendation from the preceding position, shows a green arrow and evaluates that alternative. Missing, illegal or identical recommendations are also unavailable. Select **Played move** or navigate to return to the recorded line. Previewing never changes the saved moves, result or PGN. Mouse arrows and circles remain available; left-click clears drawings.
 
 Evaluation cancels obsolete searches during rapid replay and creates a fresh worker when a cached analysis page is restored through browser history. Pending evaluation can be stopped before its search begins.
+
+## Accuracy and single-match Elo
+
+Review shows White and Black accuracy and estimated Elo, calculated from compatible engine grades without more engine searches. Accuracy is provisional until the player's complete line is analyzed; coverage is displayed. Turning off grading retains available results. Alternative previews never change the recorded game's summary.
+
+Performance model v1 is an explicit Sharpfish heuristic, not CAPS2, a Lichess score or a calibrated human Elo prediction:
+
+- Effective move loss is `min(1000, qualityLossCp)`; `qualityLossCp` uses the logarithmic winning-advantage scale above. Per-move accuracy is `100 × exp(-loss / 200)`, averaged per player. Human difficulty adjustments, Great and Brilliant do not alter this number.
+- Mate transitions have no literal CP loss. For performance only, their objective tiers use fixed loss proxies: Best 0, Good 40, Inaccuracy 100, Mistake 180, Blunder 350, Disaster 700, Catastrophe 1000. Missing scores never count as perfect moves.
+- Elo uses average effective loss `L` over positions with more than one legal move. The rule is `clamp(2800 - 700 × ln(1 + L / 10), 100, 2800)`, rounded to the nearest 50. At least five such decisions and complete analysis of that player's moves are required. Forced moves cannot supply rating evidence. The scale and constants are policy choices, not a fit to a rated dataset.
+- The footer says: “Estimated Elo is always a rough estimate for this single match only.” These estimates are independent of account ratings and do not accumulate into a player rating.
+
+A failed live grade is retried once on a fresh worker after new moves are handled; a persistent failure is reported instead of looping. Failed attempts are keyed to the actual move sequence, so undoing and changing a move cannot inherit a failure at the same index. Review also retries a failed search once before pausing with an error.
 
 ## Variant boundary
 
