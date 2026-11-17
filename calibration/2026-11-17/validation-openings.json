@@ -1,0 +1,326 @@
+[
+  {
+    "name": "Italian",
+    "moves": [
+      "e4",
+      "e5",
+      "Nf3",
+      "Nc6",
+      "Bc4",
+      "Bc5"
+    ]
+  },
+  {
+    "name": "Spanish",
+    "moves": [
+      "e4",
+      "e5",
+      "Nf3",
+      "Nc6",
+      "Bb5",
+      "a6"
+    ]
+  },
+  {
+    "name": "Sicilian",
+    "moves": [
+      "e4",
+      "c5",
+      "Nf3",
+      "d6",
+      "d4",
+      "cxd4"
+    ]
+  },
+  {
+    "name": "French",
+    "moves": [
+      "e4",
+      "e6",
+      "d4",
+      "d5",
+      "Nc3",
+      "Nf6"
+    ]
+  },
+  {
+    "name": "CaroKann",
+    "moves": [
+      "e4",
+      "c6",
+      "d4",
+      "d5",
+      "Nc3",
+      "dxe4"
+    ]
+  },
+  {
+    "name": "Scandinavian",
+    "moves": [
+      "e4",
+      "d5",
+      "exd5",
+      "Qxd5",
+      "Nc3",
+      "Qa5"
+    ]
+  },
+  {
+    "name": "QueensGambit",
+    "moves": [
+      "d4",
+      "d5",
+      "c4",
+      "e6",
+      "Nc3",
+      "Nf6"
+    ]
+  },
+  {
+    "name": "Slav",
+    "moves": [
+      "d4",
+      "d5",
+      "c4",
+      "c6",
+      "Nf3",
+      "Nf6"
+    ]
+  },
+  {
+    "name": "KingsIndian",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7"
+    ]
+  },
+  {
+    "name": "Grunfeld",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "d5"
+    ]
+  },
+  {
+    "name": "NimzoIndian",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "e6",
+      "Nc3",
+      "Bb4"
+    ]
+  },
+  {
+    "name": "QueensIndian",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "e6",
+      "Nf3",
+      "b6"
+    ]
+  },
+  {
+    "name": "English",
+    "moves": [
+      "c4",
+      "e5",
+      "Nc3",
+      "Nf6",
+      "g3",
+      "d5"
+    ]
+  },
+  {
+    "name": "Reti",
+    "moves": [
+      "Nf3",
+      "d5",
+      "c4",
+      "d4",
+      "b4",
+      "e5"
+    ]
+  },
+  {
+    "name": "Bird",
+    "moves": [
+      "f4",
+      "d5",
+      "Nf3",
+      "Nf6",
+      "e3",
+      "e6"
+    ]
+  },
+  {
+    "name": "Dutch",
+    "moves": [
+      "d4",
+      "f5",
+      "c4",
+      "Nf6",
+      "Nc3",
+      "e6"
+    ]
+  },
+  {
+    "name": "Pirc",
+    "moves": [
+      "e4",
+      "d6",
+      "d4",
+      "Nf6",
+      "Nc3",
+      "g6"
+    ]
+  },
+  {
+    "name": "Modern",
+    "moves": [
+      "e4",
+      "g6",
+      "d4",
+      "Bg7",
+      "Nc3",
+      "d6"
+    ]
+  },
+  {
+    "name": "Benoni",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "c5",
+      "d5",
+      "e6"
+    ]
+  },
+  {
+    "name": "Benko",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "c5",
+      "d5",
+      "b5"
+    ]
+  },
+  {
+    "name": "Validation-0",
+    "moves": [
+      "e4",
+      "e5",
+      "Nf3",
+      "Nc6",
+      "d4",
+      "exd4",
+      "Nxd4",
+      "Bc5"
+    ]
+  },
+  {
+    "name": "Validation-1",
+    "moves": [
+      "e4",
+      "e5",
+      "Nc3",
+      "Nf6",
+      "f4",
+      "d5",
+      "fxe5",
+      "Nxe4"
+    ]
+  },
+  {
+    "name": "Validation-2",
+    "moves": [
+      "d4",
+      "d5",
+      "Nf3",
+      "Nf6",
+      "Bf4",
+      "e6",
+      "e3",
+      "Bd6"
+    ]
+  },
+  {
+    "name": "Validation-3",
+    "moves": [
+      "e4",
+      "c5",
+      "c3",
+      "d5",
+      "exd5",
+      "Qxd5",
+      "d4",
+      "Nf6"
+    ]
+  },
+  {
+    "name": "Validation-4",
+    "moves": [
+      "d4",
+      "Nf6",
+      "Bg5",
+      "Ne4",
+      "Bf4",
+      "d5",
+      "e3",
+      "c5"
+    ]
+  },
+  {
+    "name": "Validation-5",
+    "moves": [
+      "e4",
+      "e5",
+      "f4",
+      "exf4",
+      "Nf3",
+      "g5",
+      "h4",
+      "g4"
+    ]
+  },
+  {
+    "name": "Validation-6",
+    "moves": [
+      "d4",
+      "d5",
+      "Nf3",
+      "Nf6",
+      "e3",
+      "e6",
+      "Bd3",
+      "c5"
+    ]
+  },
+  {
+    "name": "Validation-7",
+    "moves": [
+      "d4",
+      "Nf6",
+      "c4",
+      "e6",
+      "g3",
+      "d5",
+      "Bg2",
+      "Be7"
+    ]
+  }
+]

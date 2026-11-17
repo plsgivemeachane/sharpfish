@@ -102,12 +102,13 @@
         <span id="bot-current" class="bot-current"></span>
       </div>
       <div id="bot-groups" class="bot-groups"></div>
+      <div class="hint">Approximate engine ratings; these do not measure your Chess.com rating.</div>
       <details class="advanced">
         <summary>Custom strength</summary>
         <label class="field" for="rng-elo">Elo <output id="elo-out"></output></label>
         <input type="range" id="rng-elo" min="0" max="3200" step="50">
-        <div class="hint">Steps of 50 from 0 to 3150; far right is full strength.
-          Applies from the engine's next move.</div>
+        <div class="hint">Approximate targets, applied from the next move. Outside the tested range,
+          the closest tested strength is shown. Far right is full strength.</div>
       </details>
     </section>
 
@@ -123,7 +124,7 @@
             <option value="5000">5 s</option>
           </select>
         </label>
-        <div class="hint">How long the bot searches for its move.</div>
+        <div class="hint">Maximum search time. Short limits can reduce the bot's strength.</div>
       </div>
       <div class="setting">
         <label class="field">Move delay

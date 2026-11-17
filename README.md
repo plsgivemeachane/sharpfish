@@ -25,7 +25,8 @@ Each variant has its own engine. Your moves follow the normal rules of chess.
 - **Opponents.** Bots are grouped by strength (Beginner, Novice, Intermediate,
   Advanced, Engine). *Custom strength* sets any Elo from 0 to 3150, or full strength.
 - **Bot vs bot.** Pick two bots and watch them play.
-- **Think time** sets how long the bot searches (default 2 s).
+- **Think time** sets the maximum search time (default 2 s). Rated profiles also
+  use a fixed 100,000-node search budget; Full uses the selected time only.
 - **Move delay** sets the shortest wait before the bot plays (default 2 s).
   It gives you time to queue premoves. Choose *Instant* for bullet-paced games.
 - **Your clock** times your side only: 1, 3, 5 or 10 minutes, or 2 + 1 and 3 + 2
@@ -38,6 +39,18 @@ Each variant has its own engine. Your moves follow the normal rules of chess.
   toggle sound effects.
 - **Live eval bar** (optional). It moves as the search deepens instead of waiting
   for the search to finish. The analysis page uses the same live bar.
+
+### Estimated bot ratings
+
+Classic's roster now uses [measured engine-strength estimates](calibration/2026-11-17/README.md) from 2,400 complete games. These are approximate historical-reference engine ratings, **not Chess.com or FIDE equivalence**. The linked report lists every bot's old/new label, controls, uncertainty, and game evidence.
+
+Named opponents retain their measured raw controls; custom strength maps the requested target through a versioned monotonic curve in `site/bots.js`. For example, the approximate 1800 profile uses native `UCI_Elo=1750`. The supported measured range is about 250–3100. Outside it, the selector shows the closest tested strength; adjacent target steps may share a configuration.
+
+Rated moves use `go nodes 100000 movetime M`, where `M` is the selected Think time in milliseconds. Beginner profiles may finish earlier by policy. A short time cap or slow device can reduce completed work and effective strength. Full resets Skill Level to 20, disables artificial weakening, and searches for the selected time without a node cap.
+
+Profiles expose the version, requested target, underlying control, node budget, support status, and provenance. New game-history records save a per-side profile timeline with the actual control, calibration version, and time cap, including mid-game opponent changes. Existing custom selections remain requested targets and are remapped on load; bot IDs and artwork remain stable.
+
+Run `node scripts/bot-strength-test.js`. Browser checks: `node scripts/bot-strength-browser-test.js /path/to/playwright-tools http://localhost:PORT`. Calibration tools use external Python testing dependencies described in the report; the application adds no runtime dependencies.
 
 ## Move grading
 

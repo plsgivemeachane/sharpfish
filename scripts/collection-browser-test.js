@@ -3,6 +3,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const calibratedBots = require("../site/bots.js");
 const { chromium } = require(path.resolve(process.argv[2], "node_modules/playwright"));
 const base = process.argv[3] || "http://localhost:8096";
 
@@ -63,10 +64,16 @@ const base = process.argv[3] || "http://localhost:8096";
       }));
       assert(roster.master.every(elo => elo <= 2600));
       assert.deepEqual(roster.removed, [null, null, null, null]);
-      assert.equal(roster.engineRating, "2800");
-      assert.deepEqual(roster.engineCommands, ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value 2800"]);
-      assert.deepEqual(roster.fullCommands, ["setoption name UCI_LimitStrength value false"]);
-      assert.equal(await page.locator('.bot[data-id="stockfish"]').getAttribute("aria-label"), "Stockfish (2800)");
+      const classic = link === "variants/classic/";
+      const rating = classic ? calibratedBots.botRating(calibratedBots.findBot("stockfish")) : "2800";
+      assert.equal(roster.engineRating, rating);
+      assert.deepEqual(roster.engineCommands, classic
+        ? calibratedBots.botSearchConfig(calibratedBots.findBot("stockfish")).commands
+        : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value 2800"]);
+      assert.deepEqual(roster.fullCommands, classic
+        ? calibratedBots.botSearchConfig(calibratedBots.customBot(null)).commands
+        : ["setoption name UCI_LimitStrength value false"]);
+      assert.equal(await page.locator('.bot[data-id="stockfish"]').getAttribute("aria-label"), "Stockfish (" + rating + ")");
       const move = await page.evaluate(() => pos.legal.find(m => m.length === 4));
       assert(move, "expected a legal opening move");
       await page.locator(`[data-sq="${move.slice(0, 2)}"]`).click();

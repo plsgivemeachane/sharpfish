@@ -1,0 +1,1003 @@
+{
+  "knots": [
+    [
+      0,
+      0
+    ],
+    [
+      50,
+      0
+    ],
+    [
+      100,
+      0
+    ],
+    [
+      150,
+      0
+    ],
+    [
+      200,
+      0
+    ],
+    [
+      250,
+      0
+    ],
+    [
+      300,
+      0
+    ],
+    [
+      350,
+      100
+    ],
+    [
+      400,
+      100
+    ],
+    [
+      450,
+      100
+    ],
+    [
+      500,
+      250
+    ],
+    [
+      550,
+      250
+    ],
+    [
+      600,
+      400
+    ],
+    [
+      650,
+      400
+    ],
+    [
+      700,
+      550
+    ],
+    [
+      750,
+      550
+    ],
+    [
+      800,
+      700
+    ],
+    [
+      850,
+      700
+    ],
+    [
+      900,
+      800
+    ],
+    [
+      950,
+      800
+    ],
+    [
+      1000,
+      800
+    ],
+    [
+      1050,
+      900
+    ],
+    [
+      1100,
+      900
+    ],
+    [
+      1150,
+      1000
+    ],
+    [
+      1200,
+      1000
+    ],
+    [
+      1250,
+      1200
+    ],
+    [
+      1300,
+      1400
+    ],
+    [
+      1350,
+      1400
+    ],
+    [
+      1400,
+      1450
+    ],
+    [
+      1450,
+      1450
+    ],
+    [
+      1500,
+      1550
+    ],
+    [
+      1550,
+      1550
+    ],
+    [
+      1600,
+      1600
+    ],
+    [
+      1650,
+      1700
+    ],
+    [
+      1700,
+      1700
+    ],
+    [
+      1750,
+      1750
+    ],
+    [
+      1800,
+      1750
+    ],
+    [
+      1850,
+      1750
+    ],
+    [
+      1900,
+      2000
+    ],
+    [
+      1950,
+      2000
+    ],
+    [
+      2000,
+      2200
+    ],
+    [
+      2050,
+      2200
+    ],
+    [
+      2100,
+      2200
+    ],
+    [
+      2150,
+      2300
+    ],
+    [
+      2200,
+      2350
+    ],
+    [
+      2250,
+      2350
+    ],
+    [
+      2300,
+      2400
+    ],
+    [
+      2350,
+      2500
+    ],
+    [
+      2400,
+      2550
+    ],
+    [
+      2450,
+      2600
+    ],
+    [
+      2500,
+      2600
+    ],
+    [
+      2550,
+      2600
+    ],
+    [
+      2600,
+      2700
+    ],
+    [
+      2650,
+      2700
+    ],
+    [
+      2700,
+      2700
+    ],
+    [
+      2750,
+      2800
+    ],
+    [
+      2800,
+      2800
+    ],
+    [
+      2850,
+      2800
+    ],
+    [
+      2900,
+      2900
+    ],
+    [
+      2950,
+      2900
+    ],
+    [
+      3000,
+      3000
+    ],
+    [
+      3050,
+      3100
+    ],
+    [
+      3100,
+      3100
+    ],
+    [
+      3150,
+      3100
+    ]
+  ],
+  "supportedRange": [
+    250,
+    3100
+  ],
+  "predictions": [
+    {
+      "target": 0,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 50,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 100,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 150,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 200,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 250,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 300,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 350,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 400,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 450,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 500,
+      "engineElo": 250,
+      "estimated": 533.3,
+      "smoothed": 533.3,
+      "profile": "old-martin"
+    },
+    {
+      "target": 550,
+      "engineElo": 250,
+      "estimated": 533.3,
+      "smoothed": 533.3,
+      "profile": "old-martin"
+    },
+    {
+      "target": 600,
+      "engineElo": 400,
+      "estimated": 635.7,
+      "smoothed": 635.7,
+      "profile": "old-sunny"
+    },
+    {
+      "target": 650,
+      "engineElo": 400,
+      "estimated": 635.7,
+      "smoothed": 635.7,
+      "profile": "old-sunny"
+    },
+    {
+      "target": 700,
+      "engineElo": 550,
+      "estimated": 686.6,
+      "smoothed": 686.6,
+      "profile": "old-milo"
+    },
+    {
+      "target": 750,
+      "engineElo": 550,
+      "estimated": 686.6,
+      "smoothed": 686.6,
+      "profile": "old-milo"
+    },
+    {
+      "target": 800,
+      "engineElo": 700,
+      "estimated": 817.8,
+      "smoothed": 817.8,
+      "profile": "old-juno"
+    },
+    {
+      "target": 850,
+      "engineElo": 700,
+      "estimated": 817.8,
+      "smoothed": 817.8,
+      "profile": "old-juno"
+    },
+    {
+      "target": 900,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 950,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 1000,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 1050,
+      "engineElo": 900,
+      "estimated": 1062.6,
+      "smoothed": 1062.6,
+      "profile": "old-rosa"
+    },
+    {
+      "target": 1100,
+      "engineElo": 900,
+      "estimated": 1062.6,
+      "smoothed": 1062.6,
+      "profile": "old-rosa"
+    },
+    {
+      "target": 1150,
+      "engineElo": 1000,
+      "estimated": 1183.1,
+      "smoothed": 1183.1,
+      "profile": "old-felix"
+    },
+    {
+      "target": 1200,
+      "engineElo": 1000,
+      "estimated": 1183.1,
+      "smoothed": 1183.1,
+      "profile": "old-felix"
+    },
+    {
+      "target": 1250,
+      "engineElo": 1200,
+      "estimated": 1269.4,
+      "smoothed": 1256.1931818181818,
+      "profile": "old-omar"
+    },
+    {
+      "target": 1300,
+      "engineElo": 1400,
+      "estimated": 1259.2,
+      "smoothed": 1259.2,
+      "profile": "raw-1400"
+    },
+    {
+      "target": 1350,
+      "engineElo": 1400,
+      "estimated": 1259.2,
+      "smoothed": 1259.2,
+      "profile": "raw-1400"
+    },
+    {
+      "target": 1400,
+      "engineElo": 1450,
+      "estimated": 1453.9,
+      "smoothed": 1452.052380952381,
+      "profile": "old-kenji"
+    },
+    {
+      "target": 1450,
+      "engineElo": 1450,
+      "estimated": 1453.9,
+      "smoothed": 1452.052380952381,
+      "profile": "old-kenji"
+    },
+    {
+      "target": 1500,
+      "engineElo": 1550,
+      "estimated": 1534.1,
+      "smoothed": 1534.1,
+      "profile": "raw-1550"
+    },
+    {
+      "target": 1550,
+      "engineElo": 1550,
+      "estimated": 1534.1,
+      "smoothed": 1534.1,
+      "profile": "raw-1550"
+    },
+    {
+      "target": 1600,
+      "engineElo": 1600,
+      "estimated": 1612.2,
+      "smoothed": 1592.6521739130435,
+      "profile": "old-priya"
+    },
+    {
+      "target": 1650,
+      "engineElo": 1700,
+      "estimated": 1682.1,
+      "smoothed": 1682.1,
+      "profile": "raw-1700"
+    },
+    {
+      "target": 1700,
+      "engineElo": 1700,
+      "estimated": 1682.1,
+      "smoothed": 1682.1,
+      "profile": "raw-1700"
+    },
+    {
+      "target": 1750,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1800,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1850,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1900,
+      "engineElo": 2000,
+      "estimated": 1944.3,
+      "smoothed": 1902.1548387096773,
+      "profile": "raw-2000"
+    },
+    {
+      "target": 1950,
+      "engineElo": 2000,
+      "estimated": 1944.3,
+      "smoothed": 1902.1548387096773,
+      "profile": "raw-2000"
+    },
+    {
+      "target": 2000,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2050,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2100,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2150,
+      "engineElo": 2300,
+      "estimated": 2196.7,
+      "smoothed": 2196.7,
+      "profile": "raw-2300"
+    },
+    {
+      "target": 2200,
+      "engineElo": 2350,
+      "estimated": 2201.6,
+      "smoothed": 2201.6,
+      "profile": "old-dario"
+    },
+    {
+      "target": 2250,
+      "engineElo": 2350,
+      "estimated": 2201.6,
+      "smoothed": 2201.6,
+      "profile": "old-dario"
+    },
+    {
+      "target": 2300,
+      "engineElo": 2400,
+      "estimated": 2318.8,
+      "smoothed": 2318.8,
+      "profile": "raw-2400"
+    },
+    {
+      "target": 2350,
+      "engineElo": 2500,
+      "estimated": 2335.1,
+      "smoothed": 2335.1,
+      "profile": "old-sasha"
+    },
+    {
+      "target": 2400,
+      "engineElo": 2550,
+      "estimated": 2432.2,
+      "smoothed": 2432.2,
+      "profile": "raw-2550"
+    },
+    {
+      "target": 2450,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2500,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2550,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2600,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2650,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2700,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2750,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2800,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2850,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2900,
+      "engineElo": 2900,
+      "estimated": 2906.2,
+      "smoothed": 2906.2,
+      "profile": "raw-2900"
+    },
+    {
+      "target": 2950,
+      "engineElo": 2900,
+      "estimated": 2906.2,
+      "smoothed": 2906.2,
+      "profile": "raw-2900"
+    },
+    {
+      "target": 3000,
+      "engineElo": 3000,
+      "estimated": 3000.1,
+      "smoothed": 3000.1,
+      "profile": "raw-3000"
+    },
+    {
+      "target": 3050,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    },
+    {
+      "target": 3100,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    },
+    {
+      "target": 3150,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    }
+  ],
+  "points": [
+    {
+      "engineElo": 0,
+      "estimate": 266.5,
+      "games": 80,
+      "id": "old-pebble",
+      "smoothed": 266.5
+    },
+    {
+      "engineElo": 100,
+      "estimate": 431.0,
+      "games": 120,
+      "id": "old-noodle",
+      "smoothed": 431.0
+    },
+    {
+      "engineElo": 250,
+      "estimate": 533.3,
+      "games": 120,
+      "id": "old-martin",
+      "smoothed": 533.3
+    },
+    {
+      "engineElo": 400,
+      "estimate": 635.7,
+      "games": 120,
+      "id": "old-sunny",
+      "smoothed": 635.7
+    },
+    {
+      "engineElo": 550,
+      "estimate": 686.6,
+      "games": 120,
+      "id": "old-milo",
+      "smoothed": 686.6
+    },
+    {
+      "engineElo": 700,
+      "estimate": 817.8,
+      "games": 120,
+      "id": "old-juno",
+      "smoothed": 817.8
+    },
+    {
+      "engineElo": 800,
+      "estimate": 946.0,
+      "games": 120,
+      "id": "old-tobi",
+      "smoothed": 946.0
+    },
+    {
+      "engineElo": 900,
+      "estimate": 1062.6,
+      "games": 120,
+      "id": "old-rosa",
+      "smoothed": 1062.6
+    },
+    {
+      "engineElo": 1000,
+      "estimate": 1183.1,
+      "games": 120,
+      "id": "old-felix",
+      "smoothed": 1183.1
+    },
+    {
+      "engineElo": 1100,
+      "estimate": 1236.5,
+      "games": 120,
+      "id": "old-nadia",
+      "smoothed": 1236.5
+    },
+    {
+      "engineElo": 1200,
+      "estimate": 1269.4,
+      "games": 136,
+      "id": "old-omar",
+      "smoothed": 1256.1931818181818
+    },
+    {
+      "engineElo": 1250,
+      "estimate": 1304.8,
+      "games": 32,
+      "id": "raw-1250",
+      "smoothed": 1256.1931818181818
+    },
+    {
+      "engineElo": 1300,
+      "estimate": 1271.6,
+      "games": 32,
+      "id": "raw-1300",
+      "smoothed": 1256.1931818181818
+    },
+    {
+      "engineElo": 1350,
+      "estimate": 1230.9,
+      "games": 152,
+      "id": "old-lena",
+      "smoothed": 1256.1931818181818
+    },
+    {
+      "engineElo": 1400,
+      "estimate": 1259.2,
+      "games": 32,
+      "id": "raw-1400",
+      "smoothed": 1259.2
+    },
+    {
+      "engineElo": 1450,
+      "estimate": 1453.9,
+      "games": 136,
+      "id": "old-kenji",
+      "smoothed": 1452.052380952381
+    },
+    {
+      "engineElo": 1500,
+      "estimate": 1444.2,
+      "games": 32,
+      "id": "raw-1500",
+      "smoothed": 1452.052380952381
+    },
+    {
+      "engineElo": 1550,
+      "estimate": 1534.1,
+      "games": 32,
+      "id": "raw-1550",
+      "smoothed": 1534.1
+    },
+    {
+      "engineElo": 1600,
+      "estimate": 1612.2,
+      "games": 152,
+      "id": "old-priya",
+      "smoothed": 1592.6521739130435
+    },
+    {
+      "engineElo": 1650,
+      "estimate": 1499.8,
+      "games": 32,
+      "id": "raw-1650",
+      "smoothed": 1592.6521739130435
+    },
+    {
+      "engineElo": 1700,
+      "estimate": 1682.1,
+      "games": 32,
+      "id": "raw-1700",
+      "smoothed": 1682.1
+    },
+    {
+      "engineElo": 1750,
+      "estimate": 1822.8,
+      "games": 152,
+      "id": "old-hugo",
+      "smoothed": 1812.695652173913
+    },
+    {
+      "engineElo": 1800,
+      "estimate": 1764.7,
+      "games": 32,
+      "id": "raw-1800",
+      "smoothed": 1812.695652173913
+    },
+    {
+      "engineElo": 1900,
+      "estimate": 1893.5,
+      "games": 120,
+      "id": "old-aria",
+      "smoothed": 1893.5
+    },
+    {
+      "engineElo": 2000,
+      "estimate": 1944.3,
+      "games": 32,
+      "id": "raw-2000",
+      "smoothed": 1902.1548387096773
+    },
+    {
+      "engineElo": 2050,
+      "estimate": 1902.4,
+      "games": 152,
+      "id": "old-viktor",
+      "smoothed": 1902.1548387096773
+    },
+    {
+      "engineElo": 2100,
+      "estimate": 1867.1,
+      "games": 32,
+      "id": "raw-2100",
+      "smoothed": 1902.1548387096773
+    },
+    {
+      "engineElo": 2150,
+      "estimate": 1893.9,
+      "games": 32,
+      "id": "raw-2150",
+      "smoothed": 1902.1548387096773
+    },
+    {
+      "engineElo": 2200,
+      "estimate": 2078.8,
+      "games": 136,
+      "id": "old-mei",
+      "smoothed": 2078.8
+    },
+    {
+      "engineElo": 2300,
+      "estimate": 2196.7,
+      "games": 32,
+      "id": "raw-2300",
+      "smoothed": 2196.7
+    },
+    {
+      "engineElo": 2350,
+      "estimate": 2201.6,
+      "games": 152,
+      "id": "old-dario",
+      "smoothed": 2201.6
+    },
+    {
+      "engineElo": 2400,
+      "estimate": 2318.8,
+      "games": 32,
+      "id": "raw-2400",
+      "smoothed": 2318.8
+    },
+    {
+      "engineElo": 2500,
+      "estimate": 2335.1,
+      "games": 152,
+      "id": "old-sasha",
+      "smoothed": 2335.1
+    },
+    {
+      "engineElo": 2550,
+      "estimate": 2432.2,
+      "games": 32,
+      "id": "raw-2550",
+      "smoothed": 2432.2
+    },
+    {
+      "engineElo": 2600,
+      "estimate": 2462.7,
+      "games": 32,
+      "id": "raw-2600",
+      "smoothed": 2462.7
+    },
+    {
+      "engineElo": 2700,
+      "estimate": 2652.6,
+      "games": 32,
+      "id": "raw-2700",
+      "smoothed": 2652.6
+    },
+    {
+      "engineElo": 2800,
+      "estimate": 2843.9,
+      "games": 160,
+      "id": "old-stockfish",
+      "smoothed": 2843.9
+    },
+    {
+      "engineElo": 2900,
+      "estimate": 2906.2,
+      "games": 32,
+      "id": "raw-2900",
+      "smoothed": 2906.2
+    },
+    {
+      "engineElo": 3000,
+      "estimate": 3000.1,
+      "games": 32,
+      "id": "raw-3000",
+      "smoothed": 3000.1
+    },
+    {
+      "engineElo": 3100,
+      "estimate": 3087.0,
+      "games": 32,
+      "id": "raw-3100",
+      "smoothed": 3077.2
+    },
+    {
+      "engineElo": 3150,
+      "estimate": 3067.4,
+      "games": 32,
+      "id": "raw-3150",
+      "smoothed": 3077.2
+    }
+  ]
+}

@@ -1,0 +1,891 @@
+{
+  "version": "sharpfish-engine-2026-11-17-v1",
+  "scale": "historical-Stash-CCRL-anchors; not Chess.com or FIDE",
+  "scope": "Classic only; original controls re-estimated at a normalized 100000-node search budget, not a measurement of arbitrary old wall-clock settings",
+  "measurement": {
+    "games": 2400,
+    "errors": 0,
+    "plyCapDraws": 0,
+    "continuedGames": 220,
+    "continuationNote": "Continuation starts from saved position with complete move history and fresh engines/TT. Six reference-history buffer overflows were repaired and those games completed."
+  },
+  "reference": {
+    "source_head": "c9c4a8d0c6b02aaf78fc0f046b9adbd6a5eacd25",
+    "source_repository": "https://github.com/plsgivemeachane/sharpfish",
+    "nodes": 100000,
+    "threads": 1,
+    "hash_mb": 16,
+    "native_build": "ARCH=x86-64-avx2 LITE_NET=yes",
+    "references": [
+      {
+        "tag": "v8",
+        "commit": "f6a02d00dedcc335031e3e529783c136ac4f54b6",
+        "rating": 1452.8,
+        "sha256": "840be15f0a520f08c62e288bee798c4145e9d927dc50200df7787cd964a04421",
+        "repository": "https://github.com/mhouppin/stash-bot"
+      },
+      {
+        "tag": "v12",
+        "commit": "4aac78dded241a66231443ff2140b2e289154633",
+        "rating": 1963.4,
+        "sha256": "93189113b2366703737837e6d57deb9f2ee72164962543bba22adab231b5a6e5",
+        "repository": "https://github.com/mhouppin/stash-bot"
+      },
+      {
+        "tag": "v17.0",
+        "commit": "f85863d68b2f20812f8e1b330cd2613212a1b12a",
+        "rating": 2280.7,
+        "sha256": "ea0da41c3a7cf11aba25d8ce9c3a981af7d88c3758387fe72a060d2e8671adff",
+        "repository": "https://github.com/mhouppin/stash-bot"
+      },
+      {
+        "tag": "v25.0",
+        "commit": "664849453d3fa0b5b60869325a3764921c902512",
+        "rating": 2744,
+        "sha256": "6a3d8e97c8219d03412ba9f9e10fd19004809637e9ec67277463645ff3ae53b9",
+        "repository": "https://github.com/mhouppin/stash-bot"
+      }
+    ],
+    "engine_sha256": "a446cc2eafe24dce9dd4b82364b17b2460c2ad593093890afbd33a06470fa641",
+    "nnue_sha256": "61e7af4bb97d51eeeb25d322916f86513b5cd3a827ce189c98c6e31946f99e5b",
+    "wasm_sha256": "8397a6c06311f509a71253f5cf4711e03e0df26ab37bdf55142eba31db89c9ea",
+    "reference_history_repair": {
+      "engine": "Stash v8",
+      "games": 6,
+      "description": "Expand only UCI game-history move buffer from 256 to 8192 entries for six long-game continuations. Search algorithm unchanged. Other matches used the original reference binary.",
+      "sha256": "4bf031542c57470f1eea9182072ad698d31f718237b1a8437b8f4db83c37654d",
+      "patch": "after g_inter_moves = movelist_init(): g_inter_moves->moves = realloc(g_inter_moves->moves, sizeof(move_t) * 8192);"
+    },
+    "test_packages": {
+      "python": "3.13.15",
+      "python_chess": "1.11.2",
+      "numpy": "2.5.5",
+      "scipy": "1.18.1"
+    }
+  },
+  "bots": [
+    {
+      "id": "pebble",
+      "name": "Pebble",
+      "previousElo": 0,
+      "engineElo": 0,
+      "estimatedElo": 266.5,
+      "displayElo": 250,
+      "conditional95": [
+        136.8,
+        396.1
+      ],
+      "model95": [
+        6.4,
+        526.5
+      ],
+      "games": 80
+    },
+    {
+      "id": "noodle",
+      "name": "Noodle",
+      "previousElo": 100,
+      "engineElo": 100,
+      "estimatedElo": 431.0,
+      "displayElo": 450,
+      "conditional95": [
+        317.2,
+        544.8
+      ],
+      "model95": [
+        198.2,
+        663.7
+      ],
+      "games": 120
+    },
+    {
+      "id": "martin",
+      "name": "Martin",
+      "previousElo": 250,
+      "engineElo": 250,
+      "estimatedElo": 533.3,
+      "displayElo": 550,
+      "conditional95": [
+        437.7,
+        628.9
+      ],
+      "model95": [
+        324.4,
+        742.1
+      ],
+      "games": 120
+    },
+    {
+      "id": "sunny",
+      "name": "Sunny",
+      "previousElo": 400,
+      "engineElo": 400,
+      "estimatedElo": 635.7,
+      "displayElo": 650,
+      "conditional95": [
+        548.5,
+        723.0
+      ],
+      "model95": [
+        450.2,
+        821.3
+      ],
+      "games": 120
+    },
+    {
+      "id": "milo",
+      "name": "Milo",
+      "previousElo": 550,
+      "engineElo": 550,
+      "estimatedElo": 686.6,
+      "displayElo": 700,
+      "conditional95": [
+        599.9,
+        773.4
+      ],
+      "model95": [
+        521.5,
+        851.8
+      ],
+      "games": 120
+    },
+    {
+      "id": "juno",
+      "name": "Juno",
+      "previousElo": 700,
+      "engineElo": 700,
+      "estimatedElo": 817.8,
+      "displayElo": 800,
+      "conditional95": [
+        739.4,
+        896.3
+      ],
+      "model95": [
+        675.7,
+        960.0
+      ],
+      "games": 120
+    },
+    {
+      "id": "tobi",
+      "name": "Tobi",
+      "previousElo": 800,
+      "engineElo": 800,
+      "estimatedElo": 946.0,
+      "displayElo": 950,
+      "conditional95": [
+        868.6,
+        1023.4
+      ],
+      "model95": [
+        825.6,
+        1066.4
+      ],
+      "games": 120
+    },
+    {
+      "id": "rosa",
+      "name": "Rosa",
+      "previousElo": 900,
+      "engineElo": 900,
+      "estimatedElo": 1062.6,
+      "displayElo": 1050,
+      "conditional95": [
+        994.1,
+        1131.1
+      ],
+      "model95": [
+        960.2,
+        1165.0
+      ],
+      "games": 120
+    },
+    {
+      "id": "felix",
+      "name": "Felix",
+      "previousElo": 1000,
+      "engineElo": 1000,
+      "estimatedElo": 1183.1,
+      "displayElo": 1200,
+      "conditional95": [
+        1119.9,
+        1246.4
+      ],
+      "model95": [
+        1095.1,
+        1271.1
+      ],
+      "games": 120
+    },
+    {
+      "id": "nadia",
+      "name": "Nadia",
+      "previousElo": 1100,
+      "engineElo": 1100,
+      "estimatedElo": 1236.5,
+      "displayElo": 1250,
+      "conditional95": [
+        1175.5,
+        1297.5
+      ],
+      "model95": [
+        1155.8,
+        1317.2
+      ],
+      "games": 120
+    },
+    {
+      "id": "omar",
+      "name": "Omar",
+      "previousElo": 1200,
+      "engineElo": 1200,
+      "estimatedElo": 1269.4,
+      "displayElo": 1250,
+      "conditional95": [
+        1212.5,
+        1326.3
+      ],
+      "model95": [
+        1194.8,
+        1343.9
+      ],
+      "games": 136
+    },
+    {
+      "id": "lena",
+      "name": "Lena",
+      "previousElo": 1350,
+      "engineElo": 1350,
+      "estimatedElo": 1230.9,
+      "displayElo": 1250,
+      "conditional95": [
+        1172.3,
+        1289.5
+      ],
+      "model95": [
+        1156.8,
+        1305.0
+      ],
+      "games": 152
+    },
+    {
+      "id": "kenji",
+      "name": "Kenji",
+      "previousElo": 1450,
+      "engineElo": 1450,
+      "estimatedElo": 1453.9,
+      "displayElo": 1450,
+      "conditional95": [
+        1395.3,
+        1512.5
+      ],
+      "model95": [
+        1381.9,
+        1526.0
+      ],
+      "games": 136
+    },
+    {
+      "id": "priya",
+      "name": "Priya",
+      "previousElo": 1600,
+      "engineElo": 1600,
+      "estimatedElo": 1612.2,
+      "displayElo": 1600,
+      "conditional95": [
+        1545.5,
+        1679.0
+      ],
+      "model95": [
+        1540.5,
+        1684.0
+      ],
+      "games": 152
+    },
+    {
+      "id": "hugo",
+      "name": "Hugo",
+      "previousElo": 1750,
+      "engineElo": 1750,
+      "estimatedElo": 1822.8,
+      "displayElo": 1800,
+      "conditional95": [
+        1757.0,
+        1888.6
+      ],
+      "model95": [
+        1751.5,
+        1894.1
+      ],
+      "games": 152
+    },
+    {
+      "id": "aria",
+      "name": "Aria",
+      "previousElo": 1900,
+      "engineElo": 1900,
+      "estimatedElo": 1893.5,
+      "displayElo": 1900,
+      "conditional95": [
+        1827.3,
+        1959.6
+      ],
+      "model95": [
+        1821.3,
+        1965.7
+      ],
+      "games": 120
+    },
+    {
+      "id": "viktor",
+      "name": "Viktor",
+      "previousElo": 2050,
+      "engineElo": 2050,
+      "estimatedElo": 1902.4,
+      "displayElo": 1900,
+      "conditional95": [
+        1841.6,
+        1963.2
+      ],
+      "model95": [
+        1834.1,
+        1970.7
+      ],
+      "games": 152
+    },
+    {
+      "id": "mei",
+      "name": "Mei",
+      "previousElo": 2200,
+      "engineElo": 2200,
+      "estimatedElo": 2078.8,
+      "displayElo": 2100,
+      "conditional95": [
+        2012.0,
+        2145.6
+      ],
+      "model95": [
+        2003.8,
+        2153.8
+      ],
+      "games": 136
+    },
+    {
+      "id": "dario",
+      "name": "Dario",
+      "previousElo": 2350,
+      "engineElo": 2350,
+      "estimatedElo": 2201.6,
+      "displayElo": 2200,
+      "conditional95": [
+        2132.0,
+        2271.2
+      ],
+      "model95": [
+        2132.5,
+        2270.6
+      ],
+      "games": 152
+    },
+    {
+      "id": "sasha",
+      "name": "Sasha",
+      "previousElo": 2500,
+      "engineElo": 2500,
+      "estimatedElo": 2335.1,
+      "displayElo": 2350,
+      "conditional95": [
+        2263.3,
+        2406.9
+      ],
+      "model95": [
+        2260.0,
+        2410.2
+      ],
+      "games": 152
+    },
+    {
+      "id": "stockfish",
+      "name": "Stockfish",
+      "previousElo": 2800,
+      "engineElo": 2800,
+      "estimatedElo": 2843.9,
+      "displayElo": 2850,
+      "conditional95": [
+        2782.7,
+        2905.0
+      ],
+      "model95": [
+        2763.6,
+        2924.2
+      ],
+      "games": 160
+    }
+  ],
+  "replacementProfiles": [
+    {
+      "target": 0,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 50,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 100,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 150,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 200,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 250,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 300,
+      "engineElo": 0,
+      "estimated": 266.5,
+      "smoothed": 266.5,
+      "profile": "old-pebble"
+    },
+    {
+      "target": 350,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 400,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 450,
+      "engineElo": 100,
+      "estimated": 431.0,
+      "smoothed": 431.0,
+      "profile": "old-noodle"
+    },
+    {
+      "target": 500,
+      "engineElo": 250,
+      "estimated": 533.3,
+      "smoothed": 533.3,
+      "profile": "old-martin"
+    },
+    {
+      "target": 550,
+      "engineElo": 250,
+      "estimated": 533.3,
+      "smoothed": 533.3,
+      "profile": "old-martin"
+    },
+    {
+      "target": 600,
+      "engineElo": 400,
+      "estimated": 635.7,
+      "smoothed": 635.7,
+      "profile": "old-sunny"
+    },
+    {
+      "target": 650,
+      "engineElo": 400,
+      "estimated": 635.7,
+      "smoothed": 635.7,
+      "profile": "old-sunny"
+    },
+    {
+      "target": 700,
+      "engineElo": 550,
+      "estimated": 686.6,
+      "smoothed": 686.6,
+      "profile": "old-milo"
+    },
+    {
+      "target": 750,
+      "engineElo": 550,
+      "estimated": 686.6,
+      "smoothed": 686.6,
+      "profile": "old-milo"
+    },
+    {
+      "target": 800,
+      "engineElo": 700,
+      "estimated": 817.8,
+      "smoothed": 817.8,
+      "profile": "old-juno"
+    },
+    {
+      "target": 850,
+      "engineElo": 700,
+      "estimated": 817.8,
+      "smoothed": 817.8,
+      "profile": "old-juno"
+    },
+    {
+      "target": 900,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 950,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 1000,
+      "engineElo": 800,
+      "estimated": 946.0,
+      "smoothed": 946.0,
+      "profile": "old-tobi"
+    },
+    {
+      "target": 1050,
+      "engineElo": 900,
+      "estimated": 1062.6,
+      "smoothed": 1062.6,
+      "profile": "old-rosa"
+    },
+    {
+      "target": 1100,
+      "engineElo": 900,
+      "estimated": 1062.6,
+      "smoothed": 1062.6,
+      "profile": "old-rosa"
+    },
+    {
+      "target": 1150,
+      "engineElo": 1000,
+      "estimated": 1183.1,
+      "smoothed": 1183.1,
+      "profile": "old-felix"
+    },
+    {
+      "target": 1200,
+      "engineElo": 1000,
+      "estimated": 1183.1,
+      "smoothed": 1183.1,
+      "profile": "old-felix"
+    },
+    {
+      "target": 1250,
+      "engineElo": 1200,
+      "estimated": 1269.4,
+      "smoothed": 1256.1931818181818,
+      "profile": "old-omar"
+    },
+    {
+      "target": 1300,
+      "engineElo": 1400,
+      "estimated": 1259.2,
+      "smoothed": 1259.2,
+      "profile": "raw-1400"
+    },
+    {
+      "target": 1350,
+      "engineElo": 1400,
+      "estimated": 1259.2,
+      "smoothed": 1259.2,
+      "profile": "raw-1400"
+    },
+    {
+      "target": 1400,
+      "engineElo": 1450,
+      "estimated": 1453.9,
+      "smoothed": 1452.052380952381,
+      "profile": "old-kenji"
+    },
+    {
+      "target": 1450,
+      "engineElo": 1450,
+      "estimated": 1453.9,
+      "smoothed": 1452.052380952381,
+      "profile": "old-kenji"
+    },
+    {
+      "target": 1500,
+      "engineElo": 1550,
+      "estimated": 1534.1,
+      "smoothed": 1534.1,
+      "profile": "raw-1550"
+    },
+    {
+      "target": 1550,
+      "engineElo": 1550,
+      "estimated": 1534.1,
+      "smoothed": 1534.1,
+      "profile": "raw-1550"
+    },
+    {
+      "target": 1600,
+      "engineElo": 1600,
+      "estimated": 1612.2,
+      "smoothed": 1592.6521739130435,
+      "profile": "old-priya"
+    },
+    {
+      "target": 1650,
+      "engineElo": 1700,
+      "estimated": 1682.1,
+      "smoothed": 1682.1,
+      "profile": "raw-1700"
+    },
+    {
+      "target": 1700,
+      "engineElo": 1700,
+      "estimated": 1682.1,
+      "smoothed": 1682.1,
+      "profile": "raw-1700"
+    },
+    {
+      "target": 1750,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1800,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1850,
+      "engineElo": 1750,
+      "estimated": 1822.8,
+      "smoothed": 1812.695652173913,
+      "profile": "old-hugo"
+    },
+    {
+      "target": 1900,
+      "engineElo": 2000,
+      "estimated": 1944.3,
+      "smoothed": 1902.1548387096773,
+      "profile": "raw-2000"
+    },
+    {
+      "target": 1950,
+      "engineElo": 2000,
+      "estimated": 1944.3,
+      "smoothed": 1902.1548387096773,
+      "profile": "raw-2000"
+    },
+    {
+      "target": 2000,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2050,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2100,
+      "engineElo": 2200,
+      "estimated": 2078.8,
+      "smoothed": 2078.8,
+      "profile": "old-mei"
+    },
+    {
+      "target": 2150,
+      "engineElo": 2300,
+      "estimated": 2196.7,
+      "smoothed": 2196.7,
+      "profile": "raw-2300"
+    },
+    {
+      "target": 2200,
+      "engineElo": 2350,
+      "estimated": 2201.6,
+      "smoothed": 2201.6,
+      "profile": "old-dario"
+    },
+    {
+      "target": 2250,
+      "engineElo": 2350,
+      "estimated": 2201.6,
+      "smoothed": 2201.6,
+      "profile": "old-dario"
+    },
+    {
+      "target": 2300,
+      "engineElo": 2400,
+      "estimated": 2318.8,
+      "smoothed": 2318.8,
+      "profile": "raw-2400"
+    },
+    {
+      "target": 2350,
+      "engineElo": 2500,
+      "estimated": 2335.1,
+      "smoothed": 2335.1,
+      "profile": "old-sasha"
+    },
+    {
+      "target": 2400,
+      "engineElo": 2550,
+      "estimated": 2432.2,
+      "smoothed": 2432.2,
+      "profile": "raw-2550"
+    },
+    {
+      "target": 2450,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2500,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2550,
+      "engineElo": 2600,
+      "estimated": 2462.7,
+      "smoothed": 2462.7,
+      "profile": "raw-2600"
+    },
+    {
+      "target": 2600,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2650,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2700,
+      "engineElo": 2700,
+      "estimated": 2652.6,
+      "smoothed": 2652.6,
+      "profile": "raw-2700"
+    },
+    {
+      "target": 2750,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2800,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2850,
+      "engineElo": 2800,
+      "estimated": 2843.9,
+      "smoothed": 2843.9,
+      "profile": "old-stockfish"
+    },
+    {
+      "target": 2900,
+      "engineElo": 2900,
+      "estimated": 2906.2,
+      "smoothed": 2906.2,
+      "profile": "raw-2900"
+    },
+    {
+      "target": 2950,
+      "engineElo": 2900,
+      "estimated": 2906.2,
+      "smoothed": 2906.2,
+      "profile": "raw-2900"
+    },
+    {
+      "target": 3000,
+      "engineElo": 3000,
+      "estimated": 3000.1,
+      "smoothed": 3000.1,
+      "profile": "raw-3000"
+    },
+    {
+      "target": 3050,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    },
+    {
+      "target": 3100,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    },
+    {
+      "target": 3150,
+      "engineElo": 3100,
+      "estimated": 3087.0,
+      "smoothed": 3077.2,
+      "profile": "raw-3100"
+    }
+  ],
+  "supportedRange": [
+    250,
+    3100
+  ],
+  "mappingMethod": "Game-count-weighted isotonic fit of raw-control strength, nearest measured profile for each target in steps of 50. Profiles outside supportedRange use closest tested boundary.",
+  "uncertainty": "Conditional intervals exclude historical anchor/pool uncertainty (roughly +/-100 Elo or more), native/WASM differences, and device time-cap effects. Bottom values are especially provisional.",
+  "fullMode": "Skill Level 20, UCI_LimitStrength false, user movetime; no fixed Elo claim.",
+  "validation": {
+    "games": 736,
+    "newOpenings": 8,
+    "errors": 0,
+    "plyCapDraws": 0,
+    "meanAbsoluteTargetDeviation": 61.3,
+    "maxAbsoluteTargetDeviation": 153.1,
+    "conditionalOn": "Calibration fit opponent estimates held fixed; reference-anchor and device uncertainties excluded. Mapping frozen before these games."
+  }
+}

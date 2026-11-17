@@ -1,0 +1,751 @@
+[
+  {
+    "id": "old-pebble",
+    "name": "Pebble",
+    "displayElo": 0,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 0
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-noodle",
+    "name": "Noodle",
+    "displayElo": 100,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 100
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-martin",
+    "name": "Martin",
+    "displayElo": 250,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 250
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-sunny",
+    "name": "Sunny",
+    "displayElo": 400,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 400
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-milo",
+    "name": "Milo",
+    "displayElo": 550,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 550
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-juno",
+    "name": "Juno",
+    "displayElo": 700,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 700
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-tobi",
+    "name": "Tobi",
+    "displayElo": 800,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 800
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-rosa",
+    "name": "Rosa",
+    "displayElo": 900,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 900
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-felix",
+    "name": "Felix",
+    "displayElo": 1000,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1000
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-nadia",
+    "name": "Nadia",
+    "displayElo": 1100,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1100
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-omar",
+    "name": "Omar",
+    "displayElo": 1200,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1200
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-lena",
+    "name": "Lena",
+    "displayElo": 1350,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1350
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-kenji",
+    "name": "Kenji",
+    "displayElo": 1450,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1450
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-priya",
+    "name": "Priya",
+    "displayElo": 1600,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1600
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-hugo",
+    "name": "Hugo",
+    "displayElo": 1750,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1750
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-aria",
+    "name": "Aria",
+    "displayElo": 1900,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1900
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-viktor",
+    "name": "Viktor",
+    "displayElo": 2050,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2050
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-mei",
+    "name": "Mei",
+    "displayElo": 2200,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2200
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-dario",
+    "name": "Dario",
+    "displayElo": 2350,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2350
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-sasha",
+    "name": "Sasha",
+    "displayElo": 2500,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2500
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "old-stockfish",
+    "name": "Stockfish",
+    "displayElo": 2800,
+    "kind": "old",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2800
+    },
+    "nodes": 100000
+  },
+  {
+    "id": "ref-v8",
+    "name": "Stash v8",
+    "kind": "reference",
+    "command": [
+      "/tmp/sharpfish-rating-tools/stash-v8/stash-bot"
+    ],
+    "options": {
+      "Hash": 16
+    },
+    "nodes": 100000,
+    "ratingAnchor": 1452.8
+  },
+  {
+    "id": "ref-v12",
+    "name": "Stash v12",
+    "kind": "reference",
+    "command": [
+      "/tmp/sharpfish-rating-tools/stash-v12/stash-bot"
+    ],
+    "options": {
+      "Hash": 16
+    },
+    "nodes": 100000,
+    "ratingAnchor": 1963.4
+  },
+  {
+    "id": "ref-v17.0",
+    "name": "Stash v17.0",
+    "kind": "reference",
+    "command": [
+      "/tmp/sharpfish-rating-tools/stash-v17.0/src/stash-bot"
+    ],
+    "options": {
+      "Hash": 16
+    },
+    "nodes": 100000,
+    "ratingAnchor": 2280.7
+  },
+  {
+    "id": "ref-v25.0",
+    "name": "Stash v25.0",
+    "kind": "reference",
+    "command": [
+      "/tmp/sharpfish-rating-tools/stash-v25.0/src/stash-bot"
+    ],
+    "options": {
+      "Hash": 16
+    },
+    "nodes": 100000,
+    "ratingAnchor": 2744
+  },
+  {
+    "id": "raw-1250",
+    "name": "Raw 1250",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1250
+    },
+    "nodes": 100000,
+    "rawElo": 1250
+  },
+  {
+    "id": "raw-1300",
+    "name": "Raw 1300",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1300
+    },
+    "nodes": 100000,
+    "rawElo": 1300
+  },
+  {
+    "id": "raw-1400",
+    "name": "Raw 1400",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1400
+    },
+    "nodes": 100000,
+    "rawElo": 1400
+  },
+  {
+    "id": "raw-1500",
+    "name": "Raw 1500",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1500
+    },
+    "nodes": 100000,
+    "rawElo": 1500
+  },
+  {
+    "id": "raw-1550",
+    "name": "Raw 1550",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1550
+    },
+    "nodes": 100000,
+    "rawElo": 1550
+  },
+  {
+    "id": "raw-1650",
+    "name": "Raw 1650",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1650
+    },
+    "nodes": 100000,
+    "rawElo": 1650
+  },
+  {
+    "id": "raw-1700",
+    "name": "Raw 1700",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1700
+    },
+    "nodes": 100000,
+    "rawElo": 1700
+  },
+  {
+    "id": "raw-1800",
+    "name": "Raw 1800",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 1800
+    },
+    "nodes": 100000,
+    "rawElo": 1800
+  },
+  {
+    "id": "raw-2000",
+    "name": "Raw 2000",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2000
+    },
+    "nodes": 100000,
+    "rawElo": 2000
+  },
+  {
+    "id": "raw-2100",
+    "name": "Raw 2100",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2100
+    },
+    "nodes": 100000,
+    "rawElo": 2100
+  },
+  {
+    "id": "raw-2150",
+    "name": "Raw 2150",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2150
+    },
+    "nodes": 100000,
+    "rawElo": 2150
+  },
+  {
+    "id": "raw-2300",
+    "name": "Raw 2300",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2300
+    },
+    "nodes": 100000,
+    "rawElo": 2300
+  },
+  {
+    "id": "raw-2400",
+    "name": "Raw 2400",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2400
+    },
+    "nodes": 100000,
+    "rawElo": 2400
+  },
+  {
+    "id": "raw-2550",
+    "name": "Raw 2550",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2550
+    },
+    "nodes": 100000,
+    "rawElo": 2550
+  },
+  {
+    "id": "raw-2600",
+    "name": "Raw 2600",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2600
+    },
+    "nodes": 100000,
+    "rawElo": 2600
+  },
+  {
+    "id": "raw-2700",
+    "name": "Raw 2700",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2700
+    },
+    "nodes": 100000,
+    "rawElo": 2700
+  },
+  {
+    "id": "raw-2900",
+    "name": "Raw 2900",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 2900
+    },
+    "nodes": 100000,
+    "rawElo": 2900
+  },
+  {
+    "id": "raw-3000",
+    "name": "Raw 3000",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 3000
+    },
+    "nodes": 100000,
+    "rawElo": 3000
+  },
+  {
+    "id": "raw-3100",
+    "name": "Raw 3100",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 3100
+    },
+    "nodes": 100000,
+    "rawElo": 3100
+  },
+  {
+    "id": "raw-3150",
+    "name": "Raw 3150",
+    "kind": "candidate",
+    "command": [
+      "/tmp/sharpfish-rating-build/src/stockfish"
+    ],
+    "options": {
+      "Threads": 1,
+      "Hash": 16,
+      "Skill Level": 20,
+      "UCI_LimitStrength": true,
+      "UCI_Elo": 3150
+    },
+    "nodes": 100000,
+    "rawElo": 3150
+  }
+]

@@ -84,25 +84,14 @@ For evaluation changes, compare the `eval` command before and after:
 
 ## Engine strength
 
-The site's bots (`site/bots.js`) are all the same engine with `UCI_Elo` set,
-so they work for every variant without changes. `UCI_Elo` goes from 0 to
-3190 and is rounded to steps of 50.
+The native engine's extended `UCI_Elo` control accepts 0..3190 and rounds to steps of 50 before choosing the policy below (for example, 1320 becomes 1300). It is an engine handicap control, not a measured human rating:
 
-- **1320 and up:** stock Stockfish's own skill levels.
-- **Below 1320 (the beginner zone):** the engine scores every legal move at
-  depth 5. On each move it may blunder: a blunder aims to lose a set share of
-  its win chance; otherwise it plays near its best. Lower Elo means more
-  frequent and bigger blunders, and fewer of them once it is clearly winning
-  (so won games get finished). At Elo 0 every move is its worst.
+- Below 1320: the custom beginner policy evaluates legal moves and samples errors, aiming for depth 5.
+- At and above 1320: inherited Stockfish skill limiting chooses among root candidates at a skill-dependent iteration.
 
-To retune, edit `blunder_chance` and `blunder_size` in `src/search.h`, then
-play bots against each other natively. With 40 games at 50 ms per move, every
-250-Elo step down (1320 → 1000 → 750 → 500 → 250 → 0) lost its match, and Elo
-0 never won a game. These self-play numbers are only roughly calibrated
-against human ratings.
+Classic's displayed bot ratings are now separate from that control. See [the calibration report](calibration/2026-11-17/README.md) for all old/new labels, the normalized 100,000-node budget, reference engines, and uncertainty. Named opponents carry an explicit `engineElo`; custom targets use `BOT_CALIBRATION.knots`. Preserve IDs and artwork when changing labels.
 
-To add, rename or re-rate a bot, edit `site/bots.js`. Martin (250) and
-Stockfish (full strength) are fixed.
+Retune controls and node budgets with complete paired-opening matches, update evidence and provenance together, and validate the fitted curve on new openings. Do not reuse Classic's rating claims for custom-rule variants without separate measurements. Full is a distinct unrestricted-handicap mode, not a fixed 2800 rating. Martin and Stockfish retain their identities and artwork; their rating labels follow evidence.
 
 ## Publishing your fork's site
 

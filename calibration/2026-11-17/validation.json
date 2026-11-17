@@ -1,0 +1,379 @@
+{
+  "games": 736,
+  "newOpenings": 8,
+  "errors": 0,
+  "plyCapDraws": 0,
+  "meanAbsoluteTargetDeviation": 61.3,
+  "maxAbsoluteTargetDeviation": 153.1,
+  "conditionalOn": "Calibration fit opponent estimates held fixed; reference-anchor and device uncertainties excluded. Mapping frozen before these games.",
+  "profiles": [
+    {
+      "target": 0,
+      "engineElo": 0,
+      "estimate": 272.9,
+      "deviation": 272.9,
+      "conditional95Model": [
+        103.4,
+        442.3
+      ],
+      "conditional95Cluster": [
+        268.5,
+        277.2
+      ],
+      "games": 32,
+      "supported": false
+    },
+    {
+      "target": 100,
+      "engineElo": 0,
+      "estimate": 272.9,
+      "deviation": 172.9,
+      "conditional95Model": [
+        103.4,
+        442.3
+      ],
+      "conditional95Cluster": [
+        268.5,
+        277.2
+      ],
+      "games": 32,
+      "supported": false
+    },
+    {
+      "target": 250,
+      "engineElo": 0,
+      "estimate": 272.9,
+      "deviation": 22.9,
+      "conditional95Model": [
+        103.4,
+        442.3
+      ],
+      "conditional95Cluster": [
+        268.5,
+        277.2
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 400,
+      "engineElo": 100,
+      "estimate": 435.3,
+      "deviation": 35.3,
+      "conditional95Model": [
+        266.4,
+        604.1
+      ],
+      "conditional95Cluster": [
+        351.5,
+        519.1
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 550,
+      "engineElo": 250,
+      "estimate": 492.9,
+      "deviation": -57.1,
+      "conditional95Model": [
+        323.3,
+        662.5
+      ],
+      "conditional95Cluster": [
+        393.8,
+        592.0
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 700,
+      "engineElo": 550,
+      "estimate": 683.4,
+      "deviation": -16.6,
+      "conditional95Model": [
+        517.4,
+        849.4
+      ],
+      "conditional95Cluster": [
+        602.2,
+        764.5
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 800,
+      "engineElo": 700,
+      "estimate": 785.8,
+      "deviation": -14.2,
+      "conditional95Model": [
+        621.9,
+        949.7
+      ],
+      "conditional95Cluster": [
+        681.8,
+        889.8
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 900,
+      "engineElo": 800,
+      "estimate": 840.3,
+      "deviation": -59.7,
+      "conditional95Model": [
+        672.5,
+        1008.1
+      ],
+      "conditional95Cluster": [
+        755.8,
+        924.7
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1000,
+      "engineElo": 800,
+      "estimate": 900.1,
+      "deviation": -99.9,
+      "conditional95Model": [
+        740.8,
+        1059.5
+      ],
+      "conditional95Cluster": [
+        799.9,
+        1000.4
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1100,
+      "engineElo": 900,
+      "estimate": 996.5,
+      "deviation": -103.5,
+      "conditional95Model": [
+        842.5,
+        1150.6
+      ],
+      "conditional95Cluster": [
+        911.5,
+        1081.6
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1200,
+      "engineElo": 1000,
+      "estimate": 1203.6,
+      "deviation": 3.6,
+      "conditional95Model": [
+        1070.0,
+        1337.3
+      ],
+      "conditional95Cluster": [
+        1119.2,
+        1288.1
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1350,
+      "engineElo": 1400,
+      "estimate": 1249.0,
+      "deviation": -101.0,
+      "conditional95Model": [
+        1119.4,
+        1378.6
+      ],
+      "conditional95Cluster": [
+        1116.4,
+        1381.6
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1450,
+      "engineElo": 1450,
+      "estimate": 1432.1,
+      "deviation": -17.9,
+      "conditional95Model": [
+        1311.7,
+        1552.6
+      ],
+      "conditional95Cluster": [
+        1323.9,
+        1540.4
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1600,
+      "engineElo": 1600,
+      "estimate": 1590.2,
+      "deviation": -9.8,
+      "conditional95Model": [
+        1465.4,
+        1715.1
+      ],
+      "conditional95Cluster": [
+        1480.1,
+        1700.4
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1750,
+      "engineElo": 1750,
+      "estimate": 1823.9,
+      "deviation": 73.9,
+      "conditional95Model": [
+        1699.1,
+        1948.8
+      ],
+      "conditional95Cluster": [
+        1676.2,
+        1971.6
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1800,
+      "engineElo": 1750,
+      "estimate": 1835.5,
+      "deviation": 35.5,
+      "conditional95Model": [
+        1711.4,
+        1959.7
+      ],
+      "conditional95Cluster": [
+        1707.5,
+        1963.6
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 1900,
+      "engineElo": 2000,
+      "estimate": 2053.1,
+      "deviation": 153.1,
+      "conditional95Model": [
+        1928.0,
+        2178.3
+      ],
+      "conditional95Cluster": [
+        1928.6,
+        2177.7
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 2050,
+      "engineElo": 2200,
+      "estimate": 1997.8,
+      "deviation": -52.2,
+      "conditional95Model": [
+        1875.6,
+        2119.9
+      ],
+      "conditional95Cluster": [
+        1884.4,
+        2111.1
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 2200,
+      "engineElo": 2350,
+      "estimate": 2149.8,
+      "deviation": -50.2,
+      "conditional95Model": [
+        2024.8,
+        2274.8
+      ],
+      "conditional95Cluster": [
+        2035.0,
+        2264.7
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 2350,
+      "engineElo": 2500,
+      "estimate": 2469.1,
+      "deviation": 119.1,
+      "conditional95Model": [
+        2335.6,
+        2602.6
+      ],
+      "conditional95Cluster": [
+        2356.5,
+        2581.7
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 2500,
+      "engineElo": 2600,
+      "estimate": 2404.5,
+      "deviation": -95.5,
+      "conditional95Model": [
+        2279.7,
+        2529.3
+      ],
+      "conditional95Cluster": [
+        2280.3,
+        2528.6
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 2800,
+      "engineElo": 2800,
+      "estimate": 2904.8,
+      "deviation": 104.8,
+      "conditional95Model": [
+        2777.5,
+        3032.1
+      ],
+      "conditional95Cluster": [
+        2801.3,
+        3008.2
+      ],
+      "games": 32,
+      "supported": true
+    },
+    {
+      "target": 3150,
+      "engineElo": 3100,
+      "estimate": 3036.2,
+      "deviation": -113.8,
+      "conditional95Model": [
+        2897.8,
+        3174.6
+      ],
+      "conditional95Cluster": [
+        2949.9,
+        3122.5
+      ],
+      "games": 32,
+      "supported": false
+    }
+  ]
+}

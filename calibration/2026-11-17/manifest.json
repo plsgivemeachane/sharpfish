@@ -1,0 +1,54 @@
+{
+  "source_head": "c9c4a8d0c6b02aaf78fc0f046b9adbd6a5eacd25",
+  "source_repository": "https://github.com/plsgivemeachane/sharpfish",
+  "nodes": 100000,
+  "threads": 1,
+  "hash_mb": 16,
+  "native_build": "ARCH=x86-64-avx2 LITE_NET=yes",
+  "references": [
+    {
+      "tag": "v8",
+      "commit": "f6a02d00dedcc335031e3e529783c136ac4f54b6",
+      "rating": 1452.8,
+      "sha256": "840be15f0a520f08c62e288bee798c4145e9d927dc50200df7787cd964a04421",
+      "repository": "https://github.com/mhouppin/stash-bot"
+    },
+    {
+      "tag": "v12",
+      "commit": "4aac78dded241a66231443ff2140b2e289154633",
+      "rating": 1963.4,
+      "sha256": "93189113b2366703737837e6d57deb9f2ee72164962543bba22adab231b5a6e5",
+      "repository": "https://github.com/mhouppin/stash-bot"
+    },
+    {
+      "tag": "v17.0",
+      "commit": "f85863d68b2f20812f8e1b330cd2613212a1b12a",
+      "rating": 2280.7,
+      "sha256": "ea0da41c3a7cf11aba25d8ce9c3a981af7d88c3758387fe72a060d2e8671adff",
+      "repository": "https://github.com/mhouppin/stash-bot"
+    },
+    {
+      "tag": "v25.0",
+      "commit": "664849453d3fa0b5b60869325a3764921c902512",
+      "rating": 2744,
+      "sha256": "6a3d8e97c8219d03412ba9f9e10fd19004809637e9ec67277463645ff3ae53b9",
+      "repository": "https://github.com/mhouppin/stash-bot"
+    }
+  ],
+  "engine_sha256": "a446cc2eafe24dce9dd4b82364b17b2460c2ad593093890afbd33a06470fa641",
+  "nnue_sha256": "61e7af4bb97d51eeeb25d322916f86513b5cd3a827ce189c98c6e31946f99e5b",
+  "wasm_sha256": "8397a6c06311f509a71253f5cf4711e03e0df26ab37bdf55142eba31db89c9ea",
+  "reference_history_repair": {
+    "engine": "Stash v8",
+    "games": 6,
+    "description": "Expand only UCI game-history move buffer from 256 to 8192 entries for six long-game continuations. Search algorithm unchanged. Other matches used the original reference binary.",
+    "sha256": "4bf031542c57470f1eea9182072ad698d31f718237b1a8437b8f4db83c37654d",
+    "patch": "after g_inter_moves = movelist_init(): g_inter_moves->moves = realloc(g_inter_moves->moves, sizeof(move_t) * 8192);"
+  },
+  "test_packages": {
+    "python": "3.13.15",
+    "python_chess": "1.11.2",
+    "numpy": "2.5.5",
+    "scipy": "1.18.1"
+  }
+}

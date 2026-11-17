@@ -173,8 +173,8 @@ function historyRecord() {
       Event: variantInfo().title
     }, result: game.over ? (/White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2") : "*",
     grades: game.grades || {}, meta: { playerColor: game.playerColor, botMatch: !!game.botMatch,
-      bot: bot ? { id: bot.id, name: bot.name, elo: bot.elo } : null,
-      matchBots: game.matchBots ? { w: game.matchBots.w && { id: game.matchBots.w.id, name: game.matchBots.w.name, elo: game.matchBots.w.elo }, b: game.matchBots.b && { id: game.matchBots.b.id, name: game.matchBots.b.name, elo: game.matchBots.b.elo } } : null }
+      bot: botMetadata(bot), botProfiles: (game.botProfiles || []).slice(),
+      matchBots: game.matchBots ? { w: botMetadata(game.matchBots.w), b: botMetadata(game.matchBots.b) } : null }
   };
 }
 function persistGame() {
@@ -252,7 +252,8 @@ function engineMove() {
   render();
 
   var activeBot = game.botMatch ? game.matchBots[turn] : bot;
-  engine.request(strengthCommands(activeBot).concat([positionCmd(), "go movetime " + $("sel-time").value]),
+  var search = botSearchConfig(activeBot, $("sel-time").value);
+  engine.request(search.commands.concat([positionCmd(), search.go]),
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
       if (token !== game.token || l.indexOf("info depth") !== 0) return;
@@ -271,7 +272,14 @@ function engineMove() {
     if (token !== game.token) return;
     thinking = false;
     var best = lines[lines.length - 1].split(" ")[1];
-    if (best && best !== "(none)") playMove(best);
+    if (best && best !== "(none)") {
+      var profiles = game.botProfiles || (game.botProfiles = []);
+      var profile = botMetadata(activeBot);
+      var previous = profiles.slice().reverse().find(function (entry) { return entry.side === turn; });
+      if (!previous || JSON.stringify(previous.profile) !== JSON.stringify(profile) || previous.movetime !== search.limits.movetime)
+        profiles.push({ ply: game.moves.length, side: turn, profile: profile, movetime: search.limits.movetime });
+      playMove(best);
+    }
     else render();
   });
 }
@@ -488,6 +496,7 @@ function newGame(color, botMatch, silent) {
   if (thinking) engine.stop();
   thinking = false;
   game.moves = []; game.san = []; game.over = null;
+  game.botProfiles = [];
   game.historyId = null; game.historyCreatedAt = null; game.historyRevision = 0; game.grades = {};
   updateHistoryLinks();
   if (window.SFLive) window.SFLive.cancel();
@@ -567,9 +576,7 @@ function chooseBot(b) {
 }
 
 function strengthCommands(selectedBot) {
-  return selectedBot.elo === FULL
-    ? ["setoption name UCI_LimitStrength value false"]
-    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + selectedBot.elo];
+  return botSearchConfig(selectedBot).commands;
 }
 
 function setStrength() {
@@ -604,7 +611,7 @@ function renderBots() {
   $("bot-current").textContent = (bot.custom ? "Custom" : bot.name) + " · " + botRating(bot);
   var slider = $("rng-elo");
   slider.value = bot.elo === FULL ? slider.max : bot.elo;
-  $("elo-out").textContent = bot.elo === FULL ? "Full" : bot.elo;
+  $("elo-out").textContent = botRating(bot);
 }
 
 function sliderBot() {
@@ -1216,7 +1223,7 @@ $("btn-copy").onclick = function () {
 };
 $("rng-elo").oninput = function () {  // live label while dragging
   var b = sliderBot();
-  $("elo-out").textContent = b.elo === FULL ? "Full" : b.elo;
+  $("elo-out").textContent = botRating(b);
 };
 $("rng-elo").onchange = function () { chooseBot(sliderBot()); };
 $("btn-first").onclick = function () { viewPly(0); };
