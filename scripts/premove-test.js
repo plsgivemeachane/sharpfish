@@ -34,7 +34,7 @@ function declaration(name) {
 
 const names = [
   "canMove", "canPremove", "premoveBoard", "premoveMoves", "queuePremove",
-  "runPremove", "clearPremoves", "maybeEngineTurn", "stockFen"
+  "runPremove", "clearPremoves", "maybeEngineTurn"
 ];
 const context = {
   console,
@@ -216,8 +216,6 @@ test("allows premoves only during the opponent turn", () => {
   assert.equal(context.canPremove(), false);
 });
 
-if (process.exitCode) process.exit(process.exitCode);
-
 // A delayed SCP animation callback must not launch another search after a
 // human has already moved and a bot search is in progress.
 test("does not start duplicate bot searches after an animation", () => {
@@ -230,9 +228,11 @@ test("does not start duplicate bot searches after an animation", () => {
   assert.equal(context.searches, 1);
 });
 
-test("stock evaluation removes SCP and preserves FEN fields", () => {
-  assert.equal(context.stockFen("r3*2k/8/8/8/8/8/8/K7 w - - 0 1"),
-               "r6k/8/8/8/8/8/8/K7 w - - 0 1");
-  assert.equal(context.stockFen("*7/8/8/8/8/8/8/K6k b - - 3 5"),
-               "8/8/8/8/8/8/8/K6k b - - 3 5");
+test("allows friendly recapture targets while excluding SCP itself", () => {
+  reset({ pos: { turn: "b", legal: [], pending: false, board: { d4: "P", e5: "B", c5: "*" } } });
+  assert(context.premoveMoves("d4").includes("d4e5"));
+  assert(!context.premoveMoves("d4").includes("d4c5"));
+  assert.deepEqual([...context.premoveMoves("c5")], []);
 });
+
+if (process.exitCode) process.exit(process.exitCode);
