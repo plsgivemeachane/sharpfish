@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const core = require("../site/analysis-core.js");
 
-assert.equal(core.VERSION, "1.5.0");
+assert.equal(core.VERSION, "1.5.1");
 const parsed = core.parsePgn('[Event "Test"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 1-0');
 assert.deepEqual(parsed.tokens, ["e4", "e5", "Nf3", "Nc6"]);
 assert.equal(parsed.result, "1-0");
@@ -75,7 +75,7 @@ assert(!core.isValidGrade(deeperGrade, cachedRecord, 0, "test-engine", true, 200
 assert(!core.isValidGrade(cachedGrade, cachedRecord, 0, "test-engine", false), "special-grade settings are part of the cache identity");
 assert(core.isValidGrade({ ...cachedGrade, config: { ...cachedGrade.config, specialMoves: false } }, cachedRecord, 0, "test-engine", false));
 for (const broken of [
-  { ...cachedGrade, version: "1.4.0" },
+  { ...cachedGrade, version: "1.4.0" }, { ...cachedGrade, version: "1.5.0" },
   { ...cachedGrade, version: "1.0.0" }, { ...cachedGrade, depth: 0 }, { ...cachedGrade, model: "expected-score" },
   { ...cachedGrade, config: { ...cachedGrade.config, movetime: 100 } }, { ...cachedGrade, config: { engine: "test-engine" } },
   { ...cachedGrade, historyKey: "another game" }

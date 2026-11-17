@@ -139,6 +139,10 @@ A few things worth knowing:
 | `examples/` | Web and Node.js examples, plus the demo server |
 | `tests/`, `tester.js` | Simple engine tests |
 
+## Move grading
+
+Great and Brilliant use the shared ordinary-chess grading policy in [ANALYSIS.md](ANALYSIS.md). A protected piece is not a sacrifice when an immediate recapture on its square restores the material: `...Bh4 Qxh4 Rxh4` wins a queen for a bishop. Clearance sacrifices such as `...Bxf2+ Rxf2 Rxh2` remain eligible because the compensation is on a different square.
+
 ## Thanks
 
 - <a href="https://github.com/exoticorn/stockfish-js">exoticorn</a> for the original Stockfish to JS conversion
