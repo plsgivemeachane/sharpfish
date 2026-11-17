@@ -23,6 +23,9 @@ class EngineWorker {
   terminate() { this.child.kill(); }
 }
 global.Worker = EngineWorker;
+const commands = [];
+const sendCommand = EngineWorker.prototype.postMessage;
+EngineWorker.prototype.postMessage = function (command) { commands.push(command); sendCommand.call(this, command); };
 const core = require("../site/analysis-core.js");
 
 (async () => {
@@ -35,16 +38,36 @@ const core = require("../site/analysis-core.js");
     assert.equal(record.boards[4].inCheck, true);
     assert.equal(record.boards[4].legal.length, 0);
     const losing = await analyzer.grade(record, 2, { depth: 10 });
-    assert.equal(losing.label, "Blunder", "allowing an immediately obvious mate must remain Blunder");
+    assert.equal(losing.label, "Catastrophe", "allowing an immediately obvious mate earns the worst tier");
+    assert.equal(losing.mateEvidence.distance, 1);
+    assert(losing.raw.mateConfirmation.depth >= 22, "short mate is independently verified after the move");
     assert.equal(losing.playedMove, "g2g4");
-    assert(losing.depth > 0);
+    assert(losing.depth >= 20, "requested shallow grade options cannot bypass depth 20");
+    assert(losing.raw.best.depth >= 20 && losing.raw.played.depth >= 20);
+    assert.equal(losing.config.depth, 20);
+    assert(commands.includes("setoption name UCI_LimitStrength value false"));
+    assert(commands.includes("setoption name Skill Level value 20"));
     assert(losing.raw && losing.difficulty, "grade must retain engine and practical-difficulty evidence");
     const winning = await analyzer.grade(record, 3, { depth: 10 });
     assert.equal(winning.bestMove, "d8h4");
     assert(["Best", "Great"].includes(winning.label), "Black's mate must be graded from Black's viewpoint");
     const blackLoss = await analyzer.replay("1. e4 f6 2. d4 g5 3. Qh5# 1-0");
     const blackBlunder = await analyzer.grade(blackLoss, 3, { depth: 10 });
-    assert.equal(blackBlunder.label, "Blunder", "Black blunders must use Black expected score");
+    assert.equal(blackBlunder.label, "Catastrophe", "Black blunders must use Black expected score");
+    // Reconstructed screenshot: Qh6 permits Qb6#, not merely Bxh6.
+    const queenHang = await analyzer.replay('[SetUp "1"]\n[FEN "r1bk3r/3p1ppp/p2Q1N2/2p4q/2B5/5N2/PP3PPP/R1B1R1K1 b - - 0 16"]\n16... Qh6 *');
+    const queenGrade = await analyzer.grade(queenHang, 0);
+    assert.equal(queenGrade.raw.best.mateWinner, "w");
+    assert.equal(Math.abs(queenGrade.raw.best.mate), 3, "best Black defense lasts until M3");
+    assert.equal(Math.abs(queenGrade.raw.played.mate), 1, "Qh6 accelerates the loss to M1");
+    assert.equal(queenGrade.objectiveLabel, "Catastrophe");
+    assert.equal(queenGrade.label, "Catastrophe", "an obvious immediate mate is not forgiven");
+    assert.equal(queenGrade.mateEvidence.distance, 1);
+    assert.equal(queenGrade.lossCp, null, "mate distance is kept separate from numerical advantage loss");
+    assert.equal(queenGrade.raw.mateConfirmation.pv[0], "d6b6", "Qb6# is the actual best punishment");
+    const queenCapture = await analyzer.evaluate(queenHang, 1, { depth: 22, searchmoves: "c1h6" });
+    assert.equal(queenCapture.mateWinner, "w");
+    assert.equal(Math.abs(queenCapture.mate), 3, "Bxh6 wins but is slower than Qb6#");
     const terminal = await analyzer.evaluate(record, 4, { depth: 8 });
     assert.equal(terminal.mate, 0);
     const setup = await analyzer.replay('[SetUp "1"]\n[FEN "7k/8/8/8/8/8/4P3/K7 b - - 0 32"]\n32... Kg8 *');

@@ -18,6 +18,7 @@ Root: introduction, variant cards, credits. /variants/<slug>/: independent playa
 
 ## Design principles
 Clear choices, short descriptions, no account or setup before play. Each card is one generous link.
+Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss at full strength and depth20+, then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
 
 ## Visual language
 Reuse navy #04162b, text #e3f0fa, teal accents and system typography from the play site.
@@ -25,6 +26,7 @@ Use restrained borders, rounded cards, ample spacing, and the existing favicon. 
 
 ## Components
 Collection header, responsive card grid, source footer, exported navigation strip. Homepage CSS is separate from branch CSS.
+History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder, Disaster, Catastrophe; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
 
 ## Accessibility
 Semantic headings and landmarks, visible keyboard focus, descriptive links, high-contrast text, minimum 44px touch links.
@@ -42,7 +44,7 @@ Direct, brief, welcoming. Show variant names and rules without build or deployme
 ## Implementation constraints
 Plain HTML/CSS; no new frontend dependencies. Export whole branch sites. Check desktop and mobile in a real browser.
 
-Move grades use original colored circular icons with familiar chess punctuation, a star, a thumbs up, and a check. OK uses a neutral equals sign. Keep a visible grade name beside each 24px icon so meaning does not depend on color or symbol recognition. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
+Move grades use concept-inspired metallic coins: grade-tinted beveled rims, saturated faces and bold contrasting symbols, with purple sparkle for Brilliant and distinct red symbols for Disaster/Catastrophe. OK uses a slate diamond. Reserve an icon slot before SAN and provide the grade name accessibly. Show the currently displayed move's icon at the top-right of its destination piece without blocking board interaction. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
 
 ## Open questions
 None for the initial collection.
