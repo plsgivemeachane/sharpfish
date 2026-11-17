@@ -19,8 +19,11 @@ const base = (process.argv[3] || "http://localhost:8096").replace(/\/$/, "");
         // replies, while exercising each variant's actual board input and queue.
         await page.evaluate(async () => {
           window.recaptureAnalyzer = new SFAnalysis.Analyzer(STOCK_ENGINE_FILE);
-          window.recaptureFen = "7k/8/3b4/4B3/3P4/8/8/K7 b - - 0 1";
+          window.recaptureFen = "8/7k/3b4/4B3/3P4/8/8/K7 b - - 0 1";
           window.recaptureBefore = await recaptureAnalyzer.position(recaptureFen);
+          for (const reply of ["d6e5", "d6c7"]) {
+            if (!recaptureBefore.legal.includes(reply)) throw Error("Illegal fixture reply: " + reply);
+          }
           window.recaptureAfter = await recaptureAnalyzer.position(recaptureFen, ["d6e5"]);
           window.recaptureDeclined = await recaptureAnalyzer.position(recaptureFen, ["d6c7"]);
           window.recapturePlayed = [];
