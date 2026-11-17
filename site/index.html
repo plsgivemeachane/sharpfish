@@ -89,6 +89,10 @@
         <button id="btn-flip" class="btn">Flip board</button>
         <button id="btn-copy" class="btn" title="Copy the moves in PGN format">Copy PGN</button>
       </div>
+      <div class="row history-actions">
+        <a id="analyze-link" class="btn" href="analysis.html">Analyze current game</a>
+        <a id="history-link" class="btn" href="analysis.html">History</a>
+      </div>
       <label class="field">Think time
         <select id="sel-time">
           <option value="300">0.3 s</option>
@@ -102,6 +106,11 @@
       <label class="field">Eval bar (stock Stockfish)
         <input type="checkbox" id="chk-eval">
       </label>
+      <label class="field">Real-time move grading
+        <input type="checkbox" id="chk-grade">
+      </label>
+      <div id="grade-status" class="hint" role="status"></div>
+      <div id="history-status" class="hint" role="status"></div>
       <div class="hint">While the bot thinks, move your pieces to queue premoves, including consecutive moves with the same piece. Middle-click, press Esc, or use Cancel premoves to clear the queue.</div>
       <div class="hint">Right-click a square to circle it, right-drag to draw an arrow.
         Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears.</div>
@@ -117,6 +126,9 @@
 
 <div id="promo" class="promo" hidden></div>
 <script src="bots.js"></script>
+<script src="analysis-core.js"></script>
+<script src="game-history.js"></script>
+<script src="live-analysis.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
