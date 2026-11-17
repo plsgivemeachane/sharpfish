@@ -26,3 +26,15 @@
 table.moves { table-layout: fixed; width: 100%; }
 table.moves th:first-child { width: 3em; }
 table.moves td { overflow: hidden; }
+/* Tint the last-move squares in the colour of the move's grade badge. */
+.board[data-grade="brilliant"] { --last-move: rgba(143, 92, 242, 0.5); }
+.board[data-grade="great"] { --last-move: rgba(24, 181, 143, 0.5); }
+.board[data-grade="best"] { --last-move: rgba(76, 184, 74, 0.5); }
+.board[data-grade="excellent"] { --last-move: rgba(134, 178, 58, 0.5); }
+.board[data-grade="good"] { --last-move: rgba(111, 148, 104, 0.5); }
+.board[data-grade="ok"] { --last-move: rgba(109, 125, 151, 0.5); }
+.board[data-grade="inaccuracy"] { --last-move: rgba(227, 170, 28, 0.5); }
+.board[data-grade="mistake"] { --last-move: rgba(232, 120, 29, 0.5); }
+.board[data-grade="blunder"] { --last-move: rgba(216, 52, 63, 0.5); }
+.board[data-grade="disaster"] { --last-move: rgba(176, 18, 58, 0.5); }
+.board[data-grade="catastrophe"] { --last-move: rgba(116, 16, 32, 0.5); }
