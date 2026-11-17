@@ -130,6 +130,39 @@ test("generates black pawn direction and all promotion choices", () => {
     assert(promotions.includes("e7e8" + suffix), `missing e7e8${suffix}`);
 });
 
+test("allows speculative destinations occupied by friendly pieces", () => {
+  for (const [piece, from, to] of [
+    ["P", "d4", "e5"], ["N", "f3", "e5"], ["B", "d4", "e5"],
+    ["R", "e4", "e5"], ["Q", "d4", "e5"], ["K", "d4", "e5"],
+    ["p", "d5", "e4"]
+  ]) {
+    const white = piece === piece.toUpperCase();
+    reset({ game: { playerColor: white ? "w" : "b", over: null, view: null }, pos: {
+      turn: white ? "b" : "w", legal: [], pending: false,
+      board: { [from]: piece, [to]: white ? "B" : "b" }
+    } });
+    assert(context.premoveMoves(from).includes(from + to), `${piece} can queue ${from + to}`);
+    assert(!context.premoveMoves(from).includes(from + from));
+    context.queuePremove(from + to);
+    assert.equal(context.premoveBoard()[to], piece);
+    assert.equal(context.pos.board[to], white ? "B" : "b", "preview preserves the actual board");
+  }
+});
+
+test("executes a queued recapture only when the opponent makes it legal", () => {
+  for (const captured of [true, false]) {
+    reset({ pos: { turn: "b", legal: [], pending: false, board: { d4: "P", e5: "B" } } });
+    context.queuePremove("d4e5");
+    context.queuePremove("e5e6");
+    context.pos.turn = "w";
+    context.pos.board.e5 = captured ? "b" : "B";
+    context.pos.legal = captured ? ["d4e5", "d4d5"] : ["d4d5"];
+    assert.equal(context.runPremove(), captured);
+    assert.deepEqual(context.played, captured ? ["d4e5"] : []);
+    assert.deepEqual([...context.premoves], captured ? ["e5e6"] : []);
+  }
+});
+
 test("runs one legal premove and retains the rest", () => {
   reset();
   context.premoves.push("e2e4", "e4e5");

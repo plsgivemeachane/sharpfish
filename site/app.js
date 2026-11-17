@@ -632,8 +632,9 @@ function premoveMoves(from) {
   if (!piece || piece === "*" || (isWhite(piece) ? "w" : "b") !== game.playerColor) return [];
   var moves = [], type = piece.toUpperCase(), direction = isWhite(piece) ? 1 : -1;
   for (var f = 0; f < 8; f++) for (var rank = 1; rank <= 8; rank++) {
-    var to = FILES[f] + rank, target = board[to];
-    if (to === from || target === "*" || (target && isWhite(target) === isWhite(piece))) continue;
+    var to = FILES[f] + rank;
+    // A friendly piece may be captured before this premove executes.
+    if (to === from || board[to] === "*") continue;
     var dx = Math.abs(f - FILES.indexOf(from[0])), dy = rank - Number(from[1]), ay = Math.abs(dy);
     var allowed = type === "N" ? dx * ay === 2 :
       type === "B" ? dx === ay : type === "R" ? dx === 0 || dy === 0 :
