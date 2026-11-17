@@ -206,7 +206,7 @@ const inject = (page, index, label, special) => page.evaluate(([src, index, labe
     await page.emulateMedia({ reducedMotion: "no-preference" });
 
     // Unsupported variants replay without stock grading or evaluation.
-    const custom = await page.evaluate(async () => { const rec = await SFHistory.save({ moves: ["e2e4"], san: ["e4"], result: "*", revision: 1, grades: {}, variant: { slug: "scp-096", title: "SCP-096", supported: false },
+    const custom = await page.evaluate(async () => { const rec = await SFHistory.save({ moves: ["e2e4"], san: ["e4"], result: "*", revision: 1, grades: {}, variant: { slug: "unregistered-custom", title: "SCP-096", supported: false },
       boards: [{ fen: SFAnalysis.START_FEN, turn: "w" }, { fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", turn: "b" }] }); return rec.id; });
     await page.goto(`${origin}/analysis.html?game=${encodeURIComponent(custom)}`);
     await page.waitForFunction(() => document.querySelectorAll("#moves li").length === 1);

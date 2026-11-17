@@ -60,14 +60,37 @@
     return dbPromise;
   }
   function fallbackRead() {
-    if (!root.localStorage) return memory.slice();
-    var raw = root.localStorage.getItem(fallbackKey);
-    return raw ? JSON.parse(raw) : memory.slice();
+    try {
+      if (!root.localStorage) return memory.slice();
+      var raw = root.localStorage.getItem(fallbackKey);
+      var stored = raw ? JSON.parse(raw) : [];
+      return mergedRows(Array.isArray(stored) ? stored : [], memory);
+    } catch (_) { return memory.slice(); }
   }
   function fallbackWrite(rows) {
-    if (!root.localStorage) throw new Error("Local game storage is unavailable");
-    root.localStorage.setItem(fallbackKey, JSON.stringify(rows));
     memory = rows.map(clone);
+    try {
+      if (!root.localStorage) throw new Error("Local game storage is unavailable");
+      root.localStorage.setItem(fallbackKey, JSON.stringify(rows));
+      return true;
+    } catch (_) { return false; /* the in-memory session copy remains usable */ }
+  }
+  function mergedRows(primary, secondary) {
+    var byId = Object.create(null);
+    primary.concat(secondary).forEach(function (row) {
+      if (!row || !row.id) return;
+      byId[row.id] = byId[row.id] ? merge(byId[row.id], row) : clone(row);
+    });
+    return Object.keys(byId).map(function (id) { return byId[id]; })
+      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, LIMIT);
+  }
+  function fallbackSave(record) {
+    var rows = fallbackRead(), existing = rows.find(function (r) { return r.id === record.id; });
+    var merged = merge(existing, record);
+    rows = rows.filter(function (r) { return r.id !== merged.id; });
+    rows.push(merged);
+    var durable = fallbackWrite(rows.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, LIMIT));
+    return Object.assign(clone(merged), { _durable: durable });
   }
   function transactionSave(record) {
     return openDb().then(function (db) {
@@ -89,15 +112,8 @@
         tx.onerror = function () { reject(tx.error || new Error("Unable to save history")); };
         tx.onabort = function () { reject(tx.error || new Error("History save aborted")); };
       });
-    }).catch(function (err) {
-      if (root.indexedDB) throw err;
-      var rows = fallbackRead(), existing = rows.find(function (r) { return r.id === record.id; });
-      var merged = merge(existing, record);
-      rows = rows.filter(function (r) { return r.id !== merged.id; });
-      rows.push(merged);
-      rows.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-      fallbackWrite(rows.slice(0, LIMIT));
-      return clone(merged);
+    }).catch(function () {
+      return fallbackSave(record);
     });
   }
   function transactionList() {
@@ -107,7 +123,8 @@
         req.onsuccess = function () { resolve(req.result.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).map(clone)); };
         req.onerror = function () { reject(req.error || new Error("Unable to list history")); };
       });
-    }).catch(function (err) { if (root.indexedDB) throw err; return fallbackRead().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).map(clone); });
+    }).then(function (rows) { return mergedRows(rows, fallbackRead()); })
+      .catch(function () { return fallbackRead().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, LIMIT).map(clone); });
   }
   function transactionGet(id) {
     return openDb().then(function (db) {
@@ -116,7 +133,10 @@
         req.onsuccess = function () { resolve(req.result ? clone(req.result) : null); };
         req.onerror = function () { reject(req.error || new Error("Unable to read history")); };
       });
-    }).catch(function (err) { if (root.indexedDB) throw err; var r = fallbackRead().find(function (x) { return x.id === id; }); return r ? clone(r) : null; });
+    }).then(function (row) {
+      var fallback = fallbackRead().find(function (x) { return x.id === id; });
+      return row && fallback ? merge(row, fallback) : row || (fallback ? clone(fallback) : null);
+    }).catch(function () { var r = fallbackRead().find(function (x) { return x.id === id; }); return r ? clone(r) : null; });
   }
   function save(record) {
     if (!record || !Array.isArray(record.moves) || (!record.moves.length && !record.id)) return Promise.resolve(null);
@@ -130,7 +150,9 @@
       Object.keys(grades || {}).forEach(function (index) {
         var grade = grades[index], ply = Number(index);
         if (!Number.isInteger(ply) || ply < 0 || ply >= record.moves.length) return;
-        var fingerprint = (record.startFen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") + "|" + record.moves.slice(0, ply + 1).join(" ");
+        var fingerprint = root.SFAnalysis && root.SFAnalysis.historyKey ?
+          root.SFAnalysis.historyKey(record, ply + 1) :
+          (record.startFen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") + "|" + record.moves.slice(0, ply + 1).join(" ");
         if (grade.historyKey === fingerprint) compatible[index] = grade;
       });
       return Object.assign({}, record, { grades: Object.assign({}, record.grades || {}, compatible), updatedAt: Date.now() });
@@ -143,6 +165,10 @@
         req.onsuccess = function () { result = apply(req.result); if (result && revision === result.revision) store.put(result); };
         tx.oncomplete = function () { resolve(result ? clone(result) : null); };
         tx.onerror = tx.onabort = function () { reject(tx.error || new Error("Unable to save move grades")); };
+      });
+    }).catch(function () {
+      return transactionGet(id).then(function (r) {
+        var next = apply(r); return next ? fallbackSave(next) : null;
       });
     });
   }
