@@ -33,103 +33,123 @@
     <div class="player-tag" id="tag-bottom"></div>
   </section>
 
-  <aside class="panel">
+  <aside class="panel panel-game" aria-label="Game">
     <div class="card status-card">
       <div id="status" class="status">Starting…</div>
       <div id="engine-line" class="engine-line">&nbsp;</div>
       <div id="premove-state" class="premove-state" hidden>
         <span id="premove-count" role="status"></span>
-        <button id="btn-cancel-premoves" class="btn" type="button">Cancel premoves</button>
+        <button id="btn-cancel-premoves" class="btn btn-sm" type="button">Cancel premoves</button>
       </div>
     </div>
 
-    <div class="card moves-card">
-      <table class="moves" aria-label="Moves">
-        <thead><tr><th>#</th><th>White</th><th>Black</th></tr></thead>
-        <tbody id="moves"></tbody>
-      </table>
-      <div id="moves-empty" class="moves-empty">No moves yet. You play White — make the first move.</div>
-    </div>
-
-    <div class="card bots-card">
-      <div class="bots-head">
-        <span>Opponent</span>
-        <span id="bot-current" class="bot-current"></span>
+    <section class="card moves-panel" aria-label="Moves">
+      <div class="moves-card">
+        <table class="moves" aria-label="Moves">
+          <thead><tr><th>#</th><th>White</th><th>Black</th></tr></thead>
+          <tbody id="moves"></tbody>
+        </table>
+        <div id="moves-empty" class="moves-empty">No moves yet. You play White — make the first move.</div>
       </div>
-      <div id="bot-groups" class="bot-groups"></div>
-      <details class="advanced">
-        <summary>Advanced: pick any Elo</summary>
-        <label class="field" for="rng-elo">Elo <output id="elo-out"></output></label>
-        <input type="range" id="rng-elo" min="0" max="3200" step="50">
-        <div class="hint">Steps of 50 from 0 to 3150; far right is full strength.
-          Applies from the engine's next move.</div>
-      </details>
-    </div>
-
-    <div class="card controls">
-      <div class="row">
-        <button id="btn-new-white" class="btn primary">New game as White</button>
-        <button id="btn-new-black" class="btn">as Black</button>
+      <div class="row nav" aria-label="Review moves">
+        <button id="btn-first" class="btn icon" title="First position (Home)" aria-label="First position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg></button>
+        <button id="btn-prev" class="btn icon" title="Previous move (&larr;)" aria-label="Previous move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/></svg></button>
+        <button id="btn-next" class="btn icon" title="Next move (&rarr;)" aria-label="Next move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l7-5z" fill="currentColor"/></svg></button>
+        <button id="btn-last" class="btn icon" title="Back to the game (End)" aria-label="Back to the game"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
       </div>
-      <label class="field">Game mode
-        <select id="game-mode"><option value="human">Play a bot</option><option value="bots">Bot vs bot</option></select>
-      </label>
+    </section>
+
+    <section class="card controls" aria-labelledby="game-heading">
+      <div class="card-head">
+        <h2 id="game-heading" class="card-title">New game</h2>
+        <label class="mode-select"><span class="visually-hidden">Game mode</span>
+          <select id="game-mode"><option value="human">Play a bot</option><option value="bots">Bot vs bot</option></select>
+        </label>
+      </div>
+      <div class="row split">
+        <button id="btn-new-white" class="btn primary"><span class="side-dot w" aria-hidden="true"></span>Play White</button>
+        <button id="btn-new-black" class="btn"><span class="side-dot b" aria-hidden="true"></span>Play Black</button>
+      </div>
       <div id="bot-match-options" hidden>
         <label class="field">White bot <select id="white-bot"></select></label>
         <label class="field">Black bot <select id="black-bot"></select></label>
         <button id="btn-bot-match" class="btn primary" type="button">Start bot match</button>
       </div>
-      <div class="row nav" aria-label="Review moves">
-        <button id="btn-first" class="btn" title="First position (Home)" aria-label="First position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg></button>
-        <button id="btn-prev" class="btn" title="Previous move (&larr;)" aria-label="Previous move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/></svg></button>
-        <button id="btn-next" class="btn" title="Next move (&rarr;)" aria-label="Next move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l7-5z" fill="currentColor"/></svg></button>
-        <button id="btn-last" class="btn" title="Back to the game (End)" aria-label="Back to the game"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
-      </div>
-      <div class="row">
-        <button id="btn-undo" class="btn">Take back</button>
-        <button id="btn-flip" class="btn">Flip board</button>
-        <button id="btn-copy" class="btn" title="Copy the moves in PGN format">Copy PGN</button>
+      <div class="divider" role="presentation"></div>
+      <div class="row tools">
+        <button id="btn-undo" class="btn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 2 7l4 4V8h4a2.5 2.5 0 0 1 0 5H8v1.5h2a4 4 0 0 0 0-8H6z" fill="currentColor"/></svg>Take back</button>
+        <button id="btn-flip" class="btn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 1 1.5 4.5h2V12H5.5V4.5h2zM11.5 15l3-3.5h-2V4h-2v7.5h-2z" fill="currentColor"/></svg>Flip</button>
+        <button id="btn-copy" class="btn" title="Copy the moves in PGN format"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8v10h-2V3H5zM3 4h7v11H3z" fill="currentColor"/></svg>PGN</button>
       </div>
       <div class="row history-actions">
-        <a id="analyze-link" class="btn" href="analysis.html">Analyze current game</a>
-        <a id="history-link" class="btn" href="analysis.html">History</a>
+        <a id="analyze-link" class="btn quiet" href="analysis.html">Analyze this game</a>
+        <a id="history-link" class="btn quiet" href="analysis.html">Game history</a>
       </div>
-      <label class="field">Think time
-        <select id="sel-time">
-          <option value="300">0.3 s</option>
-          <option value="1000">1 s</option>
-          <option value="2000" selected>2 s</option>
-          <option value="3000">3 s</option>
-          <option value="5000">5 s</option>
-        </select>
-      </label>
-      <div class="hint">Bots take at least 2.1 seconds per move, even when their search finishes sooner.</div>
-      <label class="field">Sound effects
+      <div id="history-status" class="hint" role="status"></div>
+    </section>
+  </aside>
+
+  <aside class="panel panel-setup" aria-label="Opponent and settings">
+    <section class="card bots-card" aria-labelledby="bots-heading">
+      <div class="bots-head">
+        <h2 id="bots-heading" class="card-title">Opponent</h2>
+        <span id="bot-current" class="bot-current"></span>
+      </div>
+      <div id="bot-groups" class="bot-groups"></div>
+      <details class="advanced">
+        <summary>Custom strength</summary>
+        <label class="field" for="rng-elo">Elo <output id="elo-out"></output></label>
+        <input type="range" id="rng-elo" min="0" max="3200" step="50">
+        <div class="hint">Steps of 50 from 0 to 3150; far right is full strength.
+          Applies from the engine's next move.</div>
+      </details>
+    </section>
+
+    <section class="card settings" aria-labelledby="settings-heading">
+      <h2 id="settings-heading" class="card-title">Settings</h2>
+      <div class="setting">
+        <label class="field">Think time
+          <select id="sel-time">
+            <option value="300">0.3 s</option>
+            <option value="1000">1 s</option>
+            <option value="2000" selected>2 s</option>
+            <option value="3000">3 s</option>
+            <option value="5000">5 s</option>
+          </select>
+        </label>
+        <div class="hint">Bots take at least 2.1 seconds per move, even when their search finishes sooner.</div>
+      </div>
+      <label class="field switch">Sound effects
         <input type="checkbox" id="chk-sound" checked>
       </label>
-      <label class="field">Eval bar (stock Stockfish)
+      <label class="field switch">Eval bar <span class="field-note">stock Stockfish</span>
         <input type="checkbox" id="chk-eval">
       </label>
-      <label class="field">Real-time move grading
+      <label class="field switch">Real-time move grading
         <input type="checkbox" id="chk-grade">
       </label>
-      <label class="field" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves
+      <label class="field switch sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves
         <input type="checkbox" id="chk-special-grades" checked>
       </label>
       <div id="grade-status" class="hint" role="status"></div>
-      <div id="history-status" class="hint" role="status"></div>
-      <div class="hint">While the bot thinks, move your pieces to queue premoves, including consecutive moves with the same piece. Middle-click, press Esc, or use Cancel premoves to clear the queue.</div>
-      <div class="hint">Right-click a square to circle it, right-drag to draw an arrow.
-        Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears.</div>
-    </div>
+    </section>
+
+    <details class="card tips">
+      <summary>Tips: premoves and arrows</summary>
+      <ul>
+        <li>While the bot thinks, move your pieces to queue premoves, including consecutive moves with the same piece. Middle-click, press Esc, or use Cancel premoves to clear the queue.</li>
+        <li>Right-click a square to circle it, right-drag to draw an arrow.
+          Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. Left-click clears.</li>
+      </ul>
+    </details>
   </aside>
 </main>
 
 <footer class="foot">
-  Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).
+  <p>Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).
   Engine: <a href="https://github.com/official-stockfish/Stockfish">Stockfish</a>
   via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, GPLv3.
-  Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a>
+  Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a></p>
 </footer>
 
 <div id="promo" class="promo" hidden></div>
