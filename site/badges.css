@@ -1,0 +1,30 @@
+/* Shared by live play and history review. Text keeps every symbol unambiguous. */
+.move-grade, .move-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.move-grade { margin-left: 5px; }
+.move-label { padding: 0; background: none; }
+.move-grade::before, .move-label::before {
+  content: "";
+  display: none;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  background: center / contain no-repeat;
+}
+.grade-brilliant::before, .move-label.brilliant::before { display: block; background-image: url("badges/brilliant.png"); }
+.grade-great::before, .move-label.great::before { display: block; background-image: url("badges/great.png"); }
+.grade-best::before, .move-label.best::before { display: block; background-image: url("badges/best.png"); }
+.grade-excellent::before, .move-label.excellent::before { display: block; background-image: url("badges/excellent.png"); }
+.grade-good::before, .move-label.good::before { display: block; background-image: url("badges/good.png"); }
+.grade-ok::before, .move-label.ok::before { display: block; background-image: url("badges/ok.png"); }
+.grade-inaccuracy::before, .move-label.inaccuracy::before { display: block; background-image: url("badges/inaccuracy.png"); }
+.grade-mistake::before, .move-label.mistake::before { display: block; background-image: url("badges/mistake.png"); }
+.grade-blunder::before, .move-label.blunder::before { display: block; background-image: url("badges/blunder.png"); }
