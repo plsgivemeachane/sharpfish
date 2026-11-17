@@ -366,6 +366,11 @@ function shownPly() { return game.view === null ? game.boards.length - 1 : game.
 
 function playMove(uci) {
   $("promo").hidden = true;
+  if (!game.botMatch && pos.turn === game.playerColor) { // your move stops your clock
+    var timed = !!clock.since;
+    stopClock();
+    if (timed) clock.left += clock.inc;
+  }
   var token = game.token;
   var before = pos;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
@@ -411,6 +416,66 @@ function checkGameOver() {
   }
 }
 
+// ---------------------------------------------------------------- Your clock
+// Only the human side is timed; the bot keeps its own think time and delay.
+// As on most chess sites, your first move is free: the clock starts after it.
+var clock = { base: 0, inc: 0, left: 0, since: 0, timer: 0, flagged: false };
+
+function resetClock() {
+  var parts = $("sel-clock").value.split("+"); // "minutes+increment seconds"
+  stopClock();
+  clock.base = (Number(parts[0]) || 0) * 60000;
+  clock.inc = (Number(parts[1]) || 0) * 1000;
+  clock.left = clock.base;
+  clock.flagged = false;
+}
+function clockLeft() {
+  return clock.since ? Math.max(0, clock.left - (performance.now() - clock.since)) : clock.left;
+}
+function stopClock() {
+  if (clock.since) { clock.left = clockLeft(); clock.since = 0; }
+  clearInterval(clock.timer); clock.timer = 0;
+}
+function playerMoveCount() {
+  return game.playerColor === "w" ? Math.ceil(game.moves.length / 2) : Math.floor(game.moves.length / 2);
+}
+function syncClock() { // run exactly while it is your live turn
+  var run = clock.base > 0 && !game.botMatch && !game.over && pos && !pos.pending &&
+    pos.turn === game.playerColor && playerMoveCount() > 0;
+  if (run && !clock.since) { clock.since = performance.now(); clock.timer = setInterval(tickClock, 100); }
+  else if (!run) stopClock();
+  drawClock();
+}
+function tickClock() {
+  if (clockLeft() > 0) { drawClock(); return; }
+  stopClock();
+  clock.left = 0; clock.flagged = true;
+  game.over = "Time out — " + (game.playerColor === "w" ? "Black" : "White") + " wins";
+  if (drag) endDrag();
+  selected = null; $("promo").hidden = true;
+  clearPremoves();
+  if (window.SFSound) SFSound.play("end");
+  persistGame();
+  render();
+}
+function formatClock(ms) {
+  if (ms < 10000) return "0:0" + (Math.floor(ms / 100) / 10).toFixed(1); // tenths when it matters
+  var secs = Math.ceil(ms / 1000);
+  return Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+}
+function drawClock() {
+  var youTop = game.playerColor === (game.flipped ? "w" : "b");
+  var el = $(youTop ? "clock-top" : "clock-bottom");
+  $(youTop ? "clock-bottom" : "clock-top").hidden = true;
+  el.hidden = !(clock.base > 0 && !game.botMatch);
+  if (el.hidden) return;
+  var left = clockLeft();
+  el.textContent = formatClock(left);
+  el.classList.toggle("running", !!clock.since);
+  el.classList.toggle("low", left < 10000);
+  el.classList.toggle("flagged", clock.flagged);
+}
+
 function maybeEngineTurn() {
   if (pos && !pos.pending && !thinking && !game.over && (game.botMatch || pos.turn !== game.playerColor)) engineMove();
 }
@@ -432,6 +497,7 @@ function newGame(color, botMatch, silent) {
   game.matchBots = botMatch ? { w: findBot($("white-bot").value), b: findBot($("black-bot").value) } : null;
   game.playerColor = color;
   game.flipped = color === "b";
+  resetClock();
   selected = null;
   $("engine-line").innerHTML = "&nbsp;";
   engine.request(["ucinewgame", "isready"], function (l) { return l === "readyok"; });
@@ -447,7 +513,7 @@ function newGame(color, botMatch, silent) {
 }
 
 function takeBack() {
-  if (game.botMatch) return;
+  if (game.botMatch || clock.flagged) return; // a lost-on-time game stays lost
   clearPremoves();
   if (!game.moves.length) return;
   if (window.SFSound) SFSound.stop();
@@ -1064,11 +1130,12 @@ function render() {
   $("status").classList.toggle("reviewing", game.view !== null);
 
   renderMoves();
-  $("btn-undo").disabled = game.botMatch || !game.moves.length;
+  $("btn-undo").disabled = game.botMatch || clock.flagged || !game.moves.length;
   var ply = shownPly(), live = game.boards.length - 1;
   $("btn-first").disabled = $("btn-prev").disabled = ply <= 0;
   $("btn-next").disabled = $("btn-last").disabled = ply >= live;
   $("evalbar").classList.toggle("flipped", flipped);
+  syncClock();
   analyse();
 }
 
@@ -1136,6 +1203,8 @@ $("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
 $("btn-new-black").onclick = function () { newGame("b"); };
 $("btn-undo").onclick = takeBack;
+// A new time control applies at once until you have moved, otherwise next game.
+$("sel-clock").onchange = function () { if (!playerMoveCount() && !game.over) { resetClock(); render(); } };
 $("btn-cancel-premoves").onclick = function () { clearPremoves(); render(); };
 $("btn-flip").onclick = function () { game.flipped = !game.flipped; render(); };
 $("btn-copy").onclick = function () {
