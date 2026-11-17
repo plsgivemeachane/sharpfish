@@ -103,6 +103,10 @@ moves* switch if you only want the ordinary grades.
   before their reply. This includes rook-for-minor exchanges and combinations
   that immediately win material back, such as offering a bishop to open a rook's
   attack on the queen. Ordinary equal-value trades do not qualify.
+  A protected piece also does not qualify if an immediate recapture on its
+  square restores that material: `...Bh4 Qxh4 Rxh4` wins a queen for a bishop, so `...Bh4`
+  is not a sacrifice. `...Bxf2+ Rxf2 Rxh2` can qualify because the bishop offer
+  clears an attack on the queen on a different square.
 
 ### Practical considerations
 
