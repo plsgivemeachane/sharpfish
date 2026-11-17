@@ -5,7 +5,7 @@
   function remember(value) { try { root.localStorage.setItem("sharpfish-live-grading", value ? "1" : "0"); } catch (_) {} }
   function status(text) { if (root.SFAppHooks && root.SFAppHooks.onGradeStatus) root.SFAppHooks.onGradeStatus(text); }
   function valid(grade, record, index) {
-    return grade && grade.version === root.SFAnalysis.VERSION && grade.historyKey === root.SFAnalysis.historyKey(record, index + 1) && grade.config && grade.config.engine === root.STOCK_ENGINE_FILE;
+    return root.SFAnalysis && root.SFAnalysis.isValidGrade(grade, record, index, root.STOCK_ENGINE_FILE);
   }
   function interrupt() {
     epoch++;

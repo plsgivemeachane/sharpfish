@@ -2,8 +2,8 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder", "Great", "Brilliant"];
-  var BAD = { Inaccuracy: 1, Mistake: 1, Blunder: 1 };
+  var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder", "Disaster", "Catastrophe", "Great", "Brilliant"];
+  var BAD = { Inaccuracy: 1, Mistake: 1, Blunder: 1, Disaster: 1, Catastrophe: 1 };
   var state = { record: null, ply: 0, analyzer: null, evalAnalyzer: null, grading: false, evaluating: false, epoch: 0, gradeToken: 0, evalToken: 0 };
   var FILES = "abcdefgh";
 
@@ -33,24 +33,35 @@
     for (var rank = 8; rank >= 1; rank--) for (var file = 0; file < 8; file++) {
       var square = FILES[file] + rank, cell = document.createElement("div");
       cell.className = "square " + ((file + rank) % 2 ? "dark" : "light"); cell.dataset.sq = square; cell.setAttribute("role", "gridcell");
-      var piece = data[square]; if (piece) { var img = document.createElement("img"); img.className = "piece"; img.src = pieceAsset(piece); img.alt = (piece === piece.toUpperCase() ? "White " : "Black ") + ({P:"pawn",N:"knight",B:"bishop",R:"rook",Q:"queen",K:"king"}[piece.toUpperCase()] || "piece"); cell.appendChild(img); }
+      var piece = data[square]; if (piece) { var img = document.createElement("img"); img.className = "piece"; img.src = pieceAsset(piece); img.alt = (piece === piece.toUpperCase() ? "White " : "Black ") + ({P:"pawn",N:"knight",B:"bishop",R:"rook",Q:"queen",K:"king"}[piece.toUpperCase()] || "piece"); cell.appendChild(img);
+        var moveIndex = state.ply - 1, shownMove = state.record && state.record.moves && state.record.moves[moveIndex];
+        var grade = state.record && state.record.grades && validGrade(state.record, moveIndex, state.record.grades[moveIndex]) ? state.record.grades[moveIndex] : null;
+        if (shownMove && shownMove.slice(2, 4) === square && $("grade-toggle").checked && grade) {
+          var key = labelKey(grade.label || grade.objectiveLabel), badge = document.createElement("img"); badge.className = "move-grade-overlay grade-" + key; badge.src = "badges/" + key + ".png"; badge.alt = grade.label; badge.title = grade.label; badge.setAttribute("aria-label", grade.label); cell.appendChild(badge);
+        }
+      }
       board.appendChild(cell);
     }
     $("position-label").textContent = "Position " + state.ply + " / " + ((state.record && state.record.moves) || []).length;
   }
   function labelKey(label) { return String(label || "").toLowerCase().replace(/[^a-z]/g, ""); }
+  function validGrade(record, index, grade) {
+    return SFAnalysis.isValidGrade(grade, record, index, window.STOCK_ENGINE_FILE);
+  }
   function renderMoves() {
     var list = $("moves"); list.textContent = ""; var rec = state.record; if (!rec) return;
     var grades = rec.grades || {}, san = rec.san || [], counts = { w: {}, b: {} }, showGrades = $("grade-toggle").checked;
     san.forEach(function (move, i) {
-      var grade = grades[i], li = document.createElement("li"); li.dataset.ply = i + 1; if (state.ply === i + 1) li.classList.add("selected");
+      var grade = validGrade(rec, i, grades[i]) ? grades[i] : null, li = document.createElement("li"); li.dataset.ply = i + 1; if (state.ply === i + 1) li.classList.add("selected");
       var start = rec.startFen ? SFAnalysis.parseBoard(rec.startFen) : { turn: "w", fullmove: 1 };
       var offset = start.turn === "b" ? 1 : 0;
       var number = document.createElement("span"); number.className = "muted"; number.textContent = (start.fullmove + Math.floor((i + offset) / 2)) + (sideAt(rec, i) === "b" ? "…" : ".");
       var text = document.createElement("span"); text.textContent = move || rec.moves[i] || "?";
       var badge = document.createElement("span"); badge.className = "move-label " + labelKey(grade && grade.label); badge.textContent = showGrades && grade && grade.label || (showGrades ? "Pending" : "—"); badge.setAttribute("aria-label", showGrades && grade ? grade.label : "Grade hidden");
       if (showGrades && grade) { var side = sideAt(rec, i); counts[side][grade.label] = (counts[side][grade.label] || 0) + 1; }
-      li.tabIndex = 0; li.setAttribute("role", "button"); li.append(number, text, badge); var select = function () { state.ply = Number(li.dataset.ply); render(); if ($("eval-toggle").checked) evaluatePosition(); }; li.onclick = select; li.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } };
+      var slot = document.createElement("span"); slot.className = "move-grade-slot";
+      if (showGrades && grade) { var icon = document.createElement("img"); icon.className = "move-grade-list-icon"; icon.src = "badges/" + labelKey(grade.label) + ".png"; icon.alt = ""; slot.appendChild(icon); }
+      li.tabIndex = 0; li.setAttribute("role", "button"); li.append(number, slot, text, badge); var select = function () { state.ply = Number(li.dataset.ply); render(); if ($("eval-toggle").checked) evaluatePosition(); }; li.onclick = select; li.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } };
       list.appendChild(li);
     });
     function countText(side) { return Object.keys(counts[side]).sort(function (a, b) { return LABELS.indexOf(a) - LABELS.indexOf(b); }).map(function (key) { return key + " " + counts[side][key]; }).join(" · ") || "—"; }
@@ -58,7 +69,7 @@
     $("next-mistake").disabled = !rec.moves.length;
   }
   function renderDetail() {
-    var detail = $("move-detail"), g = state.record && state.record.grades && state.record.grades[state.ply - 1]; detail.textContent = "";
+    var detail = $("move-detail"), g = state.record && state.record.grades && validGrade(state.record, state.ply - 1, state.record.grades[state.ply - 1]) ? state.record.grades[state.ply - 1] : null; detail.textContent = "";
     if (!$("grade-toggle").checked) { detail.textContent = "Turn on grading to analyze the recorded moves."; return; }
     if (!g) { detail.textContent = state.ply ? "This move has not been graded yet." : "Select a move to see its analysis."; return; }
     var bits = [g.label || "Pending"]; if (g.bestMove) bits.push("best " + g.bestMove); if (g.pv && g.pv.length) bits.push("line " + g.pv.slice(0, 5).join(" ")); detail.textContent = bits.join(" · ");
@@ -81,7 +92,7 @@
   async function gradeAll() {
     if (!state.record || !$("grade-toggle").checked || !isSupported(state.record) || !window.SFAnalysis) return;
     var token = ++state.gradeToken, epoch = state.epoch, analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE); state.analyzer = analyzer; state.grading = true; $("cancel").disabled = false; var rec = state.record;
-    try { for (var i = 0; i < rec.moves.length; i++) { if (token !== state.gradeToken || epoch !== state.epoch || !$("grade-toggle").checked) break; if (rec.grades && rec.grades[i] && rec.grades[i].version === SFAnalysis.VERSION && rec.grades[i].historyKey === SFAnalysis.historyKey(rec, i + 1) && rec.grades[i].config && rec.grades[i].config.engine === window.STOCK_ENGINE_FILE) continue; $("progress").textContent = "Grading move " + (i + 1) + " / " + rec.moves.length + "…"; var grade = await analyzer.grade(rec, i, { difficulty: true }); if (token !== state.gradeToken || epoch !== state.epoch) break; rec.grades = rec.grades || {}; rec.grades[i] = grade; rec.updatedAt = Date.now(); renderMoves(); renderDetail(); var patch = {}; patch[i] = grade; await SFHistory.updateGrades(rec.id, rec.revision, patch); } $("progress").textContent = token === state.gradeToken ? "Grading complete." : "Grading paused."; }
+    try { for (var i = 0; i < rec.moves.length; i++) { if (token !== state.gradeToken || epoch !== state.epoch || !$("grade-toggle").checked) break; if (validGrade(rec, i, rec.grades && rec.grades[i])) continue; $("progress").textContent = "Grading move " + (i + 1) + " / " + rec.moves.length + "…"; var grade = await analyzer.grade(rec, i, { difficulty: true }); if (token !== state.gradeToken || epoch !== state.epoch) break; rec.grades = rec.grades || {}; rec.grades[i] = grade; rec.updatedAt = Date.now(); renderBoard(); renderMoves(); renderDetail(); var patch = {}; patch[i] = grade; await SFHistory.updateGrades(rec.id, rec.revision, patch); } $("progress").textContent = token === state.gradeToken ? "Grading complete." : "Grading paused."; }
     catch (err) { if (token === state.gradeToken) setError(err.message || "Move grading failed."); }
     finally { analyzer.dispose && analyzer.dispose(); if (state.analyzer === analyzer) { state.analyzer = null; state.grading = false; $("cancel").disabled = true; } }
   }
@@ -116,7 +127,7 @@
   }
   $("analyze").onclick = async function () { setError(""); try { await importPgn($("pgn-input").value); } catch (e) { setError(e.message || "Could not read PGN."); $("progress").textContent = ""; } };
   $("pgn-file").onchange = function () { var file = this.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { $("pgn-input").value = reader.result; }; reader.readAsText(file); };
-  $("grade-toggle").onchange = function () { renderMoves(); renderDetail(); if (this.checked) gradeAll(); else { state.gradeToken++; if (state.analyzer) state.analyzer.cancel && state.analyzer.cancel(); $("progress").textContent = "Grading paused."; $("cancel").disabled = true; } };
+  $("grade-toggle").onchange = function () { render(); if (this.checked) gradeAll(); else { state.gradeToken++; if (state.analyzer) state.analyzer.cancel && state.analyzer.cancel(); $("progress").textContent = "Grading paused."; $("cancel").disabled = true; } };
   $("eval-toggle").onchange = function () { if (this.checked) evaluatePosition(); else { state.evalToken++; if (state.evalAnalyzer) state.evalAnalyzer.cancel && state.evalAnalyzer.cancel(); $("evalbar").classList.add("off"); } };
   $("cancel").onclick = function () { state.gradeToken++; state.evalToken++; if (state.analyzer) state.analyzer.cancel && state.analyzer.cancel(); if (state.evalAnalyzer) state.evalAnalyzer.cancel && state.evalAnalyzer.cancel(); $("cancel").disabled = true; $("progress").textContent = "Analysis cancelled."; };
   $("first").onclick = function () { state.ply = 0; render(); if ($("eval-toggle").checked) evaluatePosition(); };
