@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const core = require("../site/analysis-core.js");
 
-assert.equal(core.VERSION, "1.3.0");
+assert.equal(core.VERSION, "1.4.0");
 const parsed = core.parsePgn('[Event "Test"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 1-0');
 assert.deepEqual(parsed.tokens, ["e4", "e5", "Nf3", "Nc6"]);
 assert.equal(parsed.result, "1-0");

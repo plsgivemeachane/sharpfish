@@ -159,7 +159,7 @@ var boardEl = $("board");
 
 function variantInfo() {
   var v = window.SHARPFISH_VARIANT || {};
-  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false };
+  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode };
 }
 function historyRecord() {
   if (!game.historyId) return null;
@@ -281,7 +281,7 @@ function engineMove() {
 // so it shows how plain Stockfish rates the game. Your variant may only remove
 // moves, so every position it reaches is a normal chess position stock
 // Stockfish can judge (it just does not know about your rule changes).
-var EVAL_DEPTH = 16;
+var EVAL_TIME_MS = 2000;
 var evalEngine = null;
 var evalKey = null;     // position being analysed
 var evalRunning = false;
@@ -300,13 +300,21 @@ function setEvalBar(share, text, title) {
 
 function analyse() {
   if (!evalEngine || !pos || pos.pending || !$("chk-eval").checked) return;
-  var key = positionCmd(game.view);
+  var viewed = game.view === null ? pos : game.boards[game.view], variant = variantInfo(), key;
+  try {
+    key = SFAnalysis.snapshotAnalysis({ variant: variant }) ? "position fen " + SFAnalysis.analysisFen({ variant: variant, boards: [viewed] }, 0) : positionCmd(game.view);
+  } catch (error) {
+    if (evalRunning) evalEngine.stop();
+    evalRunning = false; evalKey = null;
+    setEvalBar(0.5, "—", error.message); $("evalbar").classList.add("off"); return;
+  }
+  $("evalbar").classList.remove("off");
   if (key === evalKey) return;
   evalKey = key;
   if (evalRunning) evalEngine.stop(); // a new position: drop the old search
   evalRunning = true;
   var turn = game.view === null ? pos.turn : game.boards[game.view].turn;
-  evalEngine.request([key, "go depth " + EVAL_DEPTH],
+  evalEngine.request([key, "go movetime " + EVAL_TIME_MS],
     function (l) { return l.indexOf("bestmove") === 0; },
     function (l) {
       if (evalKey !== key || l.indexOf("info depth") !== 0) return;
@@ -999,7 +1007,7 @@ function render() {
         var displayedMove = last.length === 2 && last[1] === sq;
         var grade = game.grades && game.grades[moveIndex];
         var record = game.historyId ? historyRecord() : null;
-        var gradeVisible = !projecting && !pos.pending && displayedMove && $("chk-grade").checked && grade &&
+        var gradeVisible = !projecting && !pos.pending && displayedMove && $("chk-grade").checked && grade && !grade.unavailable &&
           window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE, window.SFLive ? SFLive.specialMoves() : true);
         if (gradeVisible) {
           var gradeKey = String(grade.label || grade.objectiveLabel || "").toLowerCase().replace(/[^a-z]+/g, "-");
@@ -1076,7 +1084,7 @@ function renderMoves() {
     if (j >= game.san.length) return "<td></td>";
     var grade = validLiveGrade(j), label = grade && (grade.label || grade.objectiveLabel), key = label && String(label).toLowerCase().replace(/[^a-z]+/g, "-");
     var icon = label ? '<img class="move-grade-list-icon" src="' + BADGE_ROOT + key + '.png" alt="" aria-hidden="true">' : "";
-    var textGrade = label ? ' <span class="move-grade grade-' + key + '" title="' + label + '" aria-label="' + label + '">' + label + "</span>" : "";
+    var textGrade = grade && grade.unavailable ? ' <span class="move-grade" title="Unavailable in ordinary chess">Unavailable</span>' : label ? ' <span class="move-grade grade-' + key + '" title="' + label + '" aria-label="' + label + '">' + label + "</span>" : "";
     return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '"><span class="move-grade-slot" title="' + (label || "Grade pending") + '">' + icon + '</span>' + game.san[j] + textGrade + "</td>";
   }
   for (var i = 0; i < game.san.length; i += 2) {
@@ -1094,7 +1102,7 @@ function renderMoves() {
 }
 
 function pgn() {
-  var out = "";
+  var out = SFAnalysis.snapshotAnalysis({ variant: variantInfo() }) ? '[Variant "' + variantInfo().slug + '"]\n\n' : "";
   game.san.forEach(function (s, i) { out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " "; });
   if (game.over) {
     out += /White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2";
@@ -1166,14 +1174,14 @@ boardEl.addEventListener("pointerdown", function (e) {
 $("chk-eval").onchange = toggleEval;
 if (window.SFSound) SFSound.bindToggle($("chk-sound"));
 $("chk-grade").checked = window.SFLive ? window.SFLive.init() : false;
-if (!variantInfo().supported) {
+if (!window.STOCK_ENGINE_FILE || !SFAnalysis.supportsRecord({ variant: variantInfo() })) {
   $("chk-grade").checked = false; $("chk-grade").disabled = true;
   $("grade-status").textContent = "Move grading is available for standard chess.";
 }
 // Great/Brilliant needs extra engine evidence; its own switch (persisted by
 // SFLive) cancels the in-flight grade and regrades with the new setting.
 $("chk-special-grades").checked = window.SFLive ? SFLive.specialMoves() : true;
-$("chk-special-grades").disabled = !variantInfo().supported;
+$("chk-special-grades").disabled = !window.STOCK_ENGINE_FILE || !SFAnalysis.supportsRecord({ variant: variantInfo() });
 $("chk-special-grades").onchange = function () { if (window.SFLive) SFLive.setSpecialMoves(this.checked); render(); };
 $("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); render(); };
 
