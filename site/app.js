@@ -158,7 +158,7 @@ var $ = function (id) { return document.getElementById(id); };
 var boardEl = $("board");
 
 function variantInfo() {
-  var v = window.SHARPFISH_VARIANT || {};
+  var v = window.SHARPFISH_VARIANT || { slug: "sufferfish", title: "Sufferfish", supported: true, analysisMode: "standard-line" };
   return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode };
 }
 function historyRecord() {
