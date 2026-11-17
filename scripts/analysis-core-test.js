@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const core = require("../site/analysis-core.js");
 
-assert.equal(core.VERSION, "1.2.0");
+assert.equal(core.VERSION, "1.3.0");
 const parsed = core.parsePgn('[Event "Test"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 1-0');
 assert.deepEqual(parsed.tokens, ["e4", "e5", "Nf3", "Nc6"]);
 assert.equal(parsed.result, "1-0");
@@ -28,10 +28,21 @@ assert.equal(core.classify({ loss: 501 }).label, "Disaster");
 assert.equal(core.classify({ loss: 900 }).label, "Disaster", "numerical collapse alone cannot create Catastrophe");
 for (const [best, played] of [[1500, 600], [-600, -1500]]) {
   const grade = core.classify({ best: { cp: best, wdl: [1000, 0, 0] }, played: { cp: played, wdl: [1000, 0, 0] } });
-  assert.equal(grade.label, "Disaster", "CP losses remain visible when winning chances saturate");
+  assert.equal(grade.label, played >= 500 ? "Inaccuracy" : "Disaster", "retained decisive wins are capped; losses in lost positions remain visible");
   assert.equal(grade.lossCp, 900);
   assert.equal(grade.lossPoints, 9);
 }
+const qf3 = core.classify({ best: { cp: 3098 }, played: { cp: 1819 }, side: "w" });
+assert.equal(qf3.lossCp, 1279, "retain the raw score loss for inspection");
+assert(qf3.qualityLossCp > 50 && qf3.qualityLossCp < 75);
+assert.equal(qf3.objectiveLabel, "OK", "Qf3 retains an overwhelming win and is not Disaster");
+assert.equal(core.classify({ best: { cp: -3098 }, played: { cp: -1819 }, side: "b" }).objectiveLabel, "OK", "Black gets the same logarithmic scale");
+assert.equal(core.classify({ best: { cp: 2400 }, played: { cp: 1200 } }).objectiveLabel, "Inaccuracy");
+const edgeA = core.classify({ best: { cp: 1500 }, played: { cp: 300 } });
+const edgeB = core.classify({ best: { cp: 1500 }, played: { cp: 299 } });
+assert(Math.abs(edgeB.qualityLossCp - edgeA.qualityLossCp - 1) < 1e-9, "scale stays continuous at the threshold");
+assert.equal(core.classify({ best: { cp: 2400 }, played: { cp: 0 } }).objectiveLabel, "Disaster", "losing a decisive win is still a severe error");
+assert.equal(core.classify({ best: { mate: 3, mateWinner: "w" }, played: { cp: 1800 }, side: "w" }).objectiveLabel, "Inaccuracy", "missing a forced win still leaves a winning position");
 assert.equal(core.classify({ best: { cp: 400 }, played: { cp: 398 }, brilliant: true }).label, "Brilliant", "a sound sacrifice is judged by evaluation, not lost material");
 assert.notEqual(core.classify({ loss: 900, brilliant: true }).label, "Brilliant", "unsound material offers cannot earn Brilliant");
 const shortMate = {
@@ -58,6 +69,9 @@ assert.throws(() => core.classify({ best: { wdl: [1000, 0, 0] }, played: { wdl: 
 const cachedRecord = { moves: ["e2e4"] };
 const cachedGrade = { version: core.VERSION, model: "centipawn", depth: 8, historyKey: core.historyKey(cachedRecord, 1), config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: "test-engine" } };
 assert(core.isValidGrade(cachedGrade, cachedRecord, 0, "test-engine"));
+const deeperGrade = { ...cachedGrade, config: { ...cachedGrade.config, movetime: 5000 } };
+assert(core.isValidGrade(deeperGrade, cachedRecord, 0, "test-engine", true, 5000));
+assert(!core.isValidGrade(deeperGrade, cachedRecord, 0, "test-engine", true, 2000), "analysis time is part of cache identity");
 assert(!core.isValidGrade(cachedGrade, cachedRecord, 0, "test-engine", false), "special-grade settings are part of the cache identity");
 assert(core.isValidGrade({ ...cachedGrade, config: { ...cachedGrade.config, specialMoves: false } }, cachedRecord, 0, "test-engine", false));
 for (const broken of [
