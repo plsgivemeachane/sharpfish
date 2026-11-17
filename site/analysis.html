@@ -47,6 +47,18 @@
       <div id="game-title" class="engine-line">Paste a PGN or open a saved game</div>
     </div>
 
+    <section id="performance" class="card performance-card" aria-labelledby="performance-heading" hidden>
+      <h2 id="performance-heading" class="card-title">Game performance</h2>
+      <table class="performance-table" aria-describedby="performance-progress elo-estimate-note">
+        <thead><tr><th scope="col">Player</th><th scope="col">Accuracy</th><th scope="col">Est. Elo</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="performance-player"><span class="tag-side w" aria-hidden="true"></span>White</span><span id="performance-white-name" class="performance-name"></span></th><td id="performance-white-accuracy">—</td><td id="performance-white-elo">—</td></tr>
+          <tr><th scope="row"><span class="performance-player"><span class="tag-side b" aria-hidden="true"></span>Black</span><span id="performance-black-name" class="performance-name"></span></th><td id="performance-black-accuracy">—</td><td id="performance-black-elo">—</td></tr>
+        </tbody>
+      </table>
+      <p id="performance-progress" class="hint" role="status"></p>
+    </section>
+
     <section class="card moves-card" aria-labelledby="moves-heading">
       <div class="moves-head"><span id="moves-heading">Moves</span><button id="next-mistake" class="link-btn" type="button" disabled>Next issue</button></div>
       <ol id="moves" class="moves" aria-label="Analyzed moves"></ol>
@@ -56,6 +68,8 @@
     </section>
 
     <section class="card controls" aria-label="Analysis settings">
+      <label class="field" for="analysis-time">Thinking time / move <select id="analysis-time"><option value="1000">1 second</option><option value="2000" selected>2 seconds</option><option value="5000">5 seconds</option><option value="10000">10 seconds</option><option value="30000">30 seconds</option></select></label>
+      <div class="hint">More time lets Stockfish search deeper.</div>
       <label class="field">Real-time move grading <input id="grade-toggle" type="checkbox" checked></label>
       <label class="field sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves <input id="special-toggle" type="checkbox" checked></label>
       <label class="field">Eval bar (stock Stockfish) <input id="eval-toggle" type="checkbox" checked></label>
@@ -80,7 +94,7 @@
   </aside>
 </main>
 
-<footer class="foot"><a id="source-link" href="https://github.com/plsgivemeachane/sharpfish">Source code</a> · Stockfish analysis runs locally in your browser.</footer>
+<footer class="foot"><p id="elo-estimate-note">Estimated Elo is always a rough estimate for this single match only.</p><a id="source-link" href="https://github.com/plsgivemeachane/sharpfish">Source code</a> · Stockfish analysis runs locally in your browser.</footer>
 <script src="analysis-core.js"></script>
 <script src="game-history.js"></script>
 <script src="analysis.js"></script>

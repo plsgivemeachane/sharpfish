@@ -18,7 +18,7 @@ Root: introduction, variant cards, credits. /variants/<slug>/: independent playa
 
 ## Design principles
 Clear choices, short descriptions, no account or setup before play. Each card is one generous link.
-Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss at full strength within one shared two-second budget, then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
+Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss with logarithmic compression of large winning advantages, at full strength within one shared thinking budget (two seconds by default), then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
 
 ## Visual language
 Reuse navy #04162b, text #e3f0fa, teal accents and system typography from the play site.
@@ -26,6 +26,7 @@ Use restrained borders, rounded cards, ample spacing, and the existing favicon. 
 
 ## Components
 Collection header, responsive card grid, source footer, exported navigation strip. Homepage CSS is separate from branch CSS.
+Review includes a compact Game performance table above Moves, with White/Black accuracy and estimated Elo. Reuse the existing card, typography, side dots and muted helper text. Show partial coverage explicitly, retain computed metrics when grading is paused, and withhold Elo until the player's line is analyzed and contains five non-forced decisions. A small footer note says that estimated Elo is always a rough estimate for this single match only. Preserve the recorded-line summary while previewing an alternative. Review settings include a persistent Thinking time / move select (1, 2, 5, 10 or 30 seconds; default 2) for grading and evaluation. Custom variants do not show standard-chess performance metrics.
 History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Review opens with grading and evaluation enabled for supported games. Great/Brilliant has its own persistent switch. Every board rank and file has the same size; pieces use the same scale as the play board. Replay slides moved pieces, supports board flip, and allows right-drag arrows and square circles, with mouse drawing and left-click to clear. Alternative move previews Stockfish’s preferred move for grades other than Best/Excellent, using the position before the recorded move; the same button returns to the played move without editing history. Keep the move list near the board rather than below a long history list. The review page reuses the play page layout and components (brand header, unframed board with player rows that swap on flip, 8px card stack, 6px buttons, icon navigation row); the readable score sits in a pill on the top player row, never inside the thin eval bar. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder, Disaster, Catastrophe; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
 
 ## Accessibility

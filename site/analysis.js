@@ -5,6 +5,7 @@
   "use strict";
   var BADGE_ROOT = (window.SHARPFISH_VARIANT || {}).badgePath || "badges/";
   var SPECIAL_KEY = "sharpfish-special-grading";
+  var TIME_KEY = "sharpfish-analysis-time";
   var $ = function (id) { return document.getElementById(id); };
   var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder", "Disaster", "Catastrophe", "Great", "Brilliant"];
   var BAD = { Inaccuracy: 1, Mistake: 1, Blunder: 1, Disaster: 1, Catastrophe: 1 };
@@ -49,8 +50,9 @@
   function labelKey(label) { return String(label || "").toLowerCase().replace(/[^a-z]/g, ""); }
   function reduceMotion() { return !!(motionQuery && motionQuery.matches); }
   function specialOn() { return $("special-toggle").checked; }
+  function analysisTime() { return Number($("analysis-time").value); }
   function validGrade(record, index, grade) {
-    return !!(window.SFAnalysis && SFAnalysis.isValidGrade(grade, record, index, window.STOCK_ENGINE_FILE, specialOn()));
+    return !!(window.SFAnalysis && SFAnalysis.isValidGrade(grade, record, index, window.STOCK_ENGINE_FILE, specialOn(), analysisTime()));
   }
   function shownGrade(index) {
     var rec = state.record;
@@ -301,6 +303,7 @@
     $("copy").disabled = !rec;
     var supported = isSupported(rec);
     $("grade-toggle").disabled = $("eval-toggle").disabled = $("special-toggle").disabled = !!rec && !supported;
+    $("analysis-time").disabled = !!rec && !supported;
     var alternativeButton = $("alternative-move");
     alternativeButton.disabled = state.alternativePending || !state.alternative && !alternativeGrade();
     alternativeButton.textContent = state.alternativePending ? "Loading alternative…" : state.alternative ? "Played move" : "Alternative move";
@@ -312,6 +315,30 @@
     $("cancel").textContent = resume ? "Resume grading" : state.grading ? "Stop grading" : evaluating ? "Stop evaluation" : "Stop";
     $("cancel").disabled = !(state.grading || evaluating || resume);
     document.querySelectorAll("#history-list button").forEach(function (b) { if (rec && b.dataset.id === rec.id) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); });
+    renderPerformance();
+  }
+  function renderPerformance() {
+    var rec = state.record;
+    $("performance").hidden = !rec || !isSupported(rec);
+    if (!rec || !isSupported(rec)) return;
+    var grades = rec.moves.map(function (_, i) { var grade = rec.grades && rec.grades[i]; return validGrade(rec, i, grade) ? grade : null; });
+    var summary = SFAnalysis.performanceSummary(rec, grades), headers = rec.headers || {};
+    [["w", "white", "White"], ["b", "black", "Black"]].forEach(function (row) {
+      var player = summary[row[0]], prefix = "performance-" + row[1];
+      var name = headers[row[2]] || "";
+      $(prefix + "-name").textContent = name; $(prefix + "-name").hidden = !name || name === row[2];
+      $(prefix + "-accuracy").textContent = player.accuracy == null ? "—" : player.accuracy.toFixed(1) + "%";
+      $(prefix + "-accuracy").title = player.analyzed + " / " + player.total + " moves analyzed";
+      $(prefix + "-elo").textContent = player.elo == null ? "—" : "≈ " + player.elo;
+      $(prefix + "-elo").title = player.elo != null ? "Single-match performance estimate from average objective score loss" :
+        player.analyzed < player.total ? "Waiting for this player's moves to be analyzed" : "Needs at least " + summary.minDecisions + " decisions with more than one legal move";
+    });
+    var analyzed = summary.w.analyzed + summary.b.analyzed, total = rec.moves.length;
+    var text = !total ? "No moves to analyze." : analyzed < total ?
+      analyzed + " / " + total + " moves analyzed." + (analyzed ? " Accuracy is provisional." : "") : "All " + total + " moves analyzed.";
+    if (analyzed < total && !$("grade-toggle").checked) text += " Turn on grading to continue.";
+    else if (analyzed === total && total && (summary.w.elo == null || summary.b.elo == null)) text += " Elo needs at least " + summary.minDecisions + " decisions per player.";
+    $("performance-progress").textContent = text;
   }
   function render() { renderBoard(); renderMoves(); renderDetail(); renderControls(); }
 
@@ -386,7 +413,7 @@
     if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
     state.evalBusy = true; renderControls();
     try {
-      var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: 2000 });
+      var e = await state.evalAnalyzer.evaluate(state.alternative ? state.alternative.record : state.record, ply, { movetime: analysisTime() });
       if (token !== state.evalToken || epoch !== state.epoch) return;
       var cp = e.cp == null ? (e.mateWinner === "w" ? 10000 : e.mateWinner === "b" ? -10000 : 0) : e.cp;
       var share = 1 / (1 + Math.exp(-0.00368208 * cp));
@@ -418,17 +445,26 @@
     stopGrading(false);
     var rec = state.record;
     if (!rec || !$("grade-toggle").checked || !isSupported(rec) || !window.SFAnalysis) { renderControls(); return; }
-    var token = state.gradeToken, epoch = state.epoch, special = specialOn();
+    var token = state.gradeToken, epoch = state.epoch, special = specialOn(), movetime = analysisTime();
     var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
     state.gradeAnalyzer = analyzer; state.grading = true; renderControls();
-    function current() { return token === state.gradeToken && epoch === state.epoch && state.record === rec && special === specialOn() && $("grade-toggle").checked; }
+    function current() { return token === state.gradeToken && epoch === state.epoch && state.record === rec && special === specialOn() && movetime === analysisTime() && $("grade-toggle").checked; }
     var done = false;
     try {
       for (var i = 0; i < rec.moves.length; i++) {
         if (!current()) break;
         if (validGrade(rec, i, rec.grades && rec.grades[i])) continue;
         $("progress").textContent = "Grading move " + (i + 1) + " / " + rec.moves.length + "…";
-        var grade = await analyzer.grade(rec, i, { specialMoves: special, difficulty: true });
+        var grade;
+        for (var attempt = 0; attempt < 2; attempt++) {
+          try { grade = await analyzer.grade(rec, i, { specialMoves: special, difficulty: true, movetime: movetime }); break; }
+          catch (err) {
+            if (!current() || attempt === 1) throw err;
+            analyzer.dispose(); analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE || window.ENGINE_FILE);
+            state.gradeAnalyzer = analyzer;
+            $("progress").textContent = "Retrying move " + (i + 1) + " / " + rec.moves.length + "…";
+          }
+        }
         if (!current()) break; // a stale setting or game must not overwrite the active one
         rec.grades = rec.grades || {}; rec.grades[i] = grade; rec.updatedAt = Date.now();
         onGradeChanged(i);
@@ -507,6 +543,13 @@
 
   // ------------------------------------------------------------ Controls
   try { $("special-toggle").checked = localStorage.getItem(SPECIAL_KEY) !== "0"; } catch (_) { /* storage blocked */ }
+  try { var savedTime = localStorage.getItem(TIME_KEY); if (["1000", "2000", "5000", "10000", "30000"].includes(savedTime)) $("analysis-time").value = savedTime; } catch (_) { /* storage blocked */ }
+  $("analysis-time").onchange = function () {
+    try { localStorage.setItem(TIME_KEY, this.value); } catch (_) { /* storage blocked */ }
+    stopGrading(false); clearAlternative(); render();
+    if ($("grade-toggle").checked) gradeAll();
+    scheduleEval(true);
+  };
   $("analyze").onclick = async function () { setError(""); try { await importPgn($("pgn-input").value); } catch (e) { setError(e.message || "Could not read PGN."); $("progress").textContent = ""; } };
   $("pgn-file").onchange = function () { var file = this.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { $("pgn-input").value = reader.result; }; reader.readAsText(file); };
   $("grade-toggle").onchange = function () {
