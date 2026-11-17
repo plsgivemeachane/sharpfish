@@ -28,6 +28,7 @@ constexpr bool AllowPawnDoubleStep  = true;
 constexpr bool EnableCustomRules    = false;
 constexpr bool EnableNullMove       = true;
 constexpr int  QuietPickTopN        = 0;
+constexpr int  QuietPickMaxLossCp   = 0;
 
 }  // namespace Stockfish::Variant
 

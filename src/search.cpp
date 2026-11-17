@@ -654,7 +654,8 @@ bool Search::Worker::iterative_deepening() {
                              skill.best ? skill.best : skill.pick_best(rootPos, rootMoves, multiPV)));
 
     // Sufferfish: move the highest-ranked non-capture among the top N to the
-    // front. If all of them capture, keep the best move.
+    // front, unless it is more than QuietPickMaxLossCp worse than the best
+    // move. If all of them capture, keep the best move.
     if constexpr (Variant::QuietPickTopN > 0)
     {
         usize n = std::min(multiPV, usize(Variant::QuietPickTopN));
@@ -663,6 +664,11 @@ bool Search::Worker::iterative_deepening() {
                 break;
             else if (!rootPos.capture(rootMoves[i].pv[0]))
             {
+                // Too costly compared with the best (capturing) move: capture.
+                Value best = rootMoves[0].score, quiet = rootMoves[i].score;
+                if ((is_decisive(best) || is_decisive(quiet)) ? quiet < best
+                    : best - quiet > Variant::cp_to_internal(Variant::QuietPickMaxLossCp))
+                    break;
                 std::rotate(rootMoves.begin(), rootMoves.begin() + i, rootMoves.begin() + i + 1);
                 uciPvSent = false;
                 break;

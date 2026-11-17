@@ -98,6 +98,10 @@ constexpr bool EnableNullMove = true;
 // -----------------------------------------------------------------------------
 constexpr int QuietPickTopN = 5;
 
+// ...but only if that quiet move scores at most this many cp below the best
+// move. A bigger loss (or a lost/missed mate) means the capture is played.
+constexpr int QuietPickMaxLossCp = 30;
+
 }  // namespace Stockfish::Variant
 
 #endif  // VARIANT_STOCK
