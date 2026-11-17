@@ -12,13 +12,14 @@ main { padding-top: 65px; padding-bottom: 70px; }
 h1 { font-size: clamp(42px, 7vw, 78px); line-height: 1.08; letter-spacing: -.045em; margin: 20px 0 25px; }
 .intro { max-width: 570px; font-size: 18px; color: #a6c2d6; margin-bottom: 60px; }
 h2 { font-size: 18px; margin-bottom: 22px; }
-.variants { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr)); gap: 20px; }
-.variant { display: flex; flex-direction: column; padding: 28px; min-height: 245px; border: 1px solid #31536a; border-radius: 16px; background: #0c2642b8; text-decoration: none; }
-.variant:hover { background: #123456; border-color: #61e4e0; }
+.variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.collection-card { display: flex; flex-direction: column; padding: 28px; min-height: 245px; border: 1px solid #31536a; border-radius: 16px; background: #0c2642b8; text-decoration: none; }
+.collection-card:hover { background: #123456; border-color: #61e4e0; }
 .number { color: #61e4e0; font-size: 13px; font-variant-numeric: tabular-nums; }
 h3 { font-size: 23px; margin: 16px 0 6px; }
-.variant p { color: #a6c2d6; margin: 0 0 24px; }
+.collection-card p { color: #a6c2d6; margin: 0 0 24px; }
 .play { color: #61e4e0; font-weight: 650; margin-top: auto; }
 footer { border-top: 1px solid #31536a; }
 footer a { padding: 10px 0; }
+@media (max-width: 650px) { .variants { grid-template-columns: 1fr; } }
 @media (max-width: 550px) { header, main, footer { padding-left: 22px; padding-right: 22px; } main { padding-top: 36px; } .intro { margin-bottom: 40px; } }

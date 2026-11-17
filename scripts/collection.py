@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import gzip
+import hashlib
 import html
 import json
 from pathlib import Path
@@ -87,14 +88,16 @@ def export_page(path, title, source_url, commit):
 def homepage(site, data):
     cards = []
     for number, entry in enumerate(data['variants'], 1):
-        cards.append(f'<a class="variant" href="variants/{entry["slug"]}/">'
+        cards.append(f'<a class="collection-card variant" href="variants/{entry["slug"]}/">'
                      f'<span class="number">{number:02d}</span>'
                      f'<h3>{html.escape(entry["title"])}</h3>'
                      f'<p>{html.escape(entry["description"])}</p>'
                      '<span class="play">Play variant →</span></a>')
     template = (ROOT / 'collection-server/index.html').read_text()
+    style_version = hashlib.sha256((ROOT / 'collection-server/collection.css').read_bytes()).hexdigest()[:16]
     (site / 'index.html').write_text(template.replace('{{CARDS}}', '\n'.join(cards))
-                                   .replace('{{SOURCE_URL}}', data['source_url']))
+                                   .replace('{{SOURCE_URL}}', data['source_url'])
+                                   .replace('{{STYLE_VERSION}}', style_version))
     shutil.copy2(ROOT / 'collection-server/collection.css', site)
     shutil.copy2(ROOT / 'site/favicon.svg', site)
 

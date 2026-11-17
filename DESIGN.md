@@ -16,7 +16,7 @@ Players exploring variants on desktop or mobile; maintainers publishing independ
 Players learning from their own games need accessible replay, independent grading/evaluation controls, and clear progress while the browser engine works.
 
 ## Information architecture
-Root: introduction, variant cards, credits. /variants/<slug>/: independent playable sites with a return link.
+Root: introduction, Game analysis and variant cards, credits. Analysis is the first full-size card in the same grid as the variants, with equal prominence. /variants/<slug>/: independent playable sites with a return link.
 Each integrated branch has analysis.html for PGN import and saved-game review; ?game=<id> opens one saved record. Classic combines standard chess and the former Elo ladder, including its full bot selector. The homepage links to Classic's analysis page; legacy Elo ladder URLs redirect to Classic. Other variants retain their own rules and saved replay state.
 
 ## Design principles
@@ -36,7 +36,7 @@ Semantic headings and landmarks, visible keyboard focus, descriptive links, high
 Move grades include visible text rather than color alone. Replay supports keyboard controls; file/paste errors and analysis progress have accessible status messages. Respect reduced motion.
 
 ## Responsive behavior
-Cards adapt from three columns to two and then one using available width. No horizontal overflow at 320px.
+The collection uses two equal card columns, then one at 650px and below. No horizontal overflow at 320px.
 Analysis uses a board alongside review controls on wide screens and stacks them on narrow screens. Long PGN/header content wraps or scrolls within its own control.
 
 ## Interaction states

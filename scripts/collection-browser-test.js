@@ -25,6 +25,16 @@ const base = process.argv[3] || "http://localhost:8096";
     assert.equal(links.length, 3);
     assert(links.includes("variants/classic/"));
     assert(!links.includes("variants/elo-ladder/"));
+    const analysisCard = page.locator("a.analysis-card");
+    assert.equal(await analysisCard.count(), 1);
+    assert.equal(await analysisCard.getAttribute("href"), "variants/classic/analysis.html");
+    assert(await analysisCard.locator("h3").getByText("Game analysis", { exact: true }).isVisible());
+    await analysisCard.focus();
+    assert.equal(await analysisCard.evaluate(el => getComputedStyle(el).outlineStyle), "solid");
+    await analysisCard.click();
+    await page.waitForURL(`${base}/variants/classic/analysis.html`);
+    assert(await page.locator("#pgn-input").isVisible());
+    await page.goto(base);
     const legacy = await context.request.get(`${base}/variants/elo-ladder/analysis.html?game=legacy`, { maxRedirects: 0 });
     assert.equal(legacy.status(), 308);
     assert.match(legacy.headers().location, /\/variants\/classic\/analysis\.html\?game=legacy$/);
@@ -34,6 +44,10 @@ const base = process.argv[3] || "http://localhost:8096";
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: "/tmp/sharpfish-home-mobile.png", fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
+    const analysisBox = await page.locator("a.analysis-card").boundingBox();
+    const classicBox = await page.locator("a.variant").first().boundingBox();
+    assert(Math.abs(analysisBox.width - classicBox.width) < 1 && Math.abs(analysisBox.height - classicBox.height) < 1,
+      "analysis has the same card size and prominence as Classic");
     await page.screenshot({ path: "/tmp/sharpfish-home-desktop.png", fullPage: true });
     for (const link of links) {
       await page.goto(`${base}/${link}`);
