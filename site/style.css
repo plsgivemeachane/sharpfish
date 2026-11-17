@@ -204,6 +204,20 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .sq.light .coord { color: var(--sq-dark); }
 .sq.dark  .coord { color: var(--sq-light); }
 
+.player-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.player-row .player-tag { flex: 1; min-width: 0; }
+/* Your clock: quiet while idle, bright while it runs, red when nearly out. */
+.clock {
+  flex: none; min-width: 84px; padding: 6px 12px; text-align: right;
+  font: 700 20px/1.1 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+  color: var(--muted); background: var(--inset);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.clock.running { color: var(--evalbar-dark); background: var(--evalbar-light); border-color: transparent; }
+.clock.low { color: #ff8a80; }
+.clock.low.running { color: #fff; background: #c62f2f; }
+.clock.flagged { color: #fff; background: #8e1f1f; border-color: transparent; }
 .player-tag {
   display: flex; align-items: center; gap: 10px;
   color: var(--text); font-size: 14px; font-weight: 600;

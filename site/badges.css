@@ -16,6 +16,7 @@
 .move-grade-overlay { position: absolute; z-index: 4; top: 0; right: 0; transform: translate(50%, -50%); width: 57.2%; height: 57.2%; min-width: 22px; min-height: 22px; max-width: 57.2px; max-height: 57.2px; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7)); }
 /* Centre the badge on the square's corner, including along board edges. */
 .board-row { padding: 12px 12px 0 0; }
+.player-row { padding-right: 12px; } /* keep the clock flush with the board, not the badge gutter */
 .board { overflow: visible; }
 .board > .sq:nth-child(1) { border-top-left-radius: 4px; }
 .board > .sq:nth-child(8) { border-top-right-radius: 4px; }
