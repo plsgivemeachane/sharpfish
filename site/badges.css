@@ -13,7 +13,7 @@
 .move-grade-slot { display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 28px; height: 26px; vertical-align: middle; }
 .move-grade-list-icon { width: 24px; height: 24px; object-fit: contain; flex: 0 0 24px; }
 .move-label { padding: 0; background: none; }
-.move-grade-overlay { position: absolute; z-index: 4; top: 2%; right: 2%; width: 34%; height: 34%; min-width: 16px; min-height: 16px; max-width: 32px; max-height: 32px; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7)); }
+.move-grade-overlay { position: absolute; z-index: 4; top: 2%; right: 2%; width: 52%; height: 52%; min-width: 20px; min-height: 20px; max-width: 52px; max-height: 52px; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7)); }
 .moves td { white-space: nowrap; }
 table.moves { table-layout: fixed; width: 100%; }
 table.moves th:first-child { width: 3em; }
