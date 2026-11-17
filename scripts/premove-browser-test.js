@@ -75,7 +75,13 @@ const { chromium } = process.argv[2]
     });
     await newBlack();
     await page.waitForFunction(() => game.moves.length === 1 && !pos.pending);
-    assert(await page.evaluate(() => botElapsed > 2000));
+    // Default Move delay is 2 s; allow a few ms of timer rounding.
+    assert(await page.evaluate(() => botElapsed >= 1990));
+    await page.selectOption("#sel-delay", "0"); // "Instant" skips the wait
+    await newBlack();
+    await page.waitForFunction(() => game.moves.length === 1 && !pos.pending);
+    assert(await page.evaluate(() => botElapsed < 1500));
+    await page.selectOption("#sel-delay", "2000");
 
     await page.setViewportSize({ width: 375, height: 844 });
     await newBlack();
@@ -86,7 +92,7 @@ const { chromium } = process.argv[2]
     assert.equal(await page.evaluate(() => premoves.length), 0);
     assert.equal(await page.locator("#engine-name").count(), 0);
     assert.deepEqual(errors, []);
-    console.log("PASS: multi-premoves, cancellation buttons, uninterrupted grabs, >2s bot delay, mobile touch, and browser errors");
+    console.log("PASS: multi-premoves, cancellation buttons, uninterrupted grabs, configurable bot move delay, mobile touch, and browser errors");
   } finally {
     await browser.close();
   }
