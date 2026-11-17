@@ -195,7 +195,7 @@ function updateHistoryLinks() {
 window.SFAppHooks.setGrade = function (index, grade, id, revision) {
   if (id !== game.historyId || revision !== game.historyRevision || index >= game.moves.length) return;
   game.grades[index] = grade;
-  renderMoves();
+  render();
 };
 window.SFAppHooks.onGradeError = function () { $("grade-status").textContent = "Some moves need another analysis attempt. Toggle grading to retry."; };
 window.SFAppHooks.onGradeStatus = function (text) { $("grade-status").textContent = text; };
@@ -982,6 +982,17 @@ function render() {
         var pc = board[sq];
         html += '<img class="piece" draggable="false" src="' + pieceImg(pc) + '" alt="' +
           (isWhite(pc) ? "white " : "black ") + PIECE_NAMES[pc.toLowerCase()] + '">';
+        var moveIndex = shownPly() - 1;
+        var displayedMove = last.length === 2 && last[1] === sq;
+        var grade = game.grades && game.grades[moveIndex];
+        var record = game.historyId ? historyRecord() : null;
+        var gradeVisible = !projecting && !pos.pending && displayedMove && $("chk-grade").checked && grade &&
+          window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE);
+        if (gradeVisible) {
+          var gradeKey = String(grade.label || grade.objectiveLabel || "").toLowerCase().replace(/[^a-z]+/g, "-");
+          html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="badges/' + gradeKey + '.png" alt="' +
+            grade.label + '" title="' + grade.label + '" aria-label="' + grade.label + '">';
+        }
       }
       if (queuedAt.length) html += '<span class="premove-order">' + queuedAt.join(",") + "</span>";
       html += "</div>";
@@ -1043,12 +1054,17 @@ function renderMoves() {
   var body = $("moves");
   var rows = "";
   var cur = shownPly() - 1; // index into game.san of the move shown on the board
+  function validLiveGrade(index) {
+    var grade = game.grades && game.grades[index];
+    if (!$("chk-grade").checked || !window.SFAnalysis || !game.historyId) return null;
+    return window.SFAnalysis.isValidGrade(grade, historyRecord(), index, window.STOCK_ENGINE_FILE) ? grade : null;
+  }
   function cell(j) {
     if (j >= game.san.length) return "<td></td>";
-    var grade = game.grades && game.grades[j];
-    var label = grade && (grade.label || grade.objectiveLabel);
-    return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '">' + game.san[j] +
-      (label ? ' <span class="move-grade grade-' + String(label).toLowerCase().replace(/[^a-z]+/g, "-") + '" title="' + label + '">' + label + "</span>" : "") + "</td>";
+    var grade = validLiveGrade(j), label = grade && (grade.label || grade.objectiveLabel), key = label && String(label).toLowerCase().replace(/[^a-z]+/g, "-");
+    var icon = label ? '<img class="move-grade-list-icon" src="badges/' + key + '.png" alt="" aria-hidden="true">' : "";
+    var textGrade = label ? ' <span class="move-grade grade-' + key + '" title="' + label + '" aria-label="' + label + '">' + label + "</span>" : "";
+    return '<td data-ply="' + (j + 1) + '" class="' + (j === cur ? "current" : "") + '"><span class="move-grade-slot" title="' + (label || "Grade pending") + '">' + icon + '</span>' + game.san[j] + textGrade + "</td>";
   }
   for (var i = 0; i < game.san.length; i += 2) {
     rows += "<tr><td>" + (i / 2 + 1) + ".</td>" + cell(i) + cell(i + 1) + "</tr>";
@@ -1140,7 +1156,7 @@ if (!variantInfo().supported) {
   $("chk-grade").checked = false; $("chk-grade").disabled = true;
   $("grade-status").textContent = "Move grading is available for standard chess.";
 }
-$("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); };
+$("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); render(); };
 
 (function start() {
   if (!window.ENGINE_FILE) {

@@ -21,7 +21,7 @@ Each integrated branch has analysis.html for PGN import and saved-game review; ?
 
 ## Design principles
 Clear choices, short descriptions, no account or setup before play. Each card is one generous link.
-Save games automatically. Keep grading and evaluation independent and optional. Grade with discoverability/naturalness and asymmetric forgiveness internally; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
+Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss at full strength and depth20+, then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
 
 ## Visual language
 Reuse navy #04162b, text #e3f0fa, teal accents and system typography from the play site.
@@ -29,7 +29,7 @@ Use restrained borders, rounded cards, ample spacing, and the existing favicon. 
 
 ## Components
 Collection header, responsive card grid, source footer, exported navigation strip. Homepage CSS is separate from branch CSS.
-History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
+History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder, Disaster, Catastrophe; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
 
 ## Accessibility
 Semantic headings and landmarks, visible keyboard focus, descriptive links, high-contrast text, minimum 44px touch links.
@@ -51,7 +51,7 @@ Direct, brief, welcoming. Show variant names and rules without build or deployme
 Plain HTML/CSS; no new frontend dependencies. Export whole branch sites. Check desktop and mobile in a real browser.
 Use native IndexedDB for bounded local history and Web Workers for analysis. Keep live play/premoves responsive. Version local JS/CSS and stock-engine paths from frozen source revisions. Test storage retention, replay, independent toggles, stale-job rejection, and user-provided metadata escaping.
 
-Move grades use original colored circular icons with familiar chess punctuation, a star, a thumbs up, and a check. OK uses a neutral equals sign. Keep a visible grade name beside each 24px icon so meaning does not depend on color or symbol recognition. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
+Move grades use concept-inspired metallic coins: grade-tinted beveled rims, saturated faces and bold contrasting symbols, with purple sparkle for Brilliant and distinct red symbols for Disaster/Catastrophe. OK uses a slate diamond. Reserve an icon slot before SAN and provide the grade name accessibly. Show the currently displayed move's icon at the top-right of its destination piece without blocking board interaction. Transparent PNGs, SVG originals, and a sprite are exported in `site/badges/`.
 
 ## Open questions
 Difficulty heuristics are project-defined and require continued calibration against human examples; do not claim Chess.com parity or calibrated human Elo accuracy. No blocking design questions for the agreed implementation.
