@@ -34,6 +34,8 @@ class CollectionTest(unittest.TestCase):
         (self.root / 'site/favicon.svg').write_text('<svg/>')
         (self.root / 'site/badges').mkdir()
         (self.root / 'site/badges/best.png').write_bytes(b'approved badge')
+        (self.root / 'site/sounds').mkdir()
+        (self.root / 'site/sounds/move.mp3').write_bytes(b'piece click')
         for name in ('Copying.txt', 'AUTHORS'):
             (self.root / name).write_text(name)
         (self.root / '.gitignore').write_text('/deploy/\n/.collection-*/\n')
@@ -135,6 +137,21 @@ class CollectionTest(unittest.TestCase):
                          b'next approved badge')
         self.assertIn('"badgePath": "assets/' + second + '/badges/"',
                       (target / 'engine-file.js').read_text())
+
+    def test_sound_urls_follow_the_frozen_release(self):
+        self.build()
+        first = self.git('rev-parse', 'HEAD')
+        target = self.root / 'deploy/site/variants/one'
+        self.assertEqual((target / 'assets' / first / 'sounds/move.mp3').read_bytes(), b'piece click')
+        self.assertIn('"soundPath": "assets/' + first + '/sounds/"', (target / 'engine-file.js').read_text())
+        (self.root / 'site/sounds/move.mp3').write_bytes(b'updated click')
+        self.git('add', 'site/sounds/move.mp3')
+        self.git('commit', '-qm', 'update sound')
+        self.build()
+        second = self.git('rev-parse', 'HEAD')
+        self.assertNotEqual(first, second)
+        self.assertEqual((target / 'assets' / second / 'sounds/move.mp3').read_bytes(), b'updated click')
+        self.assertIn('"soundPath": "assets/' + second + '/sounds/"', (target / 'engine-file.js').read_text())
 
     def test_reject_invalid_duplicate_or_missing_branch(self):
         for branch, slug in [('fixture', '../escape'), ('fixture', 'one'), ('absent', 'new')]:

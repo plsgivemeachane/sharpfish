@@ -134,10 +134,11 @@ def build():
             for engine_dir in ('engine', 'stock-engine'):
                 if (target / engine_dir).is_dir():
                     shutil.copytree(target / engine_dir, versioned / engine_dir)
-            # Image caches may outlive a deployment despite origin no-cache.
-            # Give dynamic badge images the same release identity as the UI.
-            if (target / 'badges').is_dir():
-                shutil.copytree(target / 'badges', versioned / 'badges')
+            # Media caches may outlive a deployment despite origin no-cache.
+            # Give badges and sounds the same release identity as the UI.
+            for media_dir in ('badges', 'sounds'):
+                if (target / media_dir).is_dir():
+                    shutil.copytree(target / media_dir, versioned / media_dir)
             selector = target / 'engine-file.js'
             if selector.exists():
                 content = selector.read_text()
@@ -148,6 +149,7 @@ def build():
                     slug=entry['slug'], title=entry['title'],
                     path='/variants/' + entry['slug'] + '/',
                     badgePath='assets/' + entry['commit'] + '/badges/',
+                    soundPath='assets/' + entry['commit'] + '/sounds/',
                     supported=entry['slug'] in ('classic', 'elo-ladder'),
                     revision=entry['commit'])) + ';\n'
                 selector.write_text(content)
