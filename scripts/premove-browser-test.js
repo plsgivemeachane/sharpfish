@@ -78,7 +78,8 @@ const { chromium } = process.argv[2]
     // Default Move delay is 2 s; allow a few ms of timer rounding.
     assert(await page.evaluate(() => botElapsed >= 1990));
     await page.selectOption("#sel-delay", "0"); // "Instant" skips the wait
-    await newBlack();
+    // The bot may finish before a "thinking" poll sees it, so wait for its move.
+    await page.locator("#btn-new-black").click();
     await page.waitForFunction(() => game.moves.length === 1 && !pos.pending);
     assert(await page.evaluate(() => botElapsed < 1500));
     await page.selectOption("#sel-delay", "2000");
