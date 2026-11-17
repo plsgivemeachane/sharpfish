@@ -11,20 +11,75 @@
 <script src="engine-file.js"></script>
 </head>
 <body>
-<header class="top"><a class="brand" href="./"><img src="favicon.svg" width="30" height="30" alt=""> <span>Sharpfish</span></a><span class="tagline">Analyze the decisions.</span></header>
-<main class="analysis-layout">
-  <section class="board-card" aria-label="Analysis board">
-    <div class="board-head"><h1>Game analysis</h1><span id="game-title" class="muted">Paste a PGN to begin</span></div>
-    <div class="board-row"><div id="evalbar" class="evalbar off" aria-label="Evaluation"><div id="evalbar-white" class="evalbar-white"></div><span id="eval-label"></span></div><div id="board" class="board" role="grid" aria-label="Position"></div></div>
-    <div class="nav-row"><button id="first" class="btn" type="button" aria-label="First position">|&lt;</button><button id="prev" class="btn" type="button" aria-label="Previous move">&lt;</button><span id="position-label" class="muted">Position 0</span><button id="next" class="btn" type="button" aria-label="Next move">&gt;</button><button id="last" class="btn" type="button" aria-label="Last position">&gt;|</button></div>
+<header class="top">
+  <a class="brand" href="./" title="Back to play">
+    <img src="favicon.svg" alt="" width="30" height="30">
+    <span class="site-name">Sharpfish</span>
+    <span class="tagline">Analyze the decisions.</span>
+  </a>
+</header>
+
+<main class="layout">
+  <section class="board-wrap" aria-label="Analysis board">
+    <div class="player-tag" id="tag-top"><span class="tag-side b"></span><span class="tag-name">Black</span><span id="eval-readout" class="eval-pill off" role="status" aria-live="polite"><span id="eval-label" class="eval-score"></span><span id="eval-detail" class="eval-detail"></span></span></div>
+    <div class="board-row">
+      <div id="evalbar" class="evalbar off" aria-hidden="true"><div id="evalbar-white" class="evalbar-white"></div></div>
+      <div id="board" class="board" role="grid" aria-label="Position"></div>
+    </div>
+    <div class="player-tag" id="tag-bottom"><span class="tag-side w"></span><span class="tag-name">White</span></div>
+    <div class="row nav" aria-label="Replay">
+      <button id="first" class="btn" type="button" title="First position (Home)" aria-label="First position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg></button>
+      <button id="prev" class="btn" type="button" title="Previous move (←)" aria-label="Previous move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/></svg></button>
+      <span id="position-label" class="position-label">Position 0 / 0</span>
+      <button id="next" class="btn" type="button" title="Next move (→)" aria-label="Next move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l7-5z" fill="currentColor"/></svg></button>
+      <button id="last" class="btn" type="button" title="Last position (End)" aria-label="Last position"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
+    </div>
+    <div class="row board-tools" aria-label="Board tools">
+      <button id="flip" class="btn" type="button" title="Flip board (F)" aria-pressed="false">Flip board</button>
+      <button id="draw-mode" class="btn" type="button" aria-pressed="false" title="Tap a square for a circle, drag for an arrow">Draw</button>
+      <button id="clear-shapes" class="btn" type="button" disabled>Clear drawings</button>
+    </div>
   </section>
-  <aside class="side">
-    <section class="card import-card"><h2>Analyze PGN</h2><label for="pgn-input">Paste a game</label><textarea id="pgn-input" rows="6" placeholder="1. e4 e5 2. Nf3 Nc6"></textarea><div class="row"><button id="analyze" class="btn primary" type="button">Analyze</button><label class="file-btn btn" for="pgn-file">Open .pgn<input id="pgn-file" type="file" accept=".pgn,text/plain"></label></div><p id="error" class="error" role="alert" hidden></p></section>
-    <section class="card controls"><h2>Tools</h2><label class="toggle"><input id="grade-toggle" type="checkbox"> <span>Grade every move</span></label><label class="toggle"><input id="eval-toggle" type="checkbox"> <span>Evaluation bar</span></label><div id="progress" class="progress" role="status"></div><div class="row"><button id="cancel" class="btn" type="button" disabled>Cancel</button><button id="copy" class="btn" type="button" disabled>Copy PGN</button></div></section>
-    <section class="card history-card"><div class="section-head"><h2>History</h2><button id="refresh-history" class="link-btn" type="button">Refresh</button></div><p id="history-empty" class="muted">No saved games yet.</p><ul id="history-list" class="history-list"></ul></section>
-    <section class="card move-card"><div class="section-head"><h2>Moves</h2><button id="next-mistake" class="link-btn" type="button" disabled>Next issue</button></div><div id="counts" class="counts muted"></div><ol id="moves" class="moves" aria-label="Analyzed moves"></ol><p id="move-detail" class="detail muted">Select a move to see its analysis.</p></section>
+
+  <aside class="panel">
+    <div class="card status-card">
+      <h1 class="status">Game analysis</h1>
+      <div id="game-title" class="engine-line">Paste a PGN or open a saved game</div>
+    </div>
+
+    <section class="card moves-card" aria-labelledby="moves-heading">
+      <div class="moves-head"><span id="moves-heading">Moves</span><button id="next-mistake" class="link-btn" type="button" disabled>Next issue</button></div>
+      <ol id="moves" class="moves" aria-label="Analyzed moves"></ol>
+      <p id="moves-empty" class="moves-empty">No game loaded. The board shows the starting position.</p>
+      <div id="counts" class="counts"></div>
+      <p id="move-detail" class="detail">Select a move to see its analysis.</p>
+    </section>
+
+    <section class="card controls" aria-label="Analysis settings">
+      <label class="field">Real-time move grading <input id="grade-toggle" type="checkbox" checked></label>
+      <label class="field sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves <input id="special-toggle" type="checkbox" checked></label>
+      <label class="field">Eval bar (stock Stockfish) <input id="eval-toggle" type="checkbox" checked></label>
+      <div id="progress" class="hint" role="status"></div>
+      <div class="row"><button id="cancel" class="btn" type="button" disabled>Stop</button><button id="copy" class="btn" type="button" disabled title="Copy the moves in PGN format">Copy PGN</button></div>
+      <div class="hint">Right-click a square to circle it, right-drag to draw an arrow. Blue by default. Hold Shift (red), Alt/Ctrl (purple) or both (yellow) to change color. On touch screens, turn on Draw.</div>
+    </section>
+
+    <section class="card import-card" aria-labelledby="import-heading">
+      <h2 id="import-heading" class="card-title">Analyze PGN</h2>
+      <label for="pgn-input" class="hint">Paste a game or open a .pgn file</label>
+      <textarea id="pgn-input" rows="4" placeholder="1. e4 e5 2. Nf3 Nc6"></textarea>
+      <div class="row"><button id="analyze" class="btn primary" type="button">Analyze</button><label class="file-btn btn" for="pgn-file">Open .pgn<input id="pgn-file" type="file" accept=".pgn,text/plain"></label></div>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section class="card history-card" aria-labelledby="history-heading">
+      <div class="card-head"><h2 id="history-heading" class="card-title">History</h2><button id="refresh-history" class="link-btn" type="button">Refresh</button></div>
+      <p id="history-empty" class="hint">No saved games yet.</p>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
   </aside>
 </main>
+
 <footer class="foot"><a id="source-link" href="https://github.com/plsgivemeachane/sharpfish">Source code</a> · Stockfish analysis runs locally in your browser.</footer>
 <script src="analysis-core.js"></script>
 <script src="game-history.js"></script>

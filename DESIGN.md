@@ -21,15 +21,15 @@ Each integrated branch has analysis.html for PGN import and saved-game review; ?
 
 ## Design principles
 Clear choices, short descriptions, no account or setup before play. Each card is one generous link.
-Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss at full strength and depth20+, then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
+Save games automatically. Keep grading and evaluation independent and optional. Grade objective advantage loss at full strength within one shared two-second budget, then apply discoverability/naturalness with asymmetric forgiveness; display one final label rather than combined difficulty badges. Preserve recorded games when reviewing them.
 
 ## Visual language
 Reuse navy #04162b, text #e3f0fa, teal accents and system typography from the play site.
-Use restrained borders, rounded cards, ample spacing, and the existing favicon. No external fonts or animation.
+Use restrained borders, rounded cards, ample spacing, and the existing favicon. No external fonts or decorative animation. Replay motion lasts about 220 ms and respects reduced motion.
 
 ## Components
 Collection header, responsive card grid, source footer, exported navigation strip. Homepage CSS is separate from branch CSS.
-History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder, Disaster, Catastrophe; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
+History list, PGN paste/file input, readonly replay board, move list with labels, evaluation bar, grading progress/cancel, and review controls. Review opens with grading and evaluation enabled for supported games. Great/Brilliant has its own persistent switch. Every board rank and file has the same size; pieces use the same scale as the play board. Replay slides moved pieces, supports board flip, and allows right-drag arrows and square circles, with a touch drawing mode and clear control. Keep the move list near the board rather than below a long history list. The review page reuses the play page layout and components (brand header, unframed board with player rows that swap on flip, 8px card stack, 6px buttons, icon navigation row); the readable score sits in a pill on the top player row, never inside the thin eval bar. Ordinary labels: Best, Excellent, Good, OK, Inaccuracy, Mistake, Blunder, Disaster, Catastrophe; Great and Brilliant require separate evidence. Reuse existing tokens and pieces; no external fonts or dependencies.
 
 ## Accessibility
 Semantic headings and landmarks, visible keyboard focus, descriptive links, high-contrast text, minimum 44px touch links.

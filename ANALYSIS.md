@@ -8,9 +8,11 @@ Games save after accepted moves and takebacks, including unfinished games and bo
 
 The ordinary ladder is **Best → Excellent → Good → OK → Inaccuracy → Mistake → Blunder → Disaster → Catastrophe**. Each move displays one final label. Great and Brilliant require separate contextual evidence.
 
-Full-strength Stockfish (Skill Level 20, strength limiting disabled) compares the played move with the best alternative at depth 20 minimum. Mate and special-grade verification uses depth 22 minimum. Requested lower grade depths are clamped to 20; the playing bot's strength never limits the analysis worker. The actual move is searched even when absent from the top alternatives.
+Full-strength Stockfish (Skill Level 20, strength limiting disabled) compares the played move with the best alternative within one shared **2000 ms budget per grade**. There is no minimum depth and no depth-escalating retry loop. All root, reply, difficulty and sacrifice searches share that budget; optional evidence is skipped when time is exhausted. The actual completed depth is retained as diagnostic metadata. The playing bot's strength never limits the analysis worker. When the played move is outside the initial top alternatives, it and the strongest candidate are compared in the same completed MultiPV iteration to avoid inconsistent independent scores.
 
-The default objective model is **centipawn loss**, normalized to the mover: `(bestWhiteCp - playedWhiteCp) × (White ? 1 : -1)`. One advantage point is 100 centipawns. There are no player ratings, win-probability curves, or material-loss penalties in this classification. A sound queen sacrifice remains good when its deep score is close to the best move.
+**Great / Brilliant** can be switched off independently of ordinary move grading, in live play and review. This skips special-grade verification and persists the preference locally. Cached grades include the time budget and special-grade setting. Live grading prioritizes the newest move, then fills the older backlog. Loading the engine and waiting behind another grade are separate from its thinking budget; a stalled grading worker is terminated at the deadline with a small transport allowance.
+
+The default objective model is **centipawn loss**, normalized to the mover: `(bestWhiteCp - playedWhiteCp) × (White ? 1 : -1)`. One advantage point is 100 centipawns. There are no player ratings, win-probability curves, or material-loss penalties in this classification. A sound queen sacrifice remains good when its searched score is close to the best move.
 
 | Advantage lost | Objective grade |
 | --- | --- |
@@ -25,17 +27,17 @@ The default objective model is **centipawn loss**, normalized to the mover: `(be
 
 These are Sharpfish policy thresholds, not published Chess.com, Lichess, or WintrChess thresholds. Unlike a probability curve, a change from +15 to +6 or −6 to −15 remains a nine-point loss.
 
-Mate is a separate ordered outcome and is never converted into a large invented centipawn number. Preserving the best known forced-mate distance can earn Best; accelerating the opponent's mate is an error, and delaying one's own forced mate earns Good. Missing a forced win is graded according to the remaining advantage. **Catastrophe** requires both the root played-move search and an independent depth-22 search of the resulting position to confirm opponent mate in 1–5, newly allowed or faster than the best defense. M6 does not qualify. Practical ease cannot manufacture this tier without mate evidence. The recorded `mateChange` and `mateEvidence` explain the comparison; numerical loss fields are null for mate transitions.
+Mate is a separate ordered outcome and is never converted into a large invented centipawn number. Preserving the best known forced-mate distance can earn Best; accelerating the opponent's mate is an error, and delaying one's own forced mate earns Good. Missing a forced win is graded according to the remaining advantage. **Catastrophe** requires both the root played-move search and an independent time-bounded search of the resulting position to confirm opponent mate in 1–5, newly allowed or faster than the best defense. M6 does not qualify. Practical ease cannot manufacture this tier without mate evidence. The recorded `mateChange` and `mateEvidence` explain the comparison; numerical loss fields are null for mate transitions.
 
 The internal objective grade is then adjusted for human difficulty:
 
-- **Discoverability:** how readily a limited search recognizes the punishment. Depth-4 and depth-7 diagnostic searches are compared with the deeper reply search; these diagnostic scores do not determine the objective grade.
+- **Discoverability:** how readily a limited search recognizes the punishment. Diagnostic searches capped at depths 4 and 7 and 20/40 ms are compared with the deeper time-bounded reply search; these diagnostic scores do not determine the objective grade.
 - **Naturalness:** whether the verified reply is a plausible human candidate in context, rather than a counterintuitive idea.
 - **Delayed hidden consequence:** supports forgiveness when the point takes time to become apparent. A long, obvious forcing line does not qualify merely because it is long.
 
 The number of punishing replies is not a difficulty input. Upgrades are easier to earn than downgrades. A move can improve up to two steps; a downgrade needs strong agreement that the error is easy to recognize and is limited to one step. Best remains reserved for objectively best or effectively tied moves. A difficulty adjustment alone cannot earn Great or Brilliant.
 
-This is a Sharpfish heuristic. Advantage-loss bands and shallow-search recognition require calibration against human examples; they do not estimate player Elo. Engine evaluations are search-dependent and not literal material counts. Results depend on engine version, analysis budget, and classifier version; incompatible cached results need recalculation. Depth-20 grading can take substantial time, especially on mobile. Browser grading can lag rapid play, and a pending or interrupted search must not be shown as a completed grade.
+This is a Sharpfish heuristic. Advantage-loss bands and shallow-search recognition require calibration against human examples; they do not estimate player Elo. Engine evaluations are search-dependent and not literal material counts. Results depend on engine version, analysis budget, and classifier version; incompatible cached results need recalculation. Search depth varies with the position and device. Optional special-grade or difficulty evidence may be unavailable within two seconds; missing evidence never manufactures a special label or difficulty adjustment. Browser grading can lag rapid play, and a pending or interrupted search must not be shown as a completed grade.
 
 The current move's grade also appears at the top-right of its destination piece in play and replay. Move lists reserve an icon slot before SAN so receiving a grade does not shift move text. Badges are original metallic coin artwork exported as transparent PNGs and scalable SVGs.
 
@@ -45,7 +47,7 @@ Classic includes the former Elo ladder and supports standard-chess PGN grading. 
 
 ## Maintenance
 
-The browser modules have no added runtime package dependency. Unit and actual-WASM tests cover the classifier and parser; browser regressions cover local history, live controls, PGN review, and independent analysis toggles. The collection exporter decorates analysis pages with source links and versions local scripts/styles and engine assets using the frozen source revision.
+The browser modules have no added runtime package dependency. Unit and actual-WASM tests cover the classifier and parser; browser regressions cover local history, live controls, PGN review, and independent analysis toggles. The collection exporter decorates analysis pages with source links and versions local scripts/styles, badge images and engine assets using the frozen source revision.
 
 ## Research references
 
