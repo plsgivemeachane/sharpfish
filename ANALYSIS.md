@@ -62,7 +62,13 @@ A failed live grade is retried once on a fresh worker after new moves are handle
 
 ## Variant boundary
 
-Classic includes the former Elo ladder and supports standard-chess PGN grading. Legacy Elo ladder URLs redirect to Classic. Alternating-colors and SCP-096 keep their own gameplay and replay snapshots; standard Stockfish cannot establish move quality under those custom rules. Saving and replaying those games remains available independently of grading support.
+Classic includes the former Elo ladder; legacy URLs redirect to Classic. Classic, Sufferfish, Alternating Colors and SCP-096 all support ordinary-chess grading and evaluation. Analysis always uses the full-strength stock Stockfish worker, independently of the playing variant's engine or bot strength.
+
+For Alternating Colors and SCP-096, each decision starts from its own saved before-position. The analysis adapter removes SCP's `*` marker, preserves already-eaten pieces as absent, repairs castling/en-passant metadata and asks Stockfish for fresh ordinary legal moves. The recorded move is graded from that position; its hypothetical reply line ignores subsequent automatic SCP eating and custom move restrictions. Evaluation of a replay position uses that actual snapshot minus SCP. The original snapshots, SCP events and game result remain unchanged in replay. Alternatives use ordinary legality and the projected before-position, so a recommendation may differ from a move the variant permits.
+
+A missing king, a revealed check on the non-moving king, or a move legal only under custom rules may have no ordinary-chess interpretation. Such moves show **Unavailable** and grading continues with later decisions; invalid FENs never reach Stockfish. Unavailable positions hide the eval bar instead of retaining an unrelated score. Accuracy shows incomplete coverage and withholds Elo when a decision is unavailable. Performance uses the side and number of ordinary legal choices from the actual grading search. Unknown variants without an adapter remain replay-only.
+
+Classifier 1.4.0 invalidates old caches. Variant grade fingerprints include the actual before-snapshot, preventing identical UCI prefixes with different SCP events from sharing results. Completed unavailable decisions are also cached to avoid endless retries.
 
 ## Maintenance
 
