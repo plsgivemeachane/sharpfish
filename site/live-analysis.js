@@ -50,11 +50,23 @@
     if (!record || !record.id) return;
     if (current && current.id === record.id && current.revision > record.revision) return;
     if (current && current.id !== record.id) { interrupt(); failed = {}; }
+    var carried = {};
     if (current && current.id === record.id) {
       record.grades = Object.assign({}, record.grades || {});
-      Object.keys(current.grades || {}).forEach(function (i) { if (valid(current.grades[i], record, +i)) record.grades[i] = current.grades[i]; });
+      Object.keys(current.grades || {}).forEach(function (i) {
+        if (!valid(record.grades[i], record, +i) && valid(current.grades[i], record, +i)) carried[i] = record.grades[i] = current.grades[i];
+      });
     }
-    current = record; drain();
+    current = record;
+    var carriedIndices = Object.keys(carried);
+    // A newer move can be saved before the previous grade's write completes.
+    // Deliver retained grades to that revision too, or the UI stays blank even
+    // though drain correctly sees a completed grade in its own copy.
+    carriedIndices.forEach(function (i) {
+      if (root.SFAppHooks && root.SFAppHooks.setGrade) root.SFAppHooks.setGrade(+i, carried[i], record.id, record.revision);
+    });
+    if (carriedIndices.length) root.SFHistory.updateGrades(record.id, record.revision, carried).catch(function () { status("Grade ready; local saving failed."); });
+    drain();
   }
   root.SFLive = {
     init: function () { try { enabled = root.localStorage.getItem("sharpfish-live-grading") === "1"; specialMoves = root.localStorage.getItem("sharpfish-special-grading") !== "0"; } catch (_) {} return enabled; },
