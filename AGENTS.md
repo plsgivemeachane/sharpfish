@@ -4,7 +4,7 @@
 
 - Public repository: https://github.com/plsgivemeachane/sharpfish (`origin`).
 - Original Stockfish.js repository is `upstream`; do not push project changes there.
-- `elo-ladder` is the default branch and owns collection tooling and deployment configuration.
+- `main` is GitHub's default branch (the Classic variant and the public README). `elo-ladder` owns collection tooling and deployment configuration; clone or check it out (`git clone -b elo-ladder …`) before running collection commands.
 - Each variant keeps its own engine and play UI on its branch. Do not merge all variants together.
 - `variants.json` on `elo-ladder` registers deployed branches and stable URL slugs.
 - Production: SSH alias `kietvnmhomeserver`, directory `/opt/sharpfish`, Docker Compose service `sharpfish`, HTTP port **8096**.
