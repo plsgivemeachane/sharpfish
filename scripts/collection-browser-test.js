@@ -39,6 +39,19 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.goto(`${base}/${link}`);
       await page.waitForFunction(() => typeof pos !== "undefined" && pos && !pos.pending && pos.turn === "w");
       assert(await page.locator("#board .piece").count() >= 32);
+      const roster = await page.evaluate(() => ({
+        master: BOT_GROUPS.filter(g => g.name === "Master").flatMap(g => g.bots).map(b => b.elo),
+        removed: ["ingrid", "rafael", "zara", "nikolai"].map(findBot),
+        engineRating: botRating(findBot("stockfish")),
+        engineCommands: strengthCommands(findBot("stockfish")),
+        fullCommands: strengthCommands(customBot(FULL))
+      }));
+      assert(roster.master.every(elo => elo <= 2600));
+      assert.deepEqual(roster.removed, [null, null, null, null]);
+      assert.equal(roster.engineRating, "2800");
+      assert.deepEqual(roster.engineCommands, ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value 2800"]);
+      assert.deepEqual(roster.fullCommands, ["setoption name UCI_LimitStrength value false"]);
+      assert.equal(await page.locator('.bot[data-id="stockfish"]').getAttribute("aria-label"), "Stockfish (2800)");
       const move = await page.evaluate(() => pos.legal.find(m => m.length === 4));
       assert(move, "expected a legal opening move");
       await page.locator(`[data-sq="${move.slice(0, 2)}"]`).click();

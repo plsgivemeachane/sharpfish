@@ -1,7 +1,7 @@
 // The bots you can play, grouped by level. Each one is the same engine set to
 // a UCI_Elo (in steps of 50, 0..3150), so this works for every variant.
 //
-// Martin (250) and Stockfish (full strength) are fixed: keep their names,
+// Martin (250) and Stockfish (2800) are fixed: keep their names,
 // Elo and avatars. Every other bot can be renamed, re-rated or re-drawn.
 // Avatars: DiceBear 9.x "avataaars" by Pablo Stanley (free for personal and
 // commercial use), saved in avatars/. Martin: Chess.com portrait; see avatars/README.md.
@@ -38,14 +38,8 @@ var BOT_GROUPS = [
     { id: "dario",  name: "Dario",  elo: 2350 },
     { id: "sasha",  name: "Sasha",  elo: 2500 },
   ] },
-  { name: "Master", bots: [
-    { id: "ingrid",  name: "Ingrid",  elo: 2650 },
-    { id: "rafael",  name: "Rafael",  elo: 2800 },
-    { id: "zara",    name: "Zara",    elo: 2950 },
-    { id: "nikolai", name: "Nikolai", elo: 3100 },
-  ] },
   { name: "Engine", bots: [
-    { id: "stockfish", name: "Stockfish", elo: FULL, fixed: true, avatar: "stockfish-logo.png" },
+    { id: "stockfish", name: "Stockfish", elo: 2800, fixed: true, avatar: "stockfish-logo.png" },
   ] },
 ];
 
@@ -57,7 +51,6 @@ var ELO_MIN = 0, ELO_MAX = 3150, ELO_STEP = 50;
 
 // A bot for any Elo picked with the slider (FULL = full strength).
 function customBot(elo) {
-  if (elo === FULL) return findBot("stockfish");
   return { id: "custom", name: "Stockfish", elo: elo, avatar: "avatars/custom.svg", custom: true };
 }
 
@@ -68,4 +61,4 @@ function findBot(id) {
   return null;
 }
 
-function botRating(bot) { return bot.elo === FULL ? "3000+" : String(bot.elo); }
+function botRating(bot) { return bot.elo === FULL ? "Full" : String(bot.elo); }
