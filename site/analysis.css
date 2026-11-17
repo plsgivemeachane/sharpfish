@@ -6,6 +6,7 @@
 .board-head span, .history-list button, .detail, .counts, .error { overflow-wrap: anywhere; }
 .history-list button { min-height: 44px; }
 .moves li:focus-visible, .link-btn:focus-visible, .history-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.moves li { grid-template-columns: 28px 28px minmax(0, 1fr) 86px; }
 @media (max-width: 420px) {
   .nav-row { gap: 4px; }
   .nav-row .btn { min-width: 36px; min-height: 44px; padding: 6px; }

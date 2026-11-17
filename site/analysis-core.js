@@ -6,7 +6,8 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0";
+  var GRADE_DEPTH = 20, VERIFY_DEPTH = 22;
   var START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   var RESULT = { "1-0": true, "0-1": true, "1/2-1/2": true, "*": true };
   var FILES = "abcdefgh";
@@ -142,37 +143,84 @@
     else return null;
     return side === "b" ? 1 - white : white;
   }
-  var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder"];
+  // CP scores are White-oriented. Mate remains a separate ordered outcome.
+  function centipawnLoss(best, played, side) {
+    if (!best || !played || !Number.isFinite(best.cp) || !Number.isFinite(played.cp)) return null;
+    return (side === "b" ? -1 : 1) * (best.cp - played.cp);
+  }
+  function moverScore(ev, side) {
+    if (ev && ev.mateWinner) return ev.mateWinner === (side || "w") ? Infinity : -Infinity;
+    return ev && Number.isFinite(ev.cp) ? ev.cp * (side === "b" ? -1 : 1) : null;
+  }
+  function scoresConflict(best, played, side, tolerance) {
+    var cp = centipawnLoss(best, played, side);
+    if (cp != null) return cp < -(tolerance || 20);
+    var a = moverScore(best, side), b = moverScore(played, side);
+    if (a == null || b == null) return true;
+    if (a !== b) return b > a;
+    if (!best.mateWinner) return false;
+    return best.mateWinner === (side || "w") ? Math.abs(played.mate) < Math.abs(best.mate) : Math.abs(played.mate) > Math.abs(best.mate);
+  }
+  var LABELS = ["Best", "Excellent", "Good", "OK", "Inaccuracy", "Mistake", "Blunder", "Disaster", "Catastrophe"];
   function objectiveLabel(loss) {
-    if (!Number.isFinite(loss) || loss < 0) throw new Error("Invalid expected-score loss");
-    if (loss <= 0.005) return "Best";
-    if (loss <= 0.02) return "Excellent";
-    if (loss <= 0.05) return "Good";
-    if (loss <= 0.075) return "OK";
-    if (loss <= 0.10) return "Inaccuracy";
-    if (loss <= 0.20) return "Mistake";
-    return "Blunder";
+    if (!Number.isFinite(loss) || loss < 0) throw new Error("Invalid centipawn loss");
+    if (loss <= 10) return "Best";
+    if (loss <= 25) return "Excellent";
+    if (loss <= 50) return "Good";
+    if (loss <= 75) return "OK";
+    if (loss <= 125) return "Inaccuracy";
+    if (loss <= 250) return "Mistake";
+    if (loss <= 500) return "Blunder";
+    return "Disaster";
+  }
+  function worsensShortMate(best, played, side) {
+    var opponent = side === "b" ? "w" : "b";
+    return !!(best && played && played.mateWinner === opponent && Number.isFinite(played.mate) &&
+      Math.abs(played.mate) >= 1 && Math.abs(played.mate) <= 5 &&
+      (best.mateWinner !== opponent || Math.abs(best.mate) > Math.abs(played.mate)));
   }
   function classify(input) {
     input = input || {};
-    var a = expectedScore(input.best, input.side), b = expectedScore(input.played, input.side);
-    var loss = a == null || b == null ? input.loss : a - b;
-    if (!Number.isFinite(loss)) throw new Error("Cannot classify an incomplete engine score");
-    if (loss < -0.015) throw new Error("Played move score conflicts with best score; deeper analysis needed");
-    loss = Math.max(0, loss);
-    var objective = objectiveLabel(loss), idx = LABELS.indexOf(objective), d = input.difficulty || {};
+    var loss = centipawnLoss(input.best, input.played, input.side), objective, mateChange = null;
+    if (loss == null && Number.isFinite(input.loss)) loss = input.loss;
+    if (loss != null) {
+      if (loss < -20) throw new Error("Played move score conflicts with best score; deeper analysis needed");
+      loss = Math.max(0, loss); objective = objectiveLabel(loss);
+    } else {
+      var best = input.best, played = input.played, side = input.side || "w", opponent = side === "w" ? "b" : "w";
+      if (!best || !played || !best.mateWinner && !played.mateWinner) throw new Error("Cannot classify an incomplete engine score");
+      if (scoresConflict(best, played, side)) throw new Error("Played move score conflicts with best score; deeper analysis needed");
+      if (best.mateWinner && best.mateWinner === played.mateWinner) {
+        var bestDistance = Math.abs(best.mate), playedDistance = Math.abs(played.mate);
+        mateChange = { winner: played.mateWinner, bestDistance: bestDistance, playedDistance: playedDistance };
+        objective = bestDistance === playedDistance ? "Best" : played.mateWinner === opponent ? "Blunder" : "Good";
+      } else if (played.mateWinner === opponent) objective = "Disaster";
+      else if (played.mateWinner === side) objective = "Best";
+      else {
+        var remaining = moverScore(played, side);
+        objective = remaining >= 300 ? "Inaccuracy" : remaining >= 0 ? "Mistake" : remaining >= -200 ? "Blunder" : "Disaster";
+      }
+    }
+    var opponent = input.side === "b" ? "w" : "b", mate = input.mateEvidence;
+    // Only verified, newly allowed or accelerated M1-M5 can earn the last tier.
+    if (worsensShortMate(input.best, input.played, input.side) && mate && mate.winner === opponent &&
+        Number.isInteger(mate.distance) && mate.distance >= 1 && mate.distance <= 5 &&
+        (input.best.mateWinner !== opponent || Math.abs(input.best.mate) > mate.distance) &&
+        mate.depth >= VERIFY_DEPTH && mate.bestDepth >= VERIFY_DEPTH) objective = "Catastrophe";
+    var idx = LABELS.indexOf(objective), d = input.difficulty || {};
     var discovery = d.discoverability === "very-hard" ? 2 : d.discoverability === "hard" ? 1 : 0;
     var natural = d.naturalness === "very-unnatural" ? 2 : d.naturalness === "unnatural" ? 1 : 0;
     var hard = discovery + natural + (d.delayed ? 1 : 0), adjustment = 0;
-    // A moderate, evidenced obstacle earns forgiveness. Downgrades require all ease signals.
     if (hard >= 1) adjustment = hard >= 4 ? 2 : 1;
-    if (!hard && d.discoverability === "very-easy" && d.naturalness === "very-natural" && d.immediate === true && loss >= 0.025) adjustment = -1;
-    var finalIdx = objective === "Best" ? 0 : Math.max(1, Math.min(6, idx - adjustment));
+    if (!hard && d.discoverability === "very-easy" && d.naturalness === "very-natural" && d.immediate === true && (loss >= 25 || idx >= 6)) adjustment = -1;
+    var worst = objective === "Catastrophe" ? 8 : 7;
+    var finalIdx = objective === "Best" ? 0 : Math.max(1, Math.min(worst, idx - adjustment));
     var label = LABELS[finalIdx];
-    if (input.brilliant === true && loss <= 0.02) label = "Brilliant";
-    else if (input.great === true && loss <= 0.02) label = "Great";
+    if (input.brilliant === true && idx <= 1) label = "Brilliant";
+    else if (input.great === true && idx <= 1) label = "Great";
     return { label: label, key: label.toLowerCase(), objectiveLabel: objective, adjustment: idx - finalIdx,
-      loss: loss, expectedBest: a, expectedPlayed: b, difficulty: d, version: VERSION };
+      lossCp: loss, lossPoints: loss == null ? null : loss / 100, mateChange: mateChange, model: "centipawn", difficulty: d,
+      mateEvidence: mate || null, version: VERSION };
   }
 
   function parseInfo(lines, turn, count) {
@@ -261,6 +309,12 @@
     return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
   }
   function historyKey(record, ply) { return (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" "); }
+  function isValidGrade(grade, record, index, engine) {
+    return !!(grade && record && record.moves && index >= 0 && index < record.moves.length &&
+      grade.version === VERSION && grade.model === "centipawn" && grade.depth >= GRADE_DEPTH &&
+      grade.config && grade.config.model === "centipawn" && grade.config.depth >= GRADE_DEPTH &&
+      grade.config.engine === engine && grade.historyKey === historyKey(record, index + 1));
+  }
   function abortError() { var error = new Error("Analysis cancelled"); error.name = "AbortError"; return error; }
 
   function Analyzer(workerFile) {
@@ -337,10 +391,10 @@
       if (forced && !pos.legal.includes(forced)) throw new Error("Cannot evaluate an illegal move");
       var count = forced ? 1 : Math.min(options.multiPV || 2, pos.legal.length);
       var lines = await request(["setoption name Clear Hash", "setoption name MultiPV value " + count,
-        positionCommand(record, ply), "go depth " + depth + (forced ? " searchmoves " + forced : "")], function (line) { return /^bestmove\b/.test(line); }, token, options.timeout || 25000);
+        positionCommand(record, ply), "go depth " + depth + (forced ? " searchmoves " + forced : "")], function (line) { return /^bestmove\b/.test(line); }, token, options.timeout || 120000);
       assertActive(token);
       var info = parseInfo(lines, pos.turn, count);
-      if (info.depth < depth && info.mate == null) throw new Error("Search stopped before the requested depth");
+      if (info.depth < depth) throw new Error("Search stopped before the requested depth");
       return info;
     }
     this.position = function (fen, moves) { return run(function (token) { return position({ startFen: fen, moves: moves || [] }, (moves || []).length, token); }); };
@@ -369,30 +423,55 @@
     this.grade = function (record, index, options) {
       options = options || {};
       return run(async function (token) {
-        var pos = await recordPosition(record, index, token), move = record.moves[index], depth = options.depth || 12;
+        var pos = await recordPosition(record, index, token), move = record.moves[index];
+        var baseDepth = Math.max(GRADE_DEPTH, options.depth || GRADE_DEPTH), depth = baseDepth;
         if (!pos.legal.includes(move)) throw new Error("No legal move at requested index");
         var best, played;
         for (var attempt = 0; attempt < 4; attempt++) {
           best = await evaluate(record, index, { depth: depth, multiPV: 2 }, token);
           played = best.alternatives.find(function (line) { return line.pv[0] === move; });
           if (!played) played = await evaluate(record, index, { depth: depth, searchmoves: move }, token);
-          if (expectedScore(played, pos.turn) <= expectedScore(best, pos.turn) + 0.005) break;
+          if (!scoresConflict(best, played, pos.turn, 10)) break;
           depth += 2;
         }
-        var before = expectedScore(best, pos.turn), after = expectedScore(played, pos.turn);
-        if (after > before + 0.015) throw new Error("Conflicting evaluations; try deeper analysis");
-        var loss = Math.max(0, before - after), difficulty = {}, raw = { best: best, played: played };
-        if (loss > 0.005) {
+        if (scoresConflict(best, played, pos.turn)) throw new Error("Conflicting evaluations; try deeper analysis");
+        var mateEvidence = null, mateConfirmation = null;
+        var opponent = pos.turn === "w" ? "b" : "w";
+        if (worsensShortMate(best, played, pos.turn)) {
+          // Recheck both the safe alternative and the actual resulting position.
+          var mateDepth = Math.max(VERIFY_DEPTH, depth);
+          best = await evaluate(record, index, { depth: mateDepth, multiPV: 2 }, token);
+          played = best.alternatives.find(function (line) { return line.pv[0] === move; }) ||
+            await evaluate(record, index, { depth: mateDepth, searchmoves: move }, token);
+          mateConfirmation = await evaluate(record, index + 1, { depth: mateDepth, multiPV: 1 }, token);
+          if (scoresConflict(best, played, pos.turn)) throw new Error("Conflicting evaluations; try deeper analysis");
+          if (mateConfirmation.mateWinner === opponent && Number.isFinite(mateConfirmation.mate)) {
+            mateEvidence = { winner: opponent, distance: Math.abs(mateConfirmation.mate),
+              depth: mateConfirmation.depth, bestDepth: best.depth };
+          }
+        }
+        if (best.depth < baseDepth || played.depth < baseDepth) throw new Error("Engine did not complete the requested grading depth");
+        var provisional = classify({ best: best, played: played, side: pos.turn, mateEvidence: mateEvidence });
+        var difficulty = {}, raw = { best: best, played: played };
+        if (mateConfirmation) raw.mateConfirmation = mateConfirmation;
+        if (provisional.objectiveLabel !== "Best") {
           var nextPos = await recordPosition(record, index + 1, token);
           if (nextPos.legal.length) {
             var shallow = await evaluate(record, index + 1, { depth: 4, multiPV: 1 }, token);
             var medium = await evaluate(record, index + 1, { depth: 7, multiPV: 1 }, token);
             var deep = await evaluate(record, index + 1, { depth: Math.max(10, depth - 1), multiPV: 1 }, token);
-            var unseen = expectedScore(deep, nextPos.turn) - expectedScore(shallow, nextPos.turn);
-            var mediumGap = expectedScore(deep, nextPos.turn) - expectedScore(medium, nextPos.turn);
+            var unseen = centipawnLoss(deep, shallow, nextPos.turn);
+            var mediumGap = centipawnLoss(deep, medium, nextPos.turn);
             var same = shallow.pv[0] === deep.pv[0] && medium.pv[0] === deep.pv[0];
+            // Seeing the same winning reply counts as discovery even if the
+            // shallow search has not yet proved the exact mate distance.
+            var recognized = same && moverScore(shallow, nextPos.turn) >= 200 && moverScore(medium, nextPos.turn) >= 200;
+            var hiddenMate = deep.mateWinner === nextPos.turn && shallow.mateWinner !== nextPos.turn && !recognized;
+            var stable = unseen != null && Math.abs(unseen) < 25 || deep.mateWinner === shallow.mateWinner && deep.mate === shallow.mate || recognized;
             var natural = naturalness(nextPos, deep.pv[0]);
-            difficulty.discoverability = unseen > 0.15 && mediumGap > 0.06 ? "very-hard" : unseen > 0.06 || mediumGap > 0.04 ? "hard" : same && Math.abs(unseen) < 0.025 ? "very-easy" : "normal";
+            if (hiddenMate && medium.mateWinner !== nextPos.turn || unseen > 150 && mediumGap > 60) difficulty.discoverability = "very-hard";
+            else if (hiddenMate || unseen > 60 || mediumGap > 40) difficulty.discoverability = "hard";
+            else difficulty.discoverability = same && stable ? "very-easy" : "normal";
             difficulty.naturalness = natural.category;
             if (natural.quiet && difficulty.discoverability === "very-hard") difficulty.naturalness = "unnatural";
             difficulty.delayed = difficulty.discoverability !== "very-easy" && delayedPayoff(nextPos, deep.pv);
@@ -403,7 +482,8 @@
           }
         }
         var great = false, brilliant = false, specialEvidence = null;
-        var alternative = best.alternatives[1], gap = alternative ? before - expectedScore(alternative, pos.turn) : 0;
+        var alternative = best.alternatives[1];
+        var gap = alternative ? moverScore(best, pos.turn) - moverScore(alternative, pos.turn) : 0;
         var afterPos = await recordPosition(record, index + 1, token);
         var accepts = afterPos.legal.filter(function (reply) {
           var square = reply.slice(2, 4), offered = afterPos.board[square];
@@ -411,24 +491,27 @@
             (square === move.slice(2, 4) || !attacked(pos.board, square, pos.turn === "b"));
         });
         var offer = accepts.length > 0 && !pos.inCheck;
-        var trivialWin = alternative && expectedScore(alternative, pos.turn) >= 0.85;
-        if (loss <= 0.02 && pos.legal.length > 1 && (gap > 0.10 || offer && !trivialWin)) {
-          var verifiedBest = await evaluate(record, index, { depth: Math.max(16, depth), multiPV: 2 }, token);
-          var verifiedPlayed = verifiedBest.alternatives.find(function (line) { return line.pv[0] === move; }) || await evaluate(record, index, { depth: Math.max(16, depth), searchmoves: move }, token);
-          var vb = expectedScore(verifiedBest, pos.turn), vp = expectedScore(verifiedPlayed, pos.turn), alt = verifiedBest.alternatives[1];
-          if (vb - vp <= 0.02 && vp - vb <= 0.015) {
-            great = !!alt && vb - expectedScore(alt, pos.turn) >= 0.12 && (vb >= 0.45 && expectedScore(alt, pos.turn) < 0.40 || vb >= 0.75 && expectedScore(alt, pos.turn) < 0.65);
-            if (offer && vb >= 0.48 && alt && expectedScore(alt, pos.turn) < 0.85) {
+        var trivialWin = alternative && moverScore(alternative, pos.turn) >= 500;
+        if (["Best", "Excellent"].includes(provisional.objectiveLabel) && pos.legal.length > 1 && (gap >= 125 || offer && !trivialWin)) {
+          var verifiedBest = await evaluate(record, index, { depth: Math.max(VERIFY_DEPTH, depth), multiPV: 2 }, token);
+          var verifiedPlayed = verifiedBest.alternatives.find(function (line) { return line.pv[0] === move; }) || await evaluate(record, index, { depth: Math.max(VERIFY_DEPTH, depth), searchmoves: move }, token);
+          var vb = moverScore(verifiedBest, pos.turn), vp = moverScore(verifiedPlayed, pos.turn), alt = verifiedBest.alternatives[1];
+          var verifiedGrade = classify({ best: verifiedBest, played: verifiedPlayed, side: pos.turn });
+          if (["Best", "Excellent"].includes(verifiedGrade.objectiveLabel)) {
+            best = verifiedBest; played = verifiedPlayed; raw.best = best; raw.played = played;
+            var altScore = alt ? moverScore(alt, pos.turn) : null;
+            great = !!alt && vb - altScore >= 125 && (vb >= -50 && altScore < -150 || vb >= 200 && altScore < 100);
+            if (offer && vb >= -50 && alt && altScore < 500) {
               var accepted = [], sound = true, meaningful = false;
               for (var ai = 0; ai < accepts.length; ai++) {
                 var reply = accepts[ai];
-                var acceptance = await evaluate(record, index + 1, { depth: Math.max(16, depth), searchmoves: reply }, token);
-                var compensation = expectedScore(acceptance, pos.turn);
+                var acceptance = await evaluate(record, index + 1, { depth: Math.max(VERIFY_DEPTH, depth), searchmoves: reply }, token);
+                var compensation = moverScore(acceptance, pos.turn);
                 var afterCapture = await position(record, index + 1, token, [reply]);
                 var response = acceptance.pv[1], returned = response ? applyBoard(afterCapture.board, response) : afterCapture.board;
                 var deficit = returned ? material(returned, pos.turn) - material(pos.board, pos.turn) : 0;
-                accepted.push({ reply: reply, expected: compensation, materialChange: deficit, depth: acceptance.depth });
-                if (compensation < 0.46 || compensation < vp - 0.04) sound = false;
+                accepted.push({ reply: reply, scoreCp: Number.isFinite(compensation) ? compensation : null, mateWinner: acceptance.mateWinner || null, materialChange: deficit, depth: acceptance.depth });
+                if (compensation < -50 || Number.isFinite(vp) && Number.isFinite(compensation) && vp - compensation > 50 || vp === Infinity && compensation !== Infinity) sound = false;
                 if (deficit <= -200) meaningful = true;
               }
               brilliant = sound && meaningful;
@@ -436,16 +519,17 @@
             }
           }
         }
-        var result = classify({ best: best, played: played, side: pos.turn, difficulty: difficulty, great: great, brilliant: brilliant });
+        var result = classify({ best: best, played: played, side: pos.turn, difficulty: difficulty,
+          mateEvidence: mateEvidence, great: great, brilliant: brilliant });
         return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv, depth: Math.min(best.depth, played.depth), raw: raw,
-          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1), config: { depth: options.depth || 12, engine: workerFile, version: VERSION },
-          configKey: VERSION + "|depth=" + (options.depth || 12) + "|engine=" + workerFile });
+          specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1), config: { model: "centipawn", depth: baseDepth, engine: workerFile, version: VERSION },
+          configKey: VERSION + "|depth=" + baseDepth + "|engine=" + workerFile });
       });
     };
     this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
     this.dispose = function () { disposed = true; self.cancel(); };
   }
   return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
-    objectiveLabel: objectiveLabel, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey,
+    objectiveLabel: objectiveLabel, centipawnLoss: centipawnLoss, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey, isValidGrade: isValidGrade,
     attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, Analyzer: Analyzer };
 }));
