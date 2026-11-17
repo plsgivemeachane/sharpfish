@@ -18,6 +18,12 @@
       "slug": "scp-096",
       "title": "SCP-096",
       "description": "Stockfish but SCP-096 stalks the board and eats pieces it sees."
+    },
+    {
+      "branch": "sufferfish",
+      "slug": "sufferfish",
+      "title": "Sufferfish",
+      "description": "Plays near-perfect chess but avoids captures: picks the best quiet move unless a capture is clearly better."
     }
   ]
 }

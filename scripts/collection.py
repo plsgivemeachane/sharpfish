@@ -150,7 +150,8 @@ def build():
                     path='/variants/' + entry['slug'] + '/',
                     badgePath='assets/' + entry['commit'] + '/badges/',
                     soundPath='assets/' + entry['commit'] + '/sounds/',
-                    supported=entry['slug'] in ('classic', 'elo-ladder'),
+                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish'),
+                    analysisMode='standard-snapshot' if entry['slug'] in ('alternating-colors', 'scp-096') else 'standard-line',
                     revision=entry['commit'])) + ';\n'
                 selector.write_text(content)
             for page_name in ('index.html', 'analysis.html'):

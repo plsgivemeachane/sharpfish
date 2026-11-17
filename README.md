@@ -3,9 +3,10 @@
 Sharpfish is a browser chess collection built on Stockfish.js. Play online at
 [sharpfish.yuzukateam.io.vn](https://sharpfish.yuzukateam.io.vn/).
 
-- **Classic** and **Elo ladder** offer standard chess with a roster of opponents.
+- **Classic** includes the former Elo ladder and offers standard chess with a roster of opponents.
 - **Alternating colors** requires the engine to alternate the color of its destination squares, except when it is in check.
 - **SCP-096** adds an uncapturable piece that blocks lines. After Black moves, it eats one randomly chosen piece that attacks its current square; a king sees adjacent squares. Losing a king to SCP-096 ends the game.
+- **Sufferfish** prefers the best quiet move among its top five choices, but captures when avoiding the best move costs over 30 centipawns or worsens a mate outcome.
 
 Choose a bot and play in your browser. The default think time is two seconds;
 bots take at least 2.1 seconds per move to leave time for premoves. You can
