@@ -1054,7 +1054,7 @@ function render() {
   var projecting = !shown && premoves.length > 0;
   if (projecting) board = premoveBoard(board);
 
-  var html = "";
+  var html = "", shownGradeKey = "";
   for (var row = 0; row < 8; row++) {
     for (var col = 0; col < 8; col++) {
       var file = flipped ? 7 - col : col;
@@ -1085,6 +1085,7 @@ function render() {
           window.SFAnalysis && window.SFAnalysis.isValidGrade(grade, record, moveIndex, window.STOCK_ENGINE_FILE, window.SFLive ? SFLive.specialMoves() : true);
         if (gradeVisible) {
           var gradeKey = String(grade.label || grade.objectiveLabel || "").toLowerCase().replace(/[^a-z]+/g, "-");
+          shownGradeKey = gradeKey;
           html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="' + BADGE_ROOT + gradeKey + '.png" alt="' +
             grade.label + '" title="' + grade.label + '" aria-label="' + grade.label + '">';
         }
@@ -1099,6 +1100,7 @@ function render() {
   shownPremoves = projecting;
   shownBoard = board;
   boardEl.innerHTML = html;
+  if (shownGradeKey) boardEl.dataset.grade = shownGradeKey; else delete boardEl.dataset.grade;
   applyAnims();
   // The board DOM changes when the bot moves, but the user's pointer capture
   // and ghost belong to the ongoing gesture. Rebind its source image.
