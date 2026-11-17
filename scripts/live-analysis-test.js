@@ -11,7 +11,7 @@ const context = {
     historyKey: (record, ply) => record.moves.slice(0, ply).join(" "),
     isValidGrade: (grade, record, index, engine, specialMoves) => !!grade && grade.specialMoves === specialMoves,
     Analyzer: class {
-      grade(record, index, options) { return new Promise((resolve, reject) => { this.reject = reject; pending.push({ index, options, resolve }); }); }
+      grade(record, index, options) { return new Promise((resolve, reject) => { this.reject = reject; pending.push({ index, options, resolve, reject }); }); }
       dispose() { if (this.reject) this.reject(Object.assign(new Error("cancelled"), { name: "AbortError" })); }
     }
   },
@@ -41,5 +41,29 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   await settle();
   assert.equal(pending.length, count, "turning grading off cancels instead of draining the backlog");
   assert(saved.length > 0);
-  console.log("PASS latest-first live grading, ordinary-grade toggle, persistence and cancellation");
+  pending.length = 0;
+  live.schedule({ id: "retry-game", revision: 1, moves: ["Be2", "reply"], grades: {} });
+  live.toggle(true);
+  pending.shift().resolve({ specialMoves: false });
+  await settle();
+  assert.equal(pending[0].index, 0);
+  pending.shift().reject(new Error("temporary engine failure"));
+  await settle();
+  assert.equal(pending[0].index, 0, "a failed Be2 grade is retried automatically");
+  pending.shift().resolve({ specialMoves: false });
+  await settle();
+  assert.equal(statuses.at(-1), "Moves graded");
+  live.cancel();
+  live.schedule({ id: "bounded", revision: 1, moves: ["old-line"], grades: {} });
+  pending.shift().reject(new Error("persistent failure"));
+  await settle();
+  pending.shift().reject(new Error("persistent failure"));
+  await settle();
+  assert.equal(pending.length, 0, "persistent failures stop after two bounded attempts");
+  assert.match(statuses.at(-1), /could not be graded/);
+  live.schedule({ id: "bounded", revision: 2, moves: ["new-line"], grades: {} });
+  assert.equal(pending[0].index, 0, "a failure at the same index on an old line does not skip a new move");
+  live.toggle(false);
+  await settle();
+  console.log("PASS latest-first live grading, settings, persistence, cancellation, automatic failed-move retry, bounded errors and changed-line recovery");
 })().catch(error => { console.error(error); process.exitCode = 1; });

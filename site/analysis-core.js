@@ -6,8 +6,9 @@
 }(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var VERSION = "1.2.0";
+  var VERSION = "1.3.0";
   var GRADE_TIME_MS = 2000;
+  function gradeTime(value) { return Number.isFinite(value) ? Math.max(1000, Math.min(30000, Math.floor(value))) : GRADE_TIME_MS; }
   function now() { return typeof performance === "object" ? performance.now() : Date.now(); }
   var START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   var RESULT = { "1-0": true, "0-1": true, "1/2-1/2": true, "*": true };
@@ -153,6 +154,8 @@
     if (ev && ev.mateWinner) return ev.mateWinner === (side || "w") ? Infinity : -Infinity;
     return ev && Number.isFinite(ev.cp) ? ev.cp * (side === "b" ? -1 : 1) : null;
   }
+  // Keep ordinary/lost positions linear; compress the surplus of a large win.
+  function qualityScore(cp) { return cp <= 300 ? cp : 300 + 100 * Math.log1p((cp - 300) / 100); }
   function scoresConflict(best, played, side, tolerance) {
     var cp = centipawnLoss(best, played, side);
     if (cp != null) return cp < -(tolerance || 20);
@@ -182,11 +185,15 @@
   }
   function classify(input) {
     input = input || {};
-    var loss = centipawnLoss(input.best, input.played, input.side), objective, mateChange = null;
+    var loss = centipawnLoss(input.best, input.played, input.side), qualityLoss = null, objective, mateChange = null;
     if (loss == null && Number.isFinite(input.loss)) loss = input.loss;
     if (loss != null) {
       if (loss < -20) throw new Error("Played move score conflicts with best score; deeper analysis needed");
-      loss = Math.max(0, loss); objective = objectiveLabel(loss);
+      loss = Math.max(0, loss); qualityLoss = loss;
+      if (input.best && input.played && Number.isFinite(input.best.cp) && Number.isFinite(input.played.cp) && !input.best.mateWinner && !input.played.mateWinner) {
+        qualityLoss = Math.max(0, qualityScore(moverScore(input.best, input.side)) - qualityScore(moverScore(input.played, input.side)));
+      }
+      objective = objectiveLabel(qualityLoss);
     } else {
       var best = input.best, played = input.played, side = input.side || "w", opponent = side === "w" ? "b" : "w";
       if (!best || !played || !best.mateWinner && !played.mateWinner) throw new Error("Cannot classify an incomplete engine score");
@@ -220,7 +227,7 @@
     if (input.brilliant === true && idx <= 1) label = "Brilliant";
     else if (input.great === true && idx <= 1) label = "Great";
     return { label: label, key: label.toLowerCase(), objectiveLabel: objective, adjustment: idx - finalIdx,
-      lossCp: loss, lossPoints: loss == null ? null : loss / 100, mateChange: mateChange, model: "centipawn", difficulty: d,
+      lossCp: loss, qualityLossCp: qualityLoss, lossPoints: loss == null ? null : loss / 100, mateChange: mateChange, model: "centipawn", difficulty: d,
       mateEvidence: mate || null, version: VERSION };
   }
 
@@ -249,6 +256,41 @@
     for (var i = 1; i <= count; i++) result.alternatives.push(depths[completed][i]);
     result.scoreText = result.mate != null ? (result.mateWinner === "b" ? "−M" : "M") + Math.abs(result.mate) :
       (result.cp >= 0 ? "+" : "") + (result.cp / 100).toFixed(2);
+    return result;
+  }
+
+  // Match performance v1: an explicit heuristic, independent of human labels.
+  // Mate transitions use the objective tier's loss proxy, never its adjusted label.
+  var MATE_PERFORMANCE_LOSS = { Best: 0, Good: 40, Inaccuracy: 100, Mistake: 180, Blunder: 350, Disaster: 700, Catastrophe: 1000 };
+  function performanceLoss(grade) {
+    if (!grade) return null;
+    if (Number.isFinite(grade.qualityLossCp) && grade.qualityLossCp >= 0) return Math.min(1000, grade.qualityLossCp);
+    if (Number.isFinite(grade.lossCp) && grade.lossCp >= 0) return Math.min(1000, grade.lossCp);
+    var raw = grade.raw;
+    if (raw && raw.best && raw.played && (raw.best.mateWinner || raw.played.mateWinner) &&
+        Object.prototype.hasOwnProperty.call(MATE_PERFORMANCE_LOSS, grade.objectiveLabel)) return MATE_PERFORMANCE_LOSS[grade.objectiveLabel];
+    return null;
+  }
+  function performanceSummary(record, grades) {
+    function empty() { return { total: 0, analyzed: 0, decisions: 0, accuracy: null, elo: null, averageLossCp: null }; }
+    var result = { w: empty(), b: empty(), minDecisions: 5 }, sums = { w: { accuracy: 0, loss: 0 }, b: { accuracy: 0, loss: 0 } };
+    var initial = record && record.startFen ? parseBoard(record.startFen).turn : "w";
+    ((record && record.moves) || []).forEach(function (_, index) {
+      var pos = record.boards && record.boards[index], side = pos && pos.turn || (index % 2 ? initial === "w" ? "b" : "w" : initial);
+      var player = result[side], loss = performanceLoss(grades && grades[index]);
+      player.total++;
+      if (loss == null) return;
+      player.analyzed++; sums[side].accuracy += 100 * Math.exp(-loss / 200);
+      if (pos && Array.isArray(pos.legal) && pos.legal.length > 1) { player.decisions++; sums[side].loss += loss; }
+    });
+    ["w", "b"].forEach(function (side) {
+      var player = result[side];
+      if (player.analyzed) player.accuracy = sums[side].accuracy / player.analyzed;
+      if (player.decisions) player.averageLossCp = sums[side].loss / player.decisions;
+      if (player.analyzed === player.total && player.decisions >= result.minDecisions) {
+        player.elo = Math.round(Math.max(100, Math.min(2800, 2800 - 700 * Math.log1p(player.averageLossCp / 10))) / 50) * 50;
+      }
+    });
     return result;
   }
 
@@ -310,10 +352,10 @@
     return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
   }
   function historyKey(record, ply) { return (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" "); }
-  function isValidGrade(grade, record, index, engine, specialMoves) {
+  function isValidGrade(grade, record, index, engine, specialMoves, movetime) {
     return !!(grade && record && record.moves && index >= 0 && index < record.moves.length &&
       grade.version === VERSION && grade.model === "centipawn" && grade.depth > 0 &&
-      grade.config && grade.config.model === "centipawn" && grade.config.movetime === GRADE_TIME_MS &&
+      grade.config && grade.config.model === "centipawn" && grade.config.movetime === gradeTime(movetime) &&
       grade.config.specialMoves === (specialMoves !== false) &&
       grade.config.engine === engine && grade.historyKey === historyKey(record, index + 1));
   }
@@ -431,21 +473,22 @@
     this.grade = function (record, index, options) {
       options = options || {};
       return run(async function (token) {
-        var started = now(), deadline = started + GRADE_TIME_MS;
-        var pos = await recordPosition(record, index, token, GRADE_TIME_MS + 200), move = record.moves[index];
+        var budget = gradeTime(options.movetime), scale = budget / GRADE_TIME_MS;
+        var started = now(), deadline = started + budget;
+        var pos = await recordPosition(record, index, token, budget + 200), move = record.moves[index];
         if (!pos.legal.includes(move)) throw new Error("No legal move at requested index");
         async function search(ply, quota, settings) {
           var remaining = Math.floor(deadline - now());
           if (remaining < 10) return null;
           return evaluate(record, ply, Object.assign({}, settings, { movetime: Math.min(quota, remaining), timeout: remaining + 200 }), token);
         }
-        var root = await search(index, 800, { multiPV: 2 });
+        var root = await search(index, 800 * scale, { multiPV: 2 });
         if (!root) throw new Error("Analysis budget expired before the position was evaluated");
         var best = root, played = root.alternatives.find(function (line) { return line.pv[0] === move; });
         if (!played) {
           // Compare both candidates in the same completed MultiPV iteration.
           // Separate forced searches can disagree even at the same depth.
-          best = await search(index, 600, { multiPV: 2, searchmoves: [root.pv[0], move], keepHash: true });
+          best = await search(index, 600 * scale, { multiPV: 2, searchmoves: [root.pv[0], move], keepHash: true });
           if (!best) throw new Error("Analysis budget expired before the played move was evaluated");
           played = best.alternatives.find(function (line) { return line.pv[0] === move; });
         }
@@ -455,7 +498,7 @@
         var afterPos = await recordPosition(record, index + 1, token, Math.max(1, deadline - now()) + 200);
         var mateEvidence = null, difficulty = {}, opponent = pos.turn === "w" ? "b" : "w";
         if (provisional.objectiveLabel !== "Best" && afterPos.legal.length) {
-          var deep = await search(index + 1, 300, { multiPV: 1 });
+          var deep = await search(index + 1, 300 * scale, { multiPV: 1 });
           if (deep && worsensShortMate(best, played, pos.turn)) {
             raw.mateConfirmation = deep;
             if (deep.mateWinner === opponent && Number.isFinite(deep.mate)) {
@@ -506,7 +549,7 @@
           if (accepts.length) {
             var accepted = [], sound = true, meaningful = false;
             for (var ai = 0; ai < accepts.length; ai++) {
-              var reply = accepts[ai], quota = Math.min(400, Math.floor((deadline - now()) / (accepts.length - ai)));
+              var reply = accepts[ai], quota = Math.min(400 * scale, Math.floor((deadline - now()) / (accepts.length - ai)));
               var acceptance = await search(index + 1, quota, { searchmoves: reply, multiPV: 1 });
               if (!acceptance) { sound = false; break; }
               var compensation = moverScore(acceptance, pos.turn);
@@ -526,8 +569,8 @@
         return Object.assign(result, { bestMove: best.pv[0], playedMove: move, pv: best.pv,
           depth: Math.min(best.depth, played.depth), elapsedMs: Math.round(now() - started), raw: raw,
           specialEvidence: specialEvidence, historyKey: historyKey(record, index + 1),
-          config: { model: "centipawn", movetime: GRADE_TIME_MS, specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION },
-          configKey: VERSION + "|movetime=" + GRADE_TIME_MS + "|specialMoves=" + (options.specialMoves !== false) + "|engine=" + workerFile });
+          config: { model: "centipawn", movetime: budget, specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION },
+          configKey: VERSION + "|movetime=" + budget + "|specialMoves=" + (options.specialMoves !== false) + "|engine=" + workerFile });
       });
     };
     this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
@@ -535,5 +578,6 @@
   }
   return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
     objectiveLabel: objectiveLabel, centipawnLoss: centipawnLoss, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey, isValidGrade: isValidGrade,
-    attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, sanCore: sanCore, Analyzer: Analyzer };
+    attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, sanCore: sanCore,
+    performanceSummary: performanceSummary, Analyzer: Analyzer };
 }));
