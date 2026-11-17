@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const core = require("../site/analysis-core.js");
 
-assert.equal(core.VERSION, "1.1.0");
+assert.equal(core.VERSION, "1.2.0");
 const parsed = core.parsePgn('[Event "Test"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 1-0');
 assert.deepEqual(parsed.tokens, ["e4", "e5", "Nf3", "Nc6"]);
 assert.equal(parsed.result, "1-0");
@@ -36,12 +36,12 @@ assert.equal(core.classify({ best: { cp: 400 }, played: { cp: 398 }, brilliant: 
 assert.notEqual(core.classify({ loss: 900, brilliant: true }).label, "Brilliant", "unsound material offers cannot earn Brilliant");
 const shortMate = {
   side: "w", best: { cp: 0, depth: 22 }, played: { mate: -5, mateWinner: "b", depth: 22 },
-  mateEvidence: { winner: "b", distance: 5, depth: 22, bestDepth: 22 }
+  mateEvidence: { winner: "b", distance: 5, depth: 12, bestDepth: 11, confirmed: true }
 };
 assert.equal(core.classify(shortMate).label, "Catastrophe", "M5 is included");
 assert.equal(core.classify({ ...shortMate, played: { mate: -1, mateWinner: "b" }, mateEvidence: { ...shortMate.mateEvidence, distance: 1 } }).label, "Catastrophe", "M1 is included");
 assert.equal(core.classify({ ...shortMate, mateEvidence: null }).label, "Disaster", "unconfirmed mate is not Catastrophe");
-assert.equal(core.classify({ ...shortMate, mateEvidence: { ...shortMate.mateEvidence, depth: 21 } }).label, "Disaster");
+assert.equal(core.classify({ ...shortMate, mateEvidence: { ...shortMate.mateEvidence, confirmed: false } }).label, "Disaster");
 assert.equal(core.classify({ ...shortMate, mateEvidence: { ...shortMate.mateEvidence, distance: 6 } }).label, "Disaster", "M6 is excluded");
 assert.equal(core.classify({ ...shortMate, played: { mate: -6, mateWinner: "b" } }).label, "Disaster", "both searches must confirm M5 or shorter");
 assert.equal(core.classify({ ...shortMate, best: { mate: -5, mateWinner: "b" } }).label, "Best", "preserving the best mate distance does not create a new catastrophe");
@@ -56,11 +56,13 @@ assert.equal(core.centipawnLoss({ mate: 3, mateWinner: "w" }, { mate: 1, mateWin
 assert.throws(() => core.classify({ best: { cp: 0 }, played: { cp: 100 } }), /conflict/);
 assert.throws(() => core.classify({ best: { wdl: [1000, 0, 0] }, played: { wdl: [1000, 0, 0] } }), /incomplete/, "WDL alone cannot determine the new grade");
 const cachedRecord = { moves: ["e2e4"] };
-const cachedGrade = { version: core.VERSION, model: "centipawn", depth: 20, historyKey: core.historyKey(cachedRecord, 1), config: { model: "centipawn", depth: 20, engine: "test-engine" } };
+const cachedGrade = { version: core.VERSION, model: "centipawn", depth: 8, historyKey: core.historyKey(cachedRecord, 1), config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: "test-engine" } };
 assert(core.isValidGrade(cachedGrade, cachedRecord, 0, "test-engine"));
+assert(!core.isValidGrade(cachedGrade, cachedRecord, 0, "test-engine", false), "special-grade settings are part of the cache identity");
+assert(core.isValidGrade({ ...cachedGrade, config: { ...cachedGrade.config, specialMoves: false } }, cachedRecord, 0, "test-engine", false));
 for (const broken of [
-  { ...cachedGrade, version: "1.0.0" }, { ...cachedGrade, depth: 12 }, { ...cachedGrade, model: "expected-score" },
-  { ...cachedGrade, config: { ...cachedGrade.config, depth: 12 } }, { ...cachedGrade, config: { engine: "test-engine" } },
+  { ...cachedGrade, version: "1.0.0" }, { ...cachedGrade, depth: 0 }, { ...cachedGrade, model: "expected-score" },
+  { ...cachedGrade, config: { ...cachedGrade.config, movetime: 100 } }, { ...cachedGrade, config: { engine: "test-engine" } },
   { ...cachedGrade, historyKey: "another game" }
 ]) assert.equal(core.isValidGrade(broken, cachedRecord, 0, "test-engine"), false);
 assert.equal(core.isValidGrade(cachedGrade, cachedRecord, 0, "other-engine"), false);

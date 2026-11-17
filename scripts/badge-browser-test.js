@@ -27,16 +27,18 @@ async function assertBadgeAssets(page) {
     await page.locator("#pgn-input").fill("1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O *");
     await page.locator("#analyze").click();
     await page.waitForFunction(() => document.querySelectorAll("#moves li").length === 7, null, { timeout: 30000 });
+    // Grading starts automatically; stop it so real results cannot race the seeded grades.
+    await page.locator("#grade-toggle").uncheck();
     const setup = await page.evaluate(async () => {
       const rec = (await SFHistory.list())[0];
       const grades = {};
-      [0, 1, 6].forEach((index, n) => { grades[index] = { label: ["Good", "Excellent", "Catastrophe"][n], objectiveLabel: ["Good", "Excellent", "Catastrophe"][n], version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: SFAnalysis.historyKey(rec, index + 1), config: { model: "centipawn", depth: 20, engine: STOCK_ENGINE_FILE } }; });
+      [0, 1, 6].forEach((index, n) => { grades[index] = { label: ["Good", "Excellent", "Catastrophe"][n], objectiveLabel: ["Good", "Excellent", "Catastrophe"][n], version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: SFAnalysis.historyKey(rec, index + 1), config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: STOCK_ENGINE_FILE } }; });
       await SFHistory.updateGrades(rec.id, rec.revision, grades);
       return { id: rec.id, revision: rec.revision };
     });
     await page.goto(`${origin}/analysis.html?game=${encodeURIComponent(setup.id)}`);
     await page.waitForFunction(() => document.querySelectorAll("#moves li").length === 7);
-    await page.locator("#grade-toggle").check();
+    assert.equal(await page.locator("#grade-toggle").isChecked(), true, "reopened review grades by default");
     await page.locator("#moves li").nth(6).click();
     await page.waitForSelector('.move-grade-overlay[src*="catastrophe.png"]');
     assert.equal(await page.locator(".move-grade-overlay").count(), 1);
@@ -64,7 +66,7 @@ async function assertBadgeAssets(page) {
     await asyncReview.locator("#analyze").click();
     await asyncReview.waitForFunction(() => document.querySelectorAll("#moves li").length === 1, null, { timeout: 30000 });
     await asyncReview.locator("#moves li").click();
-    await asyncReview.locator("#grade-toggle").check();
+    assert.equal(await asyncReview.locator("#grade-toggle").isChecked(), true, "imported review grades without a click");
     await asyncReview.waitForSelector(".move-grade-overlay", { timeout: 180000 });
     assert(await asyncReview.locator(".move-grade-overlay").getAttribute("aria-label"), "real async grade appears on selected review move");
     await asyncReview.close();
@@ -80,13 +82,13 @@ async function assertBadgeAssets(page) {
     const beforeGrade = await liveCell.evaluate(el => ({ x: el.getBoundingClientRect().x, slot: el.querySelector(".move-grade-slot").getBoundingClientRect().right }));
     const liveMeta = await live.evaluate(async () => { const rows = await SFHistory.list(); const rec = rows.find(row => row.moves && row.moves.length === 1); if (!rec) throw new Error("live game was not saved"); return { id: rec.id, revision: rec.revision, key: SFAnalysis.historyKey(rec, 1), engine: STOCK_ENGINE_FILE }; });
     await live.locator("#chk-grade").check();
-    await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Good", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", depth: 20, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
+    await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Good", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
     await live.waitForSelector('.move-grade-overlay[src*="good.png"]');
     assert.equal(await live.locator(".move-grade-overlay").getAttribute("aria-label"), "Good");
     await assertBadgeAssets(live);
     const afterGood = await liveCell.evaluate(el => ({ x: el.getBoundingClientRect().x, slot: el.querySelector(".move-grade-slot").getBoundingClientRect().right }));
     assert.deepEqual(afterGood, beforeGrade, "live SAN stays fixed when a grade arrives");
-    await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Catastrophe", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", depth: 20, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
+    await live.evaluate(meta => SFAppHooks.setGrade(0, { label: "Catastrophe", version: SFAnalysis.VERSION, model: "centipawn", depth: 20, historyKey: meta.key, config: { model: "centipawn", movetime: 2000, specialMoves: true, engine: meta.engine } }, meta.id, meta.revision), liveMeta);
     await live.waitForSelector('.move-grade-overlay[src*="catastrophe.png"]');
     const afterCatastrophe = await liveCell.evaluate(el => ({ x: el.getBoundingClientRect().x, slot: el.querySelector(".move-grade-slot").getBoundingClientRect().right }));
     assert.deepEqual(afterCatastrophe, beforeGrade, "live SAN stays fixed across grade tiers");
