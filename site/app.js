@@ -258,8 +258,8 @@ function engineMove() {
       if (token !== game.token || l.indexOf("info depth") !== 0) return;
       if (/ multipv (?!1 )\d+/.test(l)) return; // weak bots score every move; show the main line
       var depth = (l.match(/ depth (\d+)/) || [])[1];
-      var score = formatScore(l, turn);
-      if (score) $("engine-line").textContent = "Depth " + depth + " · eval " + score;
+      // Show search progress only; the bot's own score would hint at its plan.
+      if (depth && formatScore(l, turn)) $("engine-line").textContent = "Depth " + depth;
     }
   ).then(async function (lines) {
     if (token !== game.token) return;
@@ -271,8 +271,6 @@ function engineMove() {
     if (token !== game.token) return;
     thinking = false;
     var best = lines[lines.length - 1].split(" ")[1];
-    var secs = ((performance.now() - started) / 1000).toFixed(1);
-    $("engine-line").textContent += " · " + secs + " s";
     if (best && best !== "(none)") playMove(best);
     else render();
   });
