@@ -145,14 +145,9 @@ const inject = (page, index, label, special) => page.evaluate(([src, index, labe
     assert.equal(await page.locator(".move-grade-overlay").evaluate(e => e.closest(".sq").dataset.sq), "e4", "badge stays on destination after flip");
     assert.equal(await page.locator("#evalbar").evaluate(e => e.classList.contains("flipped")), true, "eval bar follows orientation");
     await snap("flipped-drawings");
-    await page.locator("#clear-shapes").click();
-    assert.equal(await page.locator("#shapes g").count(), 0, "clear removes drawings");
-    // Touch-friendly drawing: left/touch input draws only while Draw is on.
-    await page.locator("#draw-mode").click();
-    const fb = await page.locator("#board").boundingBox(), fs = fb.width / 8;
-    await page.mouse.move(fb.x + fs * 0.5, fb.y + fs * 0.5); await page.mouse.down(); await page.mouse.move(fb.x + fs * 2.5, fb.y + fs * 0.5, { steps: 4 }); await page.mouse.up();
-    assert.equal(await shape(page, "h1f1").count(), 1, "draw mode drags an arrow with the primary pointer (flipped squares)");
-    await page.locator("#draw-mode").click();
+    await page.locator('.sq[data-sq="a1"]').click();
+    assert.equal(await page.locator("#shapes g").count(), 0, "left-click clears drawings");
+    await page.locator('.sq[data-sq="c4"]').click({ button: "right" });
     await page.keyboard.press("ArrowLeft");
     assert.equal(await page.locator("#shapes g").count(), 0, "navigating to another position clears drawings");
     await page.keyboard.press("f");
@@ -237,6 +232,6 @@ const inject = (page, index, label, special) => page.evaluate(([src, index, labe
 
     assert.deepEqual(errors, [], `browser errors: ${errors.join("; ")}`);
     assert.deepEqual(failed, [], `failed resources: ${failed.join("; ")}`);
-    console.log("PASS review board geometry (desktop/320px, eval on/off), default-on analysis, slide/castle/capture/promotion/reverse/quick replay, motion survives grading, reduced motion, arrows/circles/draw mode/clear/flip, Great/Brilliant persistence and stale rejection, immutable record, custom variants, live preference");
+    console.log("PASS review board geometry (desktop/320px, eval on/off), default-on analysis, slide/castle/capture/promotion/reverse/quick replay, motion survives grading, reduced motion, mouse arrows/circles/clear/flip, Great/Brilliant persistence and stale rejection, immutable record, custom variants, live preference");
   } finally { await context.close(); await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
