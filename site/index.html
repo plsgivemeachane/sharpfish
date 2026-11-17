@@ -104,6 +104,9 @@
         </select>
       </label>
       <div class="hint">Bots take at least 2.1 seconds per move, even when their search finishes sooner.</div>
+      <label class="field">Sound effects
+        <input type="checkbox" id="chk-sound" checked>
+      </label>
       <label class="field">Eval bar (stock Stockfish)
         <input type="checkbox" id="chk-eval">
       </label>
@@ -123,6 +126,7 @@
 </main>
 
 <footer class="foot">
+  Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).
   Engine: <a href="https://github.com/official-stockfish/Stockfish">Stockfish</a>
   via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, GPLv3.
   Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a>
@@ -133,6 +137,7 @@
 <script src="analysis-core.js"></script>
 <script src="game-history.js"></script>
 <script src="live-analysis.js"></script>
+<script src="sound.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

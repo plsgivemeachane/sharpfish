@@ -31,6 +31,8 @@ History list, PGN paste/file input, readonly replay board, move list with labels
 
 ## Accessibility
 Semantic headings and landmarks, visible keyboard focus, descriptive links, high-contrast text, minimum 44px touch links.
+Move grades include visible text rather than color alone. Replay supports keyboard controls; file/paste errors and analysis progress have accessible status messages. Respect reduced motion.
+Play and review have a labelled Sound effects switch, on by default with one shared local preference across variants. Short local samples accompany completed moves, captures, checks, castling, promotions, explicit new games and game endings. Replay navigation sounds once per action; importing games, flipping, drawing, grading and evaluation updates stay silent. Audio unlocks after user interaction and never blocks play; muting stops pending and active sounds.
 
 ## Responsive behavior
 Cards adapt from three columns to two and then one using available width. No horizontal overflow at 320px.
