@@ -84,7 +84,7 @@ assert.equal(core.isValidGrade(cachedGrade, cachedRecord, 0, "other-engine"), fa
 assert.throws(() => core.classify({}), /incomplete/);
 assert.throws(() => core.parsePgn("1.e4 }"), /comment/);
 assert.throws(() => core.parsePgn('1. e4 *\n[Event "Second"]\n1. d4 *'), /one game/);
-assert.throws(() => core.parsePgn('[Variant "Atomic"]\n1. e4 *'), /Unsupported/);
+assert.equal(core.parsePgn('[Variant "Atomic"]\n1. e4 *').atomic, true);
 assert.equal(core.parsePgn('1.e4 e5 2.Nf3 *').tokens.length, 3);
 assert.throws(() => core.parseBoard("7k/8/8/8/8/8/8/K7 w K - 0 1"), /castling/);
 assert.throws(() => core.parseBoard("7k/8/8/8/8/8/8/K7 w - e6 0 1"), /en-passant/);

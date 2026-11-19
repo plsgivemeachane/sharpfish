@@ -25,7 +25,9 @@
   function normalizeSan(s) {
     return String(s).trim().replace(/[!?]+$/g, "").replace(/[+#]+$/g, "").replace(/0/g, "O").replace(/e\.p\.?$/i, "");
   }
-  function parseBoard(fen) {
+  function parseBoard(fen, options) {
+    options = options || {};
+    var atomic = options.atomic === true;
     var p = String(fen).trim().split(/\s+/);
     if (p.length < 4 || p.length > 6 || !/^[wb]$/.test(p[1])) fail("Invalid FEN");
     var board = {};
@@ -42,9 +44,12 @@
       if (file !== 8) fail("Invalid FEN rank");
     });
     var squares = Object.keys(board);
-    if (squares.filter(function (sq) { return board[sq] === "K"; }).length !== 1 || squares.filter(function (sq) { return board[sq] === "k"; }).length !== 1) fail("FEN must contain exactly one king per side");
+    var whiteKings = squares.filter(function (sq) { return board[sq] === "K"; }).length;
+    var blackKings = squares.filter(function (sq) { return board[sq] === "k"; }).length;
+    if (atomic ? (whiteKings > 1 || blackKings > 1 || whiteKings + blackKings === 0) : (whiteKings !== 1 || blackKings !== 1)) fail(atomic ? "Invalid Atomic FEN king count" : "FEN must contain exactly one king per side");
+    if (atomic && whiteKings + blackKings === 1 && ((whiteKings === 0 && p[1] !== "w") || (blackKings === 0 && p[1] !== "b"))) fail("Invalid Atomic terminal side to move");
     var wk = squares.filter(function (sq) { return board[sq] === "K"; })[0], bk = squares.filter(function (sq) { return board[sq] === "k"; })[0];
-    if (Math.abs(FILES.indexOf(wk[0]) - FILES.indexOf(bk[0])) <= 1 && Math.abs(+wk[1] - +bk[1]) <= 1) fail("FEN kings may not be adjacent");
+    if (!atomic && wk && bk && Math.abs(FILES.indexOf(wk[0]) - FILES.indexOf(bk[0])) <= 1 && Math.abs(+wk[1] - +bk[1]) <= 1) fail("FEN kings may not be adjacent");
     if (p[2] !== "-" && (!/^[KQkq]+$/.test(p[2]) || /(.).*\1/.test(p[2]))) fail("Invalid FEN castling rights");
     if (p[3] !== "-" && !/^[a-h][36]$/.test(p[3])) fail("Invalid FEN en-passant square");
     if (p.length >= 5 && (!/^\d+$/.test(p[4]) || +p[4] < 0)) fail("Invalid FEN halfmove clock");
@@ -59,7 +64,7 @@
     if (p[3] !== "-") {
       if (p[3][1] !== (p[1] === "w" ? "6" : "3") || board[p[3]] || board[p[3][0] + (p[1] === "w" ? "5" : "4")] !== (p[1] === "w" ? "p" : "P")) fail("Invalid FEN en-passant state");
     }
-    if (attacked(board, p[1] === "w" ? bk : wk, p[1] === "w")) fail("FEN side not to move is in check");
+    if (!atomic && wk && bk && attacked(board, p[1] === "w" ? bk : wk, p[1] === "w")) fail("FEN side not to move is in check");
     p[4] = p[4] || "0"; p[5] = p[5] || "1";
     return { fen: p.join(" "), board: board, turn: p[1], halfmove: +(p[4] || 0), fullmove: +(p[5] || 1), castling: p[2], ep: p[3] };
   }
@@ -130,9 +135,12 @@
     if (data.tags.SetUp === "1" && !data.tags.FEN) fail("SetUp tag requires FEN");
     if (data.tags.SetUp && data.tags.SetUp !== "0" && data.tags.SetUp !== "1") fail("Invalid SetUp tag");
     if (data.tags.SetUp === "0" && data.tags.FEN) fail("FEN conflicts with SetUp tag");
-    if (data.tags.Variant && data.tags.Variant.toLowerCase() !== "standard") fail("Unsupported PGN variant");
-    var start = data.tags.FEN ? parseBoard(data.tags.FEN).fen : null;
-    return { headers: data.tags, tokens: main, result: result, variationCount: variations, startFen: start };
+    var atomic = String(data.tags.Variant || "").toLowerCase() === "atomic";
+    if (data.tags.Variant && !["standard", "atomic"].includes(data.tags.Variant.toLowerCase())) fail("Unsupported PGN variant");
+    if (atomic && data.tags.SetUp === "1" && !data.tags.FEN) fail("Atomic SetUp requires FEN");
+    var start = data.tags.FEN ? parseBoard(data.tags.FEN, { atomic: atomic }).fen : null;
+    if (atomic) data.tags.Variant = "Atomic";
+    return { headers: data.tags, tokens: main, result: result, variationCount: variations, startFen: start, atomic: atomic };
   }
 
   function expectedScore(ev, side) {
@@ -351,7 +359,15 @@
   }
   function supportsRecord(record) {
     var variant = record && record.variant;
-    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish"].includes(variant.slug) || variant.supported !== false);
+    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish", "atomic"].includes(variant.slug) || variant.supported !== false);
+  }
+  function atomicRecord(record) { return !!(record && record.variant && record.variant.slug === "atomic"); }
+  function engineForRecord(record, env) {
+    env = env || (typeof window !== "undefined" ? window : {});
+    var variant = record && record.variant, localAtomic = !!(env.SHARPFISH_VARIANT && env.SHARPFISH_VARIANT.slug === "atomic");
+    var registry = env.SHARPFISH_ANALYSIS_ENGINES || {};
+    if (atomicRecord(record)) return registry.atomic || variant.analysisEnginePath || (localAtomic ? env.ENGINE_FILE : null) || null;
+    return registry.standard || (!localAtomic ? env.STOCK_ENGINE_FILE : null) || null;
   }
   function snapshotAnalysis(record) {
     var variant = record && record.variant;
@@ -386,6 +402,10 @@
   }
   function positionCommand(record, ply, extra) {
     if (snapshotAnalysis(record)) return "position fen " + analysisFen(record, ply) + (extra && extra.length ? " moves " + extra.join(" ") : "");
+    if (atomicRecord(record)) {
+      var atomicMoves = (record.moves || []).slice(0, ply).concat(extra || []);
+      return (record.startFen ? "position fen " + record.startFen : "position startpos") + (atomicMoves.length ? " moves " + atomicMoves.join(" ") : "");
+    }
     var moves = record.moves.slice(0, ply).concat(extra || []);
     return (record.startFen ? "position fen " + record.startFen : "position startpos") + (moves.length ? " moves " + moves.join(" ") : "");
   }
@@ -398,12 +418,16 @@
     return !!(grade && record && record.moves && index >= 0 && index < record.moves.length &&
       grade.version === VERSION && grade.model === "centipawn" && (grade.depth > 0 || grade.unavailable === true) &&
       grade.config && grade.config.model === "centipawn" && grade.config.movetime === gradeTime(movetime) &&
-      grade.config.specialMoves === (specialMoves !== false) &&
+      grade.config.specialMoves === (atomicRecord(record) ? false : specialMoves !== false) &&
+      (grade.config.atomic === true) === atomicRecord(record) &&
+      (!atomicRecord(record) || !["Great", "Brilliant"].includes(grade.label) && !["Great", "Brilliant"].includes(grade.objectiveLabel)) &&
       grade.config.engine === engine && grade.historyKey === historyKey(record, index + 1));
   }
   function abortError() { var error = new Error("Analysis cancelled"); error.name = "AbortError"; return error; }
 
-  function Analyzer(workerFile) {
+  function Analyzer(workerFile, options) {
+    options = options || {};
+    var atomic = options.atomic === true;
     var self = this, worker = null, active = null, ready = null, disposed = false, generation = 0, queue = Promise.resolve();
     function assertActive(token) { if (disposed || token !== generation) throw abortError(); }
     function stopWorker(error) {
@@ -437,8 +461,13 @@
       };
       created.onerror = function (event) { if (event.preventDefault) event.preventDefault(); if (worker === created) stopWorker(new Error("Engine failed to load: " + (event.message || "unknown error"))); };
       ready = (async function () {
-        await request(["uci"], function (line) { return line === "uciok"; }, token, 15000);
-        await request(["setoption name UCI_LimitStrength value false", "setoption name Skill Level value 20", "setoption name UCI_ShowWDL value true", "isready"], function (line) { return line === "readyok"; }, token);
+        var engineId = "";
+        await request(["uci"], function (line) { if (line.indexOf("id name ") === 0) engineId = line.slice(8).toLowerCase(); return line === "uciok"; }, token, 15000);
+        if (atomic && !/atomic/.test(engineId)) throw new Error("Atomic analysis engine identity was not confirmed");
+        if (!atomic && /atomic/.test(engineId)) throw new Error("Standard analysis cannot use an Atomic engine");
+        var settings = ["setoption name UCI_LimitStrength value false", "setoption name Skill Level value 20", "setoption name UCI_ShowWDL value true"];
+        settings.push("isready");
+        await request(settings, function (line) { return line === "readyok"; }, token);
       }());
       return ready;
     }
@@ -458,8 +487,10 @@
         else { var m = line.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/); if (m) legal.push(m[1]); }
       });
       if (!fen) throw new Error("Engine did not return a position");
-      var parsed = parseBoard(fen);
-      return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check };
+      var atomicResult = null;
+      lines.forEach(function (line) { var result = line.match(/^Atomic result:\s*(white|black|draw|none)$/i); if (result) atomicResult = result[1].toLowerCase(); });
+      var parsed = parseBoard(fen, { atomic: atomic });
+      return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check, atomicResult: atomicResult };
     }
     async function recordPosition(record, ply, token, timeout) {
       if (snapshotAnalysis(record)) return position(record, ply, token, null, timeout);
@@ -471,7 +502,7 @@
       options = options || {}; assertActive(token);
       var pos = await recordPosition(record, ply, token, options.timeout);
       if (!pos.legal.length) {
-        var winner = pos.inCheck ? (pos.turn === "w" ? "b" : "w") : null;
+        var winner = atomic && pos.atomicResult && pos.atomicResult !== "draw" && pos.atomicResult !== "none" ? (pos.atomicResult === "white" ? "w" : "b") : pos.inCheck ? (pos.turn === "w" ? "b" : "w") : null;
         return { cp: winner ? null : 0, mate: winner ? 0 : null, mateWinner: winner, wdl: winner === "w" ? [1000, 0, 0] : winner === "b" ? [0, 0, 1000] : [0, 1000, 0], depth: 0, pv: [], alternatives: [], scoreText: winner ? "Checkmate" : "Draw" };
       }
       var timed = Number.isFinite(options.movetime), depth = options.depth || (timed ? null : 12);
@@ -504,8 +535,10 @@
     this.replay = function (text) {
       var parsed;
       try { parsed = parsePgn(text); } catch (error) { return Promise.reject(error); }
+      if (!!parsed.atomic !== atomic) return Promise.reject(new Error("PGN variant does not match the analysis engine"));
       return run(async function (token) {
-        var record = { startFen: parsed.startFen, moves: [], san: [], boards: [], headers: parsed.headers, result: parsed.result, variationCount: parsed.variationCount };
+        var record = { startFen: parsed.startFen, moves: [], san: [], boards: [], headers: parsed.headers, result: parsed.result, variationCount: parsed.variationCount,
+          variant: parsed.atomic ? { slug: "atomic", title: "Atomic Chess", supported: true, analysisMode: "atomic" } : null };
         record.boards.push(await position(record, 0, token));
         for (var i = 0; i < parsed.tokens.length; i++) {
           assertActive(token);
@@ -514,10 +547,19 @@
           if (candidates.length !== 1) fail((candidates.length ? "Ambiguous" : "Illegal") + " SAN: " + parsed.tokens[i], i + 1);
           record.moves.push(candidates[0]);
           var next = await position(record, i + 1, token);
-          if (/#/.test(parsed.tokens[i]) && !(next.inCheck && !next.legal.length)) fail("Checkmate suffix does not match position", i + 1);
-          if (/\+/.test(parsed.tokens[i]) && !next.inCheck) fail("Check suffix does not match position", i + 1);
-          record.san.push(sanCore(pos, candidates[0]) + (next.inCheck ? next.legal.length ? "+" : "#" : ""));
+          var explosionWin = parsed.atomic && /^(white|black)$/.test(next.atomicResult || "");
+          var mate = next.inCheck && !next.legal.length;
+          if (/#/.test(parsed.tokens[i]) && !explosionWin && !mate) fail("Checkmate suffix does not match position", i + 1);
+          if (/\+/.test(parsed.tokens[i]) && !next.inCheck && !explosionWin) fail("Check suffix does not match position", i + 1);
+          record.san.push(sanCore(pos, candidates[0]) + (explosionWin || mate ? "#" : next.inCheck ? "+" : ""));
           record.boards.push(next);
+        }
+        if (parsed.atomic) {
+          var final = record.boards[record.boards.length - 1];
+          var finalWinner = /^(white|black)$/.test(final.atomicResult || "") ? final.atomicResult : final.inCheck && !final.legal.length ? (final.turn === "w" ? "black" : "white") : null;
+          var finalResult = finalWinner ? (finalWinner === "white" ? "1-0" : "0-1") : !final.legal.length || final.atomicResult === "draw" ? "1/2-1/2" : null;
+          if (finalResult && parsed.result !== "*" && finalResult !== parsed.result) fail("Result does not match Atomic terminal position");
+          if (finalResult) record.result = finalResult;
         }
         return record;
       });
@@ -566,7 +608,7 @@
                 depth: deep.depth, bestDepth: best.depth, confirmed: true };
             }
           }
-          if (deep && options.difficulty !== false) {
+          if (deep && !atomic && options.difficulty !== false) {
             var shallow = await search(index + 1, 20, { depth: 4, multiPV: 1 });
             var medium = await search(index + 1, 40, { depth: 7, multiPV: 1 });
             // A diagnostic that did not finish below the main reply depth
@@ -597,7 +639,7 @@
         // treating a two-candidate recheck as the complete field of alternatives.
         var alternative = root.alternatives.find(function (line) { return line.pv[0] !== move; });
         var rootPlayed = root.alternatives.find(function (line) { return line.pv[0] === move; });
-        if (options.specialMoves !== false && rootPlayed && ["Best", "Excellent"].includes(provisional.objectiveLabel) && pos.legal.length > 1) {
+        if (!atomic && options.specialMoves !== false && rootPlayed && ["Best", "Excellent"].includes(provisional.objectiveLabel) && pos.legal.length > 1) {
           var vb = moverScore(best, pos.turn), vp = moverScore(played, pos.turn);
           var altScore = alternative ? moverScore(alternative, pos.turn) : null;
           great = !!alternative && vb - altScore >= 125 && (vb >= -50 && altScore < -150 || vb >= 200 && altScore < 100);
@@ -643,13 +685,13 @@
           depth: Math.min(best.depth, played.depth), elapsedMs: Math.round(now() - started), raw: raw,
           side: pos.turn, legalMoveCount: pos.legal.length, analysisLegalMoves: pos.legal.slice(), beforeFen: pos.fen,
           specialEvidence: specialEvidence, historyKey: historyKey(originalRecord, originalIndex + 1),
-          config: { model: "centipawn", movetime: budget, specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION },
-          configKey: VERSION + "|movetime=" + budget + "|specialMoves=" + (options.specialMoves !== false) + "|engine=" + workerFile });
+          config: { model: "centipawn", movetime: budget, specialMoves: atomic ? false : options.specialMoves !== false, atomic: atomic, engine: workerFile, version: VERSION },
+          configKey: VERSION + "|movetime=" + budget + "|specialMoves=" + (atomic ? false : options.specialMoves !== false) + "|atomic=" + atomic + "|engine=" + workerFile });
       }).catch(function (error) {
         if (error.name !== "AnalysisUnavailableError") throw error;
         return { unavailable: true, reason: error.message, version: VERSION, model: "centipawn", depth: 0,
           historyKey: historyKey(originalRecord, originalIndex + 1),
-          config: { model: "centipawn", movetime: gradeTime(options.movetime), specialMoves: options.specialMoves !== false, engine: workerFile, version: VERSION } };
+          config: { model: "centipawn", movetime: gradeTime(options.movetime), specialMoves: atomic ? false : options.specialMoves !== false, atomic: atomic, engine: workerFile, version: VERSION } };
       });
     };
     this.cancel = function () { generation++; stopWorker(abortError()); queue = Promise.resolve(); };
@@ -658,5 +700,5 @@
   return { VERSION: VERSION, START_FEN: START_FEN, parsePgn: parsePgn, parseBoard: parseBoard, classify: classify,
     objectiveLabel: objectiveLabel, centipawnLoss: centipawnLoss, expectedScore: expectedScore, parseInfo: parseInfo, historyKey: historyKey, isValidGrade: isValidGrade,
     attacked: attacked, naturalness: naturalness, delayedPayoff: delayedPayoff, sanCore: sanCore,
-    performanceSummary: performanceSummary, supportsRecord: supportsRecord, snapshotAnalysis: snapshotAnalysis, analysisFen: analysisFen, Analyzer: Analyzer };
+    performanceSummary: performanceSummary, supportsRecord: supportsRecord, snapshotAnalysis: snapshotAnalysis, analysisFen: analysisFen, engineForRecord: engineForRecord, Analyzer: Analyzer };
 }));

@@ -35,7 +35,7 @@
     if (state.alternative && record === state.record && ply === state.ply) return state.alternative.position.board;
     if (!record) return SFAnalysis.parseBoard(SFAnalysis.START_FEN).board;
     var snap = record.boards && record.boards[ply];
-    if (!snap) return ply === 0 ? SFAnalysis.parseBoard(record.startFen || SFAnalysis.START_FEN).board : {};
+    if (!snap) return ply === 0 ? SFAnalysis.parseBoard(record.startFen || SFAnalysis.START_FEN, { atomic: isAtomic(record) }).board : {};
     if (snap.board && typeof snap.board === "object") return snap.board;
     return boardFromFen(snap.fen);
   }
@@ -43,16 +43,21 @@
   function moveCount() { return state.record && state.record.moves ? state.record.moves.length : 0; }
   function isWhite(p) { return !!p && p === p.toUpperCase(); }
   function pieceAsset(piece) { if (piece === "*") return "pieces/scp096.png"; return "pieces/" + (isWhite(piece) ? "w" : "b") + piece.toUpperCase() + ".svg"; }
-  function isSupported(record) { return !!window.STOCK_ENGINE_FILE && SFAnalysis.supportsRecord(record); }
+  function isSupported(record) { return !!analysisEngine(record) && SFAnalysis.supportsRecord(record); }
+  function isAtomic(record) { return !!(record && record.variant && record.variant.slug === "atomic"); }
+  function analysisEngine(record) {
+    return SFAnalysis.engineForRecord(record, window);
+  }
+  function makeAnalyzer(record) { return new SFAnalysis.Analyzer(analysisEngine(record), { atomic: isAtomic(record) }); }
   function displayTitle(record) { var h = record.headers || {}; return h.White || h.Black ? (h.White || "White") + " — " + (h.Black || "Black") : (record.result && record.result !== "*" ? record.result : "Saved game"); }
   function resultText(record) { return record.result && record.result !== "*" ? " · " + record.result : " · in progress"; }
   function setError(message) { $("error").hidden = !message; $("error").textContent = message || ""; }
   function labelKey(label) { return String(label || "").toLowerCase().replace(/[^a-z]/g, ""); }
   function reduceMotion() { return !!(motionQuery && motionQuery.matches); }
-  function specialOn() { return $("special-toggle").checked; }
+  function specialOn() { return !isAtomic(state.record) && $("special-toggle").checked; }
   function analysisTime() { return Number($("analysis-time").value); }
   function validGrade(record, index, grade) {
-    return !!(window.SFAnalysis && SFAnalysis.isValidGrade(grade, record, index, window.STOCK_ENGINE_FILE, specialOn(), analysisTime()));
+    return !!(window.SFAnalysis && SFAnalysis.isValidGrade(grade, record, index, analysisEngine(record), specialOn(), analysisTime()));
   }
   function shownGrade(index) {
     var rec = state.record;
@@ -248,7 +253,7 @@
     $("moves-empty").textContent = rec ? "This game has no moves." : "No game loaded. The board shows the starting position.";
     var counts = { w: {}, b: {} }, showGrades = $("grade-toggle").checked;
     if (!rec) { $("counts").textContent = ""; $("next-mistake").disabled = true; return; }
-    var start = rec.startFen ? SFAnalysis.parseBoard(rec.startFen) : { turn: "w", fullmove: 1 }, offset = start.turn === "b" ? 1 : 0;
+    var start = rec.startFen ? SFAnalysis.parseBoard(rec.startFen, { atomic: isAtomic(rec) }) : { turn: "w", fullmove: 1 }, offset = start.turn === "b" ? 1 : 0;
     (rec.san || []).forEach(function (move, i) {
       var grade = shownGrade(i), raw = rec.grades && rec.grades[i], unavailable = showGrades && validGrade(rec, i, raw) && raw.unavailable;
       var li = document.createElement("li"); li.dataset.ply = i + 1;
@@ -308,8 +313,16 @@
     $("next").disabled = $("last").disabled = !rec || state.ply >= n;
     $("copy").disabled = !rec;
     var supported = isSupported(rec);
-    $("analysis-context").hidden = !rec || !SFAnalysis.snapshotAnalysis(rec);
-    $("grade-toggle").disabled = $("eval-toggle").disabled = $("special-toggle").disabled = !!rec && !supported;
+    var atomicView = isAtomic(rec) || !rec && (window.SHARPFISH_VARIANT || {}).slug === "atomic";
+    $("analysis-context").hidden = !rec || (!SFAnalysis.snapshotAnalysis(rec) && !isAtomic(rec));
+    $("analysis-context").textContent = isAtomic(rec) ? "Atomic analysis: evaluation and basic grades use explosion rules. Grades are experimental."
+      : "Ordinary chess analysis: SCP and custom move restrictions are ignored.";
+    var note = document.querySelector('label:has(#eval-toggle) .field-note');
+    if (note) note.textContent = atomicView ? "Atomic engine" : "stock Stockfish";
+    $("grade-toggle").disabled = $("eval-toggle").disabled = !!rec && !supported;
+    $("special-toggle").disabled = !!rec && (!supported || isAtomic(rec));
+    $("special-toggle").closest("label").hidden = atomicView;
+    $("elo-estimate-note").hidden = atomicView;
     $("analysis-time").disabled = !!rec && !supported;
     var alternativeButton = $("alternative-move");
     alternativeButton.disabled = state.alternativePending || !state.alternative && !alternativeGrade();
@@ -326,8 +339,8 @@
   }
   function renderPerformance() {
     var rec = state.record;
-    $("performance").hidden = !rec || !isSupported(rec);
-    if (!rec || !isSupported(rec)) return;
+    $("performance").hidden = !rec || !isSupported(rec) || isAtomic(rec);
+    if (!rec || !isSupported(rec) || isAtomic(rec)) return;
     var grades = rec.moves.map(function (_, i) { var grade = rec.grades && rec.grades[i]; return validGrade(rec, i, grade) ? grade : null; });
     var summary = SFAnalysis.performanceSummary(rec, grades), headers = rec.headers || {};
     [["w", "white", "White"], ["b", "black", "Black"]].forEach(function (row) {
@@ -383,7 +396,7 @@
     if (state.alternative) { clearAlternative(); render(); scheduleEval(); return; }
     var grade = alternativeGrade(); if (!grade || state.alternativePending) return;
     var rec = state.record, ply = state.ply, move = grade.bestMove, token = ++state.alternativeToken;
-    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
+    var analyzer = makeAnalyzer(rec);
     state.alternativeAnalyzer = analyzer; state.alternativePending = true;
     $("alternative-status").hidden = false; $("alternative-status").textContent = "Loading Stockfish's alternative…";
     renderControls();
@@ -437,7 +450,7 @@
   async function evaluatePosition() {
     if (!evalOn()) return;
     var token = ++state.evalToken, epoch = state.epoch, ply = state.ply;
-    if (!state.evalAnalyzer) state.evalAnalyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
+    if (!state.evalAnalyzer) state.evalAnalyzer = makeAnalyzer(state.record);
     state.evalBusy = true; renderControls();
     try {
       var live = function (e) { if (token === state.evalToken && epoch === state.epoch) showEvaluation(e, true); };
@@ -472,7 +485,7 @@
     var rec = state.record;
     if (!rec || !$("grade-toggle").checked || !isSupported(rec) || !window.SFAnalysis) { renderControls(); return; }
     var token = state.gradeToken, epoch = state.epoch, special = specialOn(), movetime = analysisTime();
-    var analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
+    var analyzer = makeAnalyzer(rec);
     state.gradeAnalyzer = analyzer; state.grading = true; renderControls();
     function current() { return token === state.gradeToken && epoch === state.epoch && state.record === rec && special === specialOn() && movetime === analysisTime() && $("grade-toggle").checked; }
     var done = false;
@@ -486,7 +499,7 @@
           try { grade = await analyzer.grade(rec, i, { specialMoves: special, difficulty: true, movetime: movetime }); break; }
           catch (err) {
             if (!current() || attempt === 1) throw err;
-            analyzer.dispose(); analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
+            analyzer.dispose(); analyzer = makeAnalyzer(rec);
             state.gradeAnalyzer = analyzer;
             $("progress").textContent = "Retrying move " + (i + 1) + " / " + rec.moves.length + "…";
           }
@@ -524,19 +537,22 @@
     $("grade-toggle").checked = $("eval-toggle").checked = supported; // supported games start analyzed
     $("progress").textContent = "";
     render(); $("moves").scrollTop = 0;
-    if (!supported) { showEval(false); setError(window.STOCK_ENGINE_FILE ? "This variant has no ordinary-chess analysis adapter yet. Replay is available." : "The stock Stockfish analysis engine is unavailable. Replay is available."); return; }
+    if (!supported) { showEval(false); setError(window.STOCK_ENGINE_FILE ? "This variant has no analysis adapter yet. Replay is available." : "The analysis engine is unavailable. Replay is available."); return; }
     gradeAll(); scheduleEval(true);
   }
   var importToken = 0;
   async function importPgn(text) {
     if (!window.SFAnalysis || !SFAnalysis.Analyzer || !window.STOCK_ENGINE_FILE) throw new Error("Analysis engine is unavailable.");
-    var token = ++importToken, analyzer = new SFAnalysis.Analyzer(window.STOCK_ENGINE_FILE);
+    var token = ++importToken, parsed = SFAnalysis.parsePgn(text), atomicImport = parsed.atomic;
+    var importEngine = SFAnalysis.engineForRecord(atomicImport ? { variant: { slug: "atomic" } } : { variant: { slug: "classic" } }, window);
+    if (!importEngine) throw new Error("The matching analysis engine is unavailable.");
+    var analyzer = new SFAnalysis.Analyzer(importEngine, { atomic: atomicImport });
     $("progress").textContent = "Reading PGN…";
     try {
       var rec = await analyzer.replay(text); // the displayed game stays until this validates
       if (token !== importToken) return;
       rec.id = SFHistory.newId(); rec.createdAt = Date.now(); rec.updatedAt = rec.createdAt; rec.revision = 1; rec.grades = {};
-      rec.variant = { slug: "classic", title: "Standard chess PGN", path: "/variants/classic/", supported: true };
+      rec.variant = parsed.atomic ? { slug: "atomic", title: "Atomic Chess", path: "/variants/atomic/", supported: true, analysisMode: "atomic", analysisEnginePath: importEngine } : { slug: "classic", title: "Standard chess PGN", path: "/variants/classic/", supported: true, analysisMode: "standard-line" };
       await SFHistory.save(rec);
       history.replaceState(null, "", "?game=" + encodeURIComponent(rec.id));
       await openRecord(rec);
@@ -559,11 +575,12 @@
   function pgnText() {
     if (!state.record) return "";
     var rec = state.record, headers = Object.assign({}, rec.headers || {}), out = "";
-    if (SFAnalysis.snapshotAnalysis(rec)) headers.Variant = rec.variant.slug;
+    if (isAtomic(rec)) headers.Variant = "Atomic";
+    else if (SFAnalysis.snapshotAnalysis(rec)) headers.Variant = rec.variant.slug;
     if (rec.startFen) { headers.SetUp = "1"; headers.FEN = rec.startFen; }
     Object.keys(headers).forEach(function (key) { out += "[" + key + " " + JSON.stringify(String(headers[key])) + "]\n"; });
     if (out) out += "\n";
-    var initial = rec.startFen ? SFAnalysis.parseBoard(rec.startFen) : { turn: "w", fullmove: 1 }, offset = initial.turn === "b" ? 1 : 0;
+    var initial = rec.startFen ? SFAnalysis.parseBoard(rec.startFen, { atomic: isAtomic(rec) }) : { turn: "w", fullmove: 1 }, offset = initial.turn === "b" ? 1 : 0;
     (rec.san || []).forEach(function (move, i) {
       var black = (i + offset) % 2;
       if (!black || i === 0) out += (initial.fullmove + Math.floor((i + offset) / 2)) + (black ? "... " : ". ");

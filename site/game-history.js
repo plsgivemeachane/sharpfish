@@ -27,6 +27,24 @@
     r.san = Array.isArray(r.san) ? r.san.slice() : [];
     r.boards = Array.isArray(r.boards) ? clone(r.boards) : [];
     r.grades = r.grades && typeof r.grades === "object" ? clone(r.grades) : {};
+    if (r.variant && r.variant.slug === "atomic") {
+      // Atomic has basic objective grades only; never carry ordinary performance
+      // statistics or special-label evidence across a save/reload.
+      delete r.performance; delete r.accuracy; delete r.estimatedElo; delete r.elo;
+      Object.keys(r.grades).forEach(function (index) {
+        var grade = r.grades[index]; if (!grade || typeof grade !== "object") return;
+        delete grade.great; delete grade.brilliant; delete grade.specialEvidence; delete grade.difficulty;
+        if (["Great", "Brilliant"].includes(grade.objectiveLabel)) { delete r.grades[index]; return; }
+        if (["Great", "Brilliant"].includes(grade.label)) {
+          if (!grade.objectiveLabel) { delete r.grades[index]; return; }
+          grade.label = grade.objectiveLabel;
+        }
+        if (grade.config) {
+          if (grade.config.atomic !== true) { delete r.grades[index]; return; }
+          grade.config.specialMoves = false;
+        }
+      });
+    }
     r.headers = r.headers && typeof r.headers === "object" ? clone(r.headers) : {};
     r.result = r.result || "*";
     r.schemaVersion = 1;
@@ -35,11 +53,11 @@
   function merge(existing, incoming) {
     if (!existing) return normalize(incoming);
     var next = normalize(incoming);
-    if (next.revision < existing.revision) return clone(existing);
+    if (next.revision < existing.revision) return normalize(existing);
     next.createdAt = existing.createdAt;
     if (next.revision === existing.revision) {
-      if ((next.startFen || "") !== (existing.startFen || "") || next.moves.join(" ") !== existing.moves.join(" ")) return clone(existing);
-      next = Object.assign({}, clone(existing), { grades: Object.assign({}, existing.grades || {}, incoming.grades || {}) });
+      if ((next.startFen || "") !== (existing.startFen || "") || next.moves.join(" ") !== existing.moves.join(" ")) return normalize(existing);
+      next = normalize(Object.assign({}, clone(existing), { grades: Object.assign({}, existing.grades || {}, incoming.grades || {}) }));
       next.updatedAt = Math.max(existing.updatedAt || 0, incoming.updatedAt || 0);
     }
     return next;
@@ -79,7 +97,7 @@
     var byId = Object.create(null);
     primary.concat(secondary).forEach(function (row) {
       if (!row || !row.id) return;
-      byId[row.id] = byId[row.id] ? merge(byId[row.id], row) : clone(row);
+      byId[row.id] = byId[row.id] ? merge(byId[row.id], row) : normalize(row);
     });
     return Object.keys(byId).map(function (id) { return byId[id]; })
       .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, LIMIT);
@@ -130,7 +148,7 @@
     return openDb().then(function (db) {
       return new Promise(function (resolve, reject) {
         var req = db.transaction(STORE, "readonly").objectStore(STORE).get(id);
-        req.onsuccess = function () { resolve(req.result ? clone(req.result) : null); };
+        req.onsuccess = function () { resolve(req.result ? normalize(req.result) : null); };
         req.onerror = function () { reject(req.error || new Error("Unable to read history")); };
       });
     }).then(function (row) {
@@ -155,7 +173,7 @@
           (record.startFen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") + "|" + record.moves.slice(0, ply + 1).join(" ");
         if (grade.historyKey === fingerprint) compatible[index] = grade;
       });
-      return Object.assign({}, record, { grades: Object.assign({}, record.grades || {}, compatible), updatedAt: Date.now() });
+      return normalize(Object.assign({}, record, { grades: Object.assign({}, record.grades || {}, compatible), updatedAt: Date.now() }));
     }
     if (!root.indexedDB) return transactionGet(id).then(function (r) { var next = apply(r); return next ? transactionSave(next) : null; });
     return openDb().then(function (db) {

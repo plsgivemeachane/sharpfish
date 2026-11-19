@@ -238,3 +238,6 @@ textarea { width: 100%; resize: vertical; background: var(--inset); border: 1px 
 @media (prefers-reduced-motion: reduce) {
   .evalbar-white, .btn, .field.switch input, .field.switch input::before { transition: none; }
 }
+
+/* Capability-hidden controls must stay hidden even inside flex rows. */
+[hidden] { display: none !important; }

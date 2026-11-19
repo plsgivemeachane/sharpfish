@@ -5,7 +5,9 @@
   function remember(value) { try { root.localStorage.setItem("sharpfish-live-grading", value ? "1" : "0"); } catch (_) {} }
   function status(text) { if (root.SFAppHooks && root.SFAppHooks.onGradeStatus) root.SFAppHooks.onGradeStatus(text); }
   function valid(grade, record, index) {
-    return root.SFAnalysis && root.SFAnalysis.isValidGrade(grade, record, index, root.STOCK_ENGINE_FILE, specialMoves);
+    var atomic = !!(record && record.variant && record.variant.slug === "atomic");
+    var engine = root.SFAnalysis && root.SFAnalysis.engineForRecord ? root.SFAnalysis.engineForRecord(record, root) : root.STOCK_ENGINE_FILE;
+    return !!(root.SFAnalysis && engine && root.SFAnalysis.isValidGrade(grade, record, index, engine, atomic ? false : specialMoves));
   }
   function interrupt() {
     epoch++;
@@ -13,7 +15,9 @@
     analyzer = null; running = null;
   }
   function drain() {
-    if (running || !enabled || !current || !root.SFAnalysis || !root.STOCK_ENGINE_FILE || !root.SFAnalysis.supportsRecord(current)) return;
+    var atomic = !!(current && current.variant && current.variant.slug === "atomic");
+    var engine = root.SFAnalysis && root.SFAnalysis.engineForRecord ? root.SFAnalysis.engineForRecord(current, root) : root.STOCK_ENGINE_FILE;
+    if (running || !enabled || !current || !root.SFAnalysis || !engine || !root.SFAnalysis.supportsRecord(current)) return;
     var record = current;
     var index = -1, retry = -1, unavailable = 0;
     for (var i = record.moves.length - 1; i >= 0; i--) {
@@ -28,10 +32,10 @@
       var incompatible = Object.keys(record.grades || {}).filter(function (i) { return valid(record.grades[i], record, +i) && record.grades[i].unavailable; }).length;
       status(unavailable ? unavailable + (unavailable === 1 ? " move" : " moves") + " could not be graded after retrying. Toggle grading to retry." : incompatible ? "Moves graded; " + incompatible + " unavailable in ordinary chess." : "Moves graded"); return;
     }
-    if (!analyzer) analyzer = new root.SFAnalysis.Analyzer(root.STOCK_ENGINE_FILE);
+    if (!analyzer) analyzer = new root.SFAnalysis.Analyzer(engine, { atomic: atomic });
     var job = { epoch: epoch, id: record.id, index: index, key: root.SFAnalysis.historyKey(record, index + 1) };
     running = job; status((failed[job.key] ? "Retrying move " : "Grading move ") + (index + 1) + "…");
-    analyzer.grade(record, index, { specialMoves: specialMoves }).then(async function (grade) {
+    analyzer.grade(record, index, { specialMoves: atomic ? false : specialMoves }).then(async function (grade) {
       if (!enabled || epoch !== job.epoch || !current || current.id !== job.id || root.SFAnalysis.historyKey(current, index + 1) !== job.key) return;
       current.grades = current.grades || {}; current.grades[index] = grade;
       delete failed[job.key];
@@ -74,7 +78,7 @@
   root.SFLive = {
     init: function () { try { enabled = root.localStorage.getItem("sharpfish-live-grading") === "1"; specialMoves = root.localStorage.getItem("sharpfish-special-grading") !== "0"; } catch (_) {} return enabled; },
     enabled: function () { return enabled; },
-    specialMoves: function () { return specialMoves; },
+    specialMoves: function () { return (root.SHARPFISH_VARIANT || {}).slug === "atomic" || current && current.variant && current.variant.slug === "atomic" ? false : specialMoves; },
     setSpecialMoves: function (value) { specialMoves = !!value; try { root.localStorage.setItem("sharpfish-special-grading", specialMoves ? "1" : "0"); } catch (_) {} interrupt(); failed = {}; drain(); },
     toggle: function (value) { enabled = !!value; remember(enabled); failed = {}; if (!enabled) { interrupt(); status(""); } else drain(); return enabled; },
     schedule: schedule,
