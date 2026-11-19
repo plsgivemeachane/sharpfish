@@ -568,8 +568,8 @@ function chooseBot(b) {
 
 function strengthCommands(selectedBot) {
   return selectedBot.elo === FULL
-    ? ["setoption name UCI_LimitStrength value false"]
-    : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + selectedBot.elo];
+    ? ["setoption name Skill Level value 20", "setoption name UCI_LimitStrength value false"]
+    : ["setoption name Skill Level value 20", "setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value " + selectedBot.elo];
 }
 
 function setStrength() {
@@ -1199,7 +1199,7 @@ syncGameMode();
     });
   });
 });
-$("white-bot").value = "martin";
+$("white-bot").value = "stockfish";
 $("black-bot").value = "stockfish";
 $("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
