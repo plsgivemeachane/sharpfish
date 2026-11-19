@@ -1206,7 +1206,7 @@ syncGameMode();
     });
   });
 });
-$("white-bot").value = "martin";
+$("white-bot").value = "stockfish";
 $("black-bot").value = "stockfish";
 $("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
