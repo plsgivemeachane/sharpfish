@@ -1,5 +1,21 @@
 # Making your own engine variant
 
+## Atomic branch
+
+This branch extends the existing engine with Atomic Chess, including reversible
+multi-piece explosions, Atomic king safety and a classical Atomic evaluator.
+`Variant::Atomic` enables the rules; `VARIANT_STOCK` keeps ordinary chess.
+The play engine and independent full-strength analysis Workers use the same
+Atomic-aware WASM build. Ordinary-chess NNUE and tablebases are bypassed for
+Atomic. Evaluation uses material and bounded tactical explosion search, rather
+than a trained Atomic network; grades and difficulty remain experimental.
+Bot difficulty tiers have no calibrated Elo claims. Atomic review offers
+evaluation, basic move grades and alternatives, without Great/Brilliant,
+accuracy or estimated Elo. See `DESIGN.md` for the player-facing contract.
+
+Run Atomic engine and analysis regression checks in `scripts/atomic-*-test.*`
+alongside `./make-web.sh test` when modifying this branch.
+
 This repo is set up so that every fork (or branch) can change how the engine
 plays and get a working, playable web build with one command.
 

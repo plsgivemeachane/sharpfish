@@ -253,7 +253,7 @@ template<GenType Type>
 Move* generate(const Position& pos, Move* moveList) {
 
     static_assert(Type != LEGAL, "Unsupported type in generate()");
-    assert((Type == EVASIONS) == bool(pos.checkers()));
+    assert(Variant::Atomic || (Type == EVASIONS) == bool(pos.checkers()));
 
     Color us = pos.side_to_move();
 
@@ -271,6 +271,20 @@ template Move* generate<NON_EVASIONS>(const Position&, Move*);
 
 template<>
 Move* generate<LEGAL>(const Position& pos, Move* moveList) {
+
+    if constexpr (Variant::Atomic)
+    {
+        if (!pos.count<KING>(WHITE) || !pos.count<KING>(BLACK))
+            return moveList;
+        Move* cur = moveList;
+        moveList = generate<NON_EVASIONS>(pos, moveList);
+        while (cur != moveList)
+            if (!pos.legal(*cur))
+                *cur = *(--moveList);
+            else
+                ++cur;
+        return moveList;
+    }
 
     Color    us     = pos.side_to_move();
     Bitboard pinned = pos.blockers_for_king(us) & pos.pieces(us);

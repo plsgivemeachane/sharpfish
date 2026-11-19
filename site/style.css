@@ -56,6 +56,18 @@ body {
 button, input, select, textarea { font: inherit; }
 a { color: var(--accent-hi); }
 :focus-visible { outline: none; box-shadow: var(--ring); }
+[hidden] { display: none !important; }
+.atomic-rules { padding: 16px; }
+.atomic-rules p { color: var(--muted); margin: 10px 0; font-size: 13px; }
+.atomic-rules summary { cursor: pointer; font-size: 13px; }
+.blast-hint { min-height: 2.9em; max-width: 100%; margin-top: 8px; }
+.sq.blast-area { box-shadow: inset 0 0 0 2px #a84a19; }
+.sq.blast-center { box-shadow: inset 0 0 0 4px #a52c11; }
+.blast-marker { position: absolute; right: 3px; bottom: 2px; z-index: 5; padding: 0 3px; border-radius: 3px; background: #43190b; color: #fff4dc; font-weight: 800; pointer-events: none; line-height: 1.2; }
+.blast-marker.immune { background: #073d35; color: #dcfff4; }
+.sq.blast-flash { animation: atomic-blast 220ms ease-out; }
+@keyframes atomic-blast { from { box-shadow: inset 0 0 0 6px #ffb454; } to { box-shadow: inset 0 0 0 2px transparent; } }
+@media (prefers-reduced-motion: reduce) { .sq.blast-flash { animation: none; box-shadow: inset 0 0 0 2px #a84a19; } }
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

@@ -87,7 +87,21 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
     for (Bitboard b = pos.checkers(); b;)
         os << UCIEngine::square(pop_lsb(b)) << " ";
 
+    if constexpr (Variant::Atomic)
+    {
+        os << "\nAtomic result: ";
+        if (!pos.count<KING>(WHITE))
+            os << "black";
+        else if (!pos.count<KING>(BLACK))
+            os << "white";
+        else if (pos.atomic_insufficient_material())
+            os << "draw";
+        else
+            os << "none";
+    }
+
 #ifndef __NO_SYZYGY__
+    if constexpr (!Variant::Atomic)
     if (Tablebases::MaxCardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
     {
         StateInfo st;
@@ -276,7 +290,9 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
     if (pieces(PAWN) & (Rank1BB | Rank8BB))
         return PositionSetError("Unsupported position. Pawns on the first or eighth rank.");
 
-    if (count<KING>(WHITE) != 1 || count<KING>(BLACK) != 1)
+    if (Variant::Atomic ? (count<KING>(WHITE) > 1 || count<KING>(BLACK) > 1
+                          || count<KING>(WHITE) + count<KING>(BLACK) == 0)
+                        : (count<KING>(WHITE) != 1 || count<KING>(BLACK) != 1))
         return PositionSetError("Unsupported position. Incorrect number of kings.");
 
     for (Color c : {WHITE, BLACK})
@@ -299,6 +315,10 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
         return PositionSetError(std::string("Invalid FEN. Invalid side to move: ")
                                 + std::string(1, token));
     sideToMove = (token == 'w' ? WHITE : BLACK);
+    if constexpr (Variant::Atomic)
+        if ((!count<KING>(WHITE) && sideToMove != WHITE)
+            || (!count<KING>(BLACK) && sideToMove != BLACK))
+            return PositionSetError("Invalid Atomic terminal side to move.");
     if (!(ss >> token) || !isspace(token) || ss.eof())
         return PositionSetError("Invalid FEN. Expected whitespace after side to move.");
 
@@ -409,9 +429,12 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
                      && !(pieces() & (st->epSquare | (st->epSquare + pawn_push(sideToMove))));
 
             // If no pawn can execute the en passant capture without leaving the king in check, don't record the epSquare
-            while (pawns)
-                legalEP |= !(attackers_to(square<KING>(sideToMove), occ ^ pop_lsb(pawns))
-                             & pieces(~sideToMove) & ~target);
+            if constexpr (Variant::Atomic)
+                legalEP = enpassant;
+            else
+                while (pawns)
+                    legalEP |= !(attackers_to(square<KING>(sideToMove), occ ^ pop_lsb(pawns))
+                                 & pieces(~sideToMove) & ~target);
         }
         else
             return PositionSetError("Invalid FEN. Invalid en-passant square.");
@@ -437,9 +460,12 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
 
     chess960 = isChess960;
     set_state();
+    if constexpr (Variant::Atomic)
+        normalize_atomic_ep();
 
-    if (attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove))
-        return PositionSetError("Unsupported position. King can be captured.");
+    if constexpr (!Variant::Atomic)
+        if (attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove))
+            return PositionSetError("Unsupported position. King can be captured.");
 
     assert(pos_is_ok());
 
@@ -494,9 +520,18 @@ void Position::set_state() const {
     st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = 0;
     st->pawnKey                                   = Zobrist::noPawns;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
-    st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
-
-    set_check_info();
+    if constexpr (Variant::Atomic)
+    {
+        st->checkersBB = atomic_checkers(sideToMove);
+        for (Color c : {WHITE, BLACK})
+            st->blockersForKing[c] = st->pinners[c] = 0;
+        std::fill(std::begin(st->checkSquares), std::end(st->checkSquares), Bitboard(0));
+    }
+    else
+    {
+        st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
+        set_check_info();
+    }
 
     for (Bitboard b = pieces(); b;)
     {
@@ -529,6 +564,54 @@ void Position::set_state() const {
 
     st->key ^= Zobrist::castling[st->castlingRights];
     st->materialKey = compute_material_key();
+}
+
+// Atomic check follows direct attacks on the king. Connected kings suppress
+// these attacks because capturing either one would also explode the other.
+Bitboard Position::atomic_checkers(Color c) const {
+    if (!count<KING>(c) || !count<KING>(~c))
+        return 0;
+    Square king = square<KING>(c);
+    if (attacks_bb<KING>(king) & pieces(~c, KING))
+        return 0;
+    return attackers_to(king) & pieces(~c) & ~pieces(KING);
+}
+
+bool Position::atomic_insufficient_material() const {
+    constexpr Bitboard DarkSquares = 0xAA55AA55AA55AA55ULL;
+    if (!count<KING>(WHITE) || !count<KING>(BLACK))
+        return false;
+    auto insufficient = [&](Color c) {
+        if (!(pieces(c) & ~pieces(KING)))
+            return true;
+        if (pieces(~c) & ~pieces(KING))
+        {
+            if (pieces() == (pieces(BISHOP) | pieces(KING)))
+            {
+                Bitboard ours = pieces(c, BISHOP), theirs = pieces(~c, BISHOP);
+                return (!(ours & DarkSquares) && !(theirs & ~DarkSquares))
+                    || (!(ours & ~DarkSquares) && !(theirs & DarkSquares));
+            }
+            return false;
+        }
+        if (pieces(QUEEN, PAWN))
+            return false;
+        if (popcount(pieces(KNIGHT, BISHOP, ROOK)) == 1)
+            return true;
+        return pieces() == (pieces(KNIGHT) | pieces(KING)) && popcount(pieces(KNIGHT)) <= 2;
+    };
+    return insufficient(WHITE) && insufficient(BLACK);
+}
+
+void Position::normalize_atomic_ep() {
+    if (st->epSquare == SQ_NONE)
+        return;
+    Bitboard candidates = attacks_bb<PAWN>(st->epSquare, ~sideToMove) & pieces(sideToMove, PAWN);
+    while (candidates)
+        if (legal(Move::make<EN_PASSANT>(pop_lsb(candidates), st->epSquare)))
+            return;
+    st->epSquare = SQ_NONE;
+    set_state();
 }
 
 Key Position::compute_material_key() const {
@@ -671,12 +754,50 @@ bool Position::legal(Move m) const {
     Square to   = m.to_sq();
 
     assert(color_of(moved_piece(m)) == us);
-    assert(piece_on(square<KING>(us)) == make_piece(us, KING));
+    if constexpr (!Variant::Atomic)
+        assert(piece_on(square<KING>(us)) == make_piece(us, KING));
 
     // Fork rules (src/variant/config.h)
     if constexpr (Variant::HasRuleFilter)
         if (!Variant::move_allowed(*this, m))
             return false;
+
+    if constexpr (Variant::Atomic)
+    {
+        if (!count<KING>(us) || !count<KING>(~us))
+            return false;
+        bool capture = m.type_of() == EN_PASSANT
+                    || (m.type_of() != CASTLING && piece_on(to) != NO_PIECE);
+        if (capture && type_of(piece_on(from)) == KING)
+            return false;
+
+        if (m.type_of() == CASTLING)
+        {
+            Square destination = relative_square(us, to > from ? SQ_G1 : SQ_C1);
+            Direction step = destination > from ? EAST : WEST;
+            for (Square s = from;; s += step)
+            {
+                // A capture on a square next to the enemy king would explode
+                // that king as well, so connected castling path squares are safe.
+                if (!(attacks_bb<KING>(square<KING>(~us)) & s)
+                    && (attackers_to(s, pieces() ^ from) & pieces(~us) & ~pieces(KING)))
+                    return false;
+                if (s == destination)
+                    break;
+            }
+        }
+
+        // Legality depends on the entire resulting blast, including discovered
+        // attacks and the winning-explosion exception while in check. The
+        // position is always restored before exposing the result to callers.
+        Position& mutablePos = const_cast<Position&>(*this);
+        StateInfo next;
+        mutablePos.do_move(m, next);
+        bool allowed = mutablePos.count<KING>(us)
+                    && (!mutablePos.count<KING>(~us) || !mutablePos.atomic_checkers(us));
+        mutablePos.undo_move(m);
+        return allowed;
+    }
 
     // Castling moves generation does not check if the castling path is clear of
     // enemy attacks, it is delayed at a later time: now!
@@ -773,6 +894,9 @@ bool Position::pseudo_legal(const Move m) const {
 // Tests whether a pseudo-legal move gives a check
 bool Position::gives_check(Move m) const {
 
+    if constexpr (Variant::Atomic)
+        return false;  // do_move recomputes Atomic checkers from the final board.
+
     assert(m.is_ok());
     assert(color_of(moved_piece(m)) == sideToMove);
 
@@ -861,6 +985,20 @@ void Position::do_move(Move                      m,
     Piece  pc       = piece_on(from);
     Piece  captured = m.type_of() == EN_PASSANT ? make_piece(them, PAWN) : piece_on(to);
 
+    st->atomicRemovedCount = 0;
+    st->atomicCapture      = false;
+    st->atomicMover        = pc;
+    st->atomicMoverFrom    = from;
+    auto atomic_record = [&](Piece removed, Square square) {
+        if constexpr (Variant::Atomic)
+            if (st->atomicRemovedCount < 10)
+            {
+                st->atomicRemovedPiece[st->atomicRemovedCount] = removed;
+                st->atomicRemovedSquare[st->atomicRemovedCount] = square;
+                ++st->atomicRemovedCount;
+            }
+    };
+
     dp.pc     = pc;
     dp.from   = from;
     dp.to     = to;
@@ -868,7 +1006,8 @@ void Position::do_move(Move                      m,
 
     assert(color_of(pc) == us);
     assert(captured == NO_PIECE || color_of(captured) == (m.type_of() != CASTLING ? them : us));
-    assert(type_of(captured) != KING);
+    if constexpr (!Variant::Atomic)
+        assert(type_of(captured) != KING);
 
     if (m.type_of() == CASTLING)
     {
@@ -901,6 +1040,7 @@ void Position::do_move(Move                      m,
                 assert(piece_on(capsq) == make_piece(them, PAWN));
 
                 // Update board and piece lists in ep case, normal captures are updated later
+                atomic_record(captured, capsq);
                 remove_piece(capsq, &dts);
             }
 
@@ -917,6 +1057,10 @@ void Position::do_move(Move                      m,
 
         dp.remove_pc = captured;
         dp.remove_sq = capsq;
+
+        if constexpr (Variant::Atomic)
+            if (m.type_of() != EN_PASSANT)
+                atomic_record(captured, capsq);
 
         k ^= Zobrist::psq[captured][capsq];
         st->materialKey ^=
@@ -963,7 +1107,7 @@ void Position::do_move(Move                      m,
                 // If the pawn gives discovered check, ep is never legal. Else, if at least one
                 // pawn was not a blocker for the enemy king or lies on the same line as the
                 // enemy king and en passant square, a legal capture exists.
-                if (noDiscovery && (pawns & (notBlockers | line_bb(epSquare, ksq))))
+                if (Variant::Atomic || (noDiscovery && (pawns & (notBlockers | line_bb(epSquare, ksq)))))
                 {
                     st->epSquare = epSquare;
                     k ^= Zobrist::enpassant[file_of(epSquare)];
@@ -1047,16 +1191,54 @@ void Position::do_move(Move                      m,
         }
     }
 
+    if constexpr (Variant::Atomic)
+    {
+        if (captured && m.type_of() != CASTLING)
+        {
+            st->atomicCapture = true;
+            // The capturing piece and every adjacent non-pawn are removed.
+            // Pawns adjacent to the blast centre survive by Atomic rule.
+            Bitboard blast = 0;
+            for (int dr = -1; dr <= 1; ++dr)
+                for (int df = -1; df <= 1; ++df)
+                {
+                    int f = int(file_of(to)) + df, r = int(rank_of(to)) + dr;
+                    if (f >= FILE_A && f <= FILE_H && r >= RANK_1 && r <= RANK_8)
+                        blast |= make_square(File(f), Rank(r));
+                }
+            while (blast)
+            {
+                Square s = pop_lsb(blast);
+                Piece  p = piece_on(s);
+                if (p != NO_PIECE && (s == to || type_of(p) != PAWN))
+                {
+                    if (s != to)
+                        atomic_record(p, s);
+                    st->castlingRights &= ~castlingRightsMask[s];
+                    remove_piece(s, &dts);
+                }
+            }
+        }
+    }
+
     // Set capture piece
     st->capturedPiece = captured;
 
     // Calculate checkers bitboard (if move gives check)
-    st->checkersBB = givesCheck ? attackers_to(square<KING>(them)) & pieces(us) : 0;
+    st->checkersBB = givesCheck && count<KING>(them) && piece_on(square<KING>(them)) != NO_PIECE
+                   ? attackers_to(square<KING>(them)) & pieces(us)
+                   : 0;
 
     sideToMove = ~sideToMove;
 
     // Update king attacks used for fast check detection
-    set_check_info();
+    if constexpr (Variant::Atomic)
+    {
+        set_state();
+        normalize_atomic_ep();
+    }
+    else
+        set_check_info();
 
     // Calculate the repetition info. It is the ply distance from the previous
     // occurrence of the same position, negative in the 3-fold case, or zero
@@ -1077,7 +1259,8 @@ void Position::do_move(Move                      m,
         }
     }
 
-    assert(pos_is_ok());
+    if constexpr (!Variant::Atomic)
+        assert(pos_is_ok());
 
     dpps.after[WHITE] = pieces(WHITE, PAWN);
     dpps.after[BLACK] = pieces(BLACK, PAWN);
@@ -1102,8 +1285,25 @@ void Position::undo_move(Move m) {
     Square to   = m.to_sq();
     Piece  pc   = piece_on(to);
 
+    if constexpr (Variant::Atomic)
+    {
+        if (st->atomicCapture)
+        {
+            // The mover was part of the blast and is therefore absent from
+            // the destination. Restore all collateral/target pieces followed
+            // by the original mover at its source square.
+            for (int i = 0; i < st->atomicRemovedCount; ++i)
+                put_piece(st->atomicRemovedPiece[i], st->atomicRemovedSquare[i]);
+            put_piece(st->atomicMover, st->atomicMoverFrom);
+            st = st->previous;
+            --gamePly;
+            return;
+        }
+    }
+
     assert(empty(from) || m.type_of() == CASTLING);
-    assert(type_of(st->capturedPiece) != KING);
+    if constexpr (!Variant::Atomic)
+        assert(type_of(st->capturedPiece) != KING);
 
     if (m.type_of() == PROMOTION)
     {
@@ -1147,7 +1347,8 @@ void Position::undo_move(Move m) {
     st = st->previous;
     --gamePly;
 
-    assert(pos_is_ok());
+    if constexpr (!Variant::Atomic)
+        assert(pos_is_ok());
 }
 
 inline void add_dirty_threat(DirtyThreats* const dts,
@@ -1502,6 +1703,13 @@ bool Position::see_ge(Move m, int threshold) const {
 // Tests whether the position is drawn by 50-move rule
 // or by repetition. It does not detect stalemates.
 bool Position::is_draw(int ply) const {
+    if constexpr (Variant::Atomic)
+    {
+        if (!count<KING>(WHITE) || !count<KING>(BLACK))
+            return false;
+        if (atomic_insufficient_material())
+            return true;
+    }
 
     if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
         return true;
@@ -1618,6 +1826,33 @@ bool Position::material_key_is_ok() const { return compute_material_key() == st-
 // and raise an assert if something wrong is detected.
 // This is meant to be helpful when debugging.
 bool Position::pos_is_ok() const {
+
+    if constexpr (Variant::Atomic)
+    {
+        if (sideToMove != WHITE && sideToMove != BLACK)
+            return false;
+        if (count<KING>(WHITE) > 1 || count<KING>(BLACK) > 1
+            || count<KING>(WHITE) + count<KING>(BLACK) == 0)
+            return false;
+        Bitboard occupied = 0;
+        for (int s = 0; s < SQUARE_NB; ++s)
+            if (board[s] != NO_PIECE)
+            {
+                Piece pc = board[s];
+                if (!(pieces(color_of(pc), type_of(pc)) & Square(s)))
+                    return false;
+                occupied |= Square(s);
+            }
+        if (occupied != pieces() || (pieces(WHITE) & pieces(BLACK))
+            || (pieces(WHITE) | pieces(BLACK)) != occupied
+            || (pieces(PAWN) & (Rank1BB | Rank8BB)))
+            return false;
+        for (Piece pc : Pieces)
+            if (pieceCount[pc] != popcount(pieces(color_of(pc), type_of(pc)))
+                || pieceCount[pc] != std::count(board.begin(), board.end(), pc))
+                return false;
+        return material_key_is_ok() && st->checkersBB == atomic_checkers(sideToMove);
+    }
 
     if ((sideToMove != WHITE && sideToMove != BLACK) || piece_on(square<KING>(WHITE)) != W_KING
         || piece_on(square<KING>(BLACK)) != B_KING

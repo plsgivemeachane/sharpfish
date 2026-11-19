@@ -16,6 +16,7 @@
 namespace Stockfish::Variant {
 
 constexpr const char* EngineName = "";
+constexpr bool Atomic = false;
 constexpr int  PieceValueTweakCp[5] = {0, 0, 0, 0, 0};
 constexpr int  NnueScalePercent     = 100;
 constexpr bool EnableEvalHook       = false;

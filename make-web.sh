@@ -40,7 +40,7 @@ fi
 #    The stock engine behind the eval bar is built once (all variant settings
 #    off via -DVARIANT_STOCK) and committed in site/stock-engine/.
 STOCK_DIR=site/stock-engine
-if [ "$CMD" = "stock" ] || [ ! -f "$STOCK_DIR/stockfish-stock.wasm" ]; then
+if [ "$CMD" = "stock" ]; then
     echo ">> Building stock reference engine (eval bar)..."
     EXTRACXXFLAGS="-DVARIANT_STOCK" node build.js --single-threaded --lite -f -s \
         --basename=stockfish-stock "$@"
@@ -60,7 +60,11 @@ ENGINE_WASM="${ENGINE_JS%.js}.wasm"
 cp "src/$ENGINE_JS" "src/$ENGINE_WASM" site/engine/
 cat > site/engine-file.js <<EOF2
 window.ENGINE_FILE = "engine/$ENGINE_JS";
-window.STOCK_ENGINE_FILE = "stock-engine/stockfish-stock.js";
+// Analysis uses an independent Worker running the same Atomic-aware engine.
+window.STOCK_ENGINE_FILE = new URL(window.ENGINE_FILE, location.href).pathname;
+window.SHARPFISH_ANALYSIS_ENGINES = {atomic:window.STOCK_ENGINE_FILE,standard:new URL("stock-engine/stockfish-stock.js",location.href).pathname};
+window.SHARPFISH_VARIANT = {slug:"atomic",title:"Atomic Chess",supported:true,analysisMode:"atomic",analysisEnginePath:window.STOCK_ENGINE_FILE,
+  analysisFeatures:{evaluation:true,grading:true,alternatives:true,greatBrilliant:false,accuracy:false,estimatedElo:false}};
 EOF2
 echo ">> Engine copied to site/engine/$ENGINE_JS (+ .wasm, $(du -h "site/engine/$ENGINE_WASM" | cut -f1))"
 

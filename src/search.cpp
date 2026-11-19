@@ -197,6 +197,109 @@ void Search::Worker::ensure_network_replicated() {
     (void) (network[numaAccessToken]);
 }
 
+// Small, deliberately conservative Atomic search. Orthodox Stockfish's NNUE,
+// SEE and pruning assume two kings and a single captured piece; Atomic removes
+// an arbitrary blast set and may end with one king, so this path uses legal
+// move generation plus a material/king-terminal evaluation instead.
+Value Search::Worker::atomic_negamax(Position& pos,
+                                     int depth, Value alpha, Value beta,
+                                     std::vector<Move>& pv, int ply) {
+    if (!pos.count<KING>(pos.side_to_move()))
+        return -VALUE_MATE + ply;
+    if (!pos.count<KING>(~pos.side_to_move()))
+        return VALUE_MATE - ply;
+    ++nodes;
+    const auto budget = limits.movetime ? limits.movetime : main_manager()->tm.maximum();
+    if (threads.stop || (limits.nodes && nodes >= limits.nodes)
+        || (!limits.infinite && main_manager()->tm.elapsed_time() >= budget))
+    {
+        threads.stop = true;
+        return VALUE_DRAW;
+    }
+    if (pos.is_draw(ply))
+        return VALUE_DRAW;
+    MoveList<LEGAL> moves(pos);
+    if (!moves.size())
+        return pos.checkers() ? -VALUE_MATE + ply : VALUE_DRAW;
+
+    Value material = 0;
+    for (Color c : {WHITE, BLACK})
+        for (PieceType pt = PAWN; pt < KING; ++pt)
+            material += (c == pos.side_to_move() ? 1 : -1)
+                      * PieceValue[make_piece(c, pt)] * popcount(pos.pieces(c, pt));
+    // Resolve a bounded sequence of explosions at the horizon. In check,
+    // examine evasions instead of accepting a material-only stand pat.
+    if (depth <= -3 || ply >= MAX_PLY - 1)
+        return material;
+    Value best = -VALUE_INFINITE;
+    if (depth <= 0 && !pos.checkers())
+    {
+        best = material;
+        if (best >= beta) return best;
+        alpha = std::max(alpha, best);
+    }
+    for (const auto& m : moves)
+    {
+        if (depth <= 0 && !pos.checkers() && !pos.capture(m)) continue;
+        StateInfo st;
+        pos.do_move(m, st, &tt);
+        std::vector<Move> child;
+        Value score = -atomic_negamax(pos, depth - 1, -beta, -alpha, child, ply + 1);
+        pos.undo_move(m);
+        if (threads.stop) return VALUE_DRAW;
+        if (score > best)
+        {
+            best = score;
+            pv = {m};
+            pv.insert(pv.end(), child.begin(), child.end());
+        }
+        alpha = std::max(alpha, score);
+        if (alpha >= beta) break;
+    }
+    return best;
+}
+
+Value Search::Worker::atomic_search_root() {
+    Skill skill(options["Skill Level"], bool(options["UCI_LimitStrength"]), int(options["UCI_Elo"]));
+    int maxDepth = limits.depth ? limits.depth : 12;
+    if (skill.enabled())
+        maxDepth = std::min(maxDepth, skill.beginner() ? 2 : 2 + int(skill.level) / 4);
+    maxDepth = std::clamp(maxDepth, 1, 12);
+    for (int depth = 1; depth <= maxDepth && !threads.stop; ++depth)
+    {
+        // Publish only complete iterations; interruption retains a legal move
+        // and the last complete ranking, including all MultiPV scores.
+        auto iteration = rootMoves;
+        for (auto& rm : iteration)
+        {
+            Move rootMove = rm.pv[0];
+            StateInfo st;
+            rootPos.do_move(rootMove, st, &tt);
+            std::vector<Move> child;
+            Value score = -atomic_negamax(rootPos, depth - 1, -VALUE_INFINITE, VALUE_INFINITE, child, 1);
+            rootPos.undo_move(rootMove);
+            if (threads.stop) break;
+            rm.score = rm.uciScore = score;
+            rm.pv.clear();
+            rm.pv.push_back(rootMove);
+            rm.pv.insert(rm.pv.end(), child.begin(), child.end());
+        }
+        if (threads.stop) break;
+        std::stable_sort(iteration.begin(), iteration.end());
+        rootMoves = std::move(iteration);
+        main_manager()->output_pv(*this, threads, tt, depth);
+        if (!limits.infinite && main_manager()->tm.elapsed_time() >= main_manager()->tm.optimum()) break;
+    }
+    if (skill.enabled() && rootMoves.size() > 1)
+    {
+        Move choice = skill.pick_best(rootPos, rootMoves, rootMoves.size());
+        auto selected = std::find_if(rootMoves.begin(), rootMoves.end(),
+                                    [choice](const auto& rm) { return rm.pv[0] == choice; });
+        if (selected != rootMoves.end()) std::iter_swap(rootMoves.begin(), selected);
+    }
+    return rootMoves[0].score;
+}
+
 void Search::Worker::start_searching() {
 
 #ifdef __EMSCRIPTEN_SINGLE_THREADED__
@@ -219,9 +322,24 @@ void Search::Worker::start_searching() {
 
     if (rootMoves.empty())
     {
+        if constexpr (Variant::Atomic)
+        {
+            Value terminal = !rootPos.count<KING>(rootPos.side_to_move()) ? -VALUE_MATE
+                         : !rootPos.count<KING>(~rootPos.side_to_move()) ? VALUE_MATE : rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW;
+            main_manager()->updates.onUpdateNoMoves({0, {terminal, rootPos}});
+        }
+        else
         main_manager()->updates.onUpdateNoMoves(
           {0, {rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW, rootPos}});
         main_manager()->updates.onBestmove(UCIEngine::move(Move::none()), "");
+        return;
+    }
+
+    if constexpr (Variant::Atomic)
+    {
+        atomic_search_root();
+        threads.stop = true;
+        main_manager()->updates.onBestmove(UCIEngine::move(rootMoves[0].pv[0], rootPos.is_chess960()), "");
         return;
     }
 

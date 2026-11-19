@@ -32,6 +32,7 @@
 #include "attacks.h"
 #include "bitboard.h"
 #include "types.h"
+#include "variant/config.h"
 
 namespace Stockfish {
 
@@ -64,6 +65,15 @@ struct StateInfo {
     Bitboard   checkSquares[PIECE_TYPE_NB];
     Piece      capturedPiece;
     int        repetition;
+
+    // Atomic capture undo data. The moving piece is represented separately;
+    // these are collateral/target pieces removed by the blast.
+    uint8_t    atomicRemovedCount;
+    Piece      atomicRemovedPiece[10];
+    Square     atomicRemovedSquare[10];
+    Piece      atomicMover;
+    Square     atomicMoverFrom;
+    bool       atomicCapture;
 };
 
 
@@ -156,6 +166,9 @@ class Position {
 
     // Static Exchange Evaluation
     bool see_ge(Move m, int threshold = 0) const;
+    Bitboard atomic_checkers(Color c) const;
+    bool atomic_insufficient_material() const;
+    void normalize_atomic_ep();
 
     // Accessing hash keys
     Key key() const;
@@ -272,7 +285,13 @@ inline int Position::count() const {
 
 template<PieceType Pt>
 inline Square Position::square(Color c) const {
-    assert(count<Pt>(c) == 1);
+    if constexpr (Variant::Atomic)
+    {
+        if (count<Pt>(c) == 0)
+            return SQ_NONE;
+    }
+    else
+        assert(count<Pt>(c) == 1);
     return lsb(pieces(c, Pt));
 }
 
@@ -386,7 +405,7 @@ inline void Position::put_piece(Piece pc, Square s, [[maybe_unused]] DirtyThreat
     pieceCount[make_piece(color_of(pc), ALL_PIECES)]++;
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats(pc, true, s, dts);
 #endif
 }
@@ -395,7 +414,7 @@ inline void Position::remove_piece(Square s, [[maybe_unused]] DirtyThreats* cons
     Piece pc = board[s];
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats(pc, false, s, dts);
 #endif
 
@@ -412,7 +431,7 @@ inline void Position::move_piece(Square from, Square to, [[maybe_unused]] DirtyT
     Bitboard fromTo = from | to;
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats(pc, false, from, dts, fromTo);
 #endif
 
@@ -423,7 +442,7 @@ inline void Position::move_piece(Square from, Square to, [[maybe_unused]] DirtyT
     board[to]   = pc;
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats(pc, true, to, dts, fromTo);
 #endif
 }
@@ -434,14 +453,14 @@ inline void Position::swap_piece(Square s, Piece pc, [[maybe_unused]] DirtyThrea
     remove_piece(s);
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats<false>(old, false, s, dts);
 #endif
 
     put_piece(pc, s);
 
 #ifndef USE_LITE_NET
-    if (dts)
+    if (dts && !Variant::Atomic)
         update_piece_threats<false>(pc, true, s, dts);
 #endif
 }

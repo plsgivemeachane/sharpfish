@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sharpfish</title>
-<meta name="description" content="Sharpfish: Stockfish variants, but not dumb. Play them in your browser.">
+<title>Sharpfish · Atomic Chess</title>
+<meta name="description" content="Atomic Chess: every capture explodes nearby pieces. Blow up the enemy king to win.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="badges.css">
@@ -16,7 +16,7 @@
   <div class="brand">
     <img src="favicon.svg" alt="" width="30" height="30">
     <span class="site-name">Sharpfish</span>
-    <span class="tagline">It knows. It adapts.</span>
+    <span class="tagline">Atomic Chess</span>
   </div>
 </header>
 
@@ -27,12 +27,13 @@
       <div id="clock-top" class="clock" role="timer" aria-label="Your clock" hidden></div>
     </div>
     <div class="board-row">
-      <div id="evalbar" class="evalbar" title="Stock Stockfish evaluation">
+      <div id="evalbar" class="evalbar" title="Atomic evaluation">
         <div class="evalbar-white"></div>
         <span id="eval-label" class="evalbar-label"></span>
       </div>
       <div id="board" class="board" role="grid"></div>
     </div>
+    <div id="blast-hint" class="hint blast-hint" aria-live="polite">Select a piece to see legal moves. Hover a capture to preview its blast.</div>
     <div class="player-row">
       <div class="player-tag" id="tag-bottom"></div>
       <div id="clock-bottom" class="clock" role="timer" aria-label="Your clock" hidden></div>
@@ -41,7 +42,7 @@
 
   <aside class="panel panel-game" aria-label="Game">
     <div class="card status-card">
-      <div id="status" class="status">Starting…</div>
+      <div id="status" class="status" role="status" aria-live="polite">Starting…</div>
       <div id="engine-line" class="engine-line">&nbsp;</div>
       <div id="premove-state" class="premove-state" hidden>
         <span id="premove-count" role="status"></span>
@@ -102,13 +103,12 @@
         <span id="bot-current" class="bot-current"></span>
       </div>
       <div id="bot-groups" class="bot-groups"></div>
-      <div class="hint">Approximate engine ratings; these do not measure your Chess.com rating.</div>
+      <div class="hint">Atomic difficulty tiers are experimental, with no Elo rating claims.</div>
       <details class="advanced">
         <summary>Custom strength</summary>
-        <label class="field" for="rng-elo">Elo <output id="elo-out"></output></label>
+        <label class="field" for="rng-elo">Difficulty <output id="elo-out"></output></label>
         <input type="range" id="rng-elo" min="0" max="3200" step="50">
-        <div class="hint">Approximate targets, applied from the next move. Outside the tested range,
-          the closest tested strength is shown. Far right is full strength.</div>
+        <div class="hint">Applies from the next move. Far right is full strength.</div>
       </details>
     </section>
 
@@ -155,18 +155,27 @@
       <label class="field switch">Sound effects
         <input type="checkbox" id="chk-sound" checked>
       </label>
-      <label class="field switch">Eval bar <span class="field-note">stock Stockfish</span>
+      <label class="field switch">Eval bar <span class="field-note">Atomic engine</span>
         <input type="checkbox" id="chk-eval">
       </label>
       <label class="field switch">Real-time move grading
         <input type="checkbox" id="chk-grade">
       </label>
-      <label class="field switch sub" title="Look for Great and Brilliant moves. Off keeps ordinary grades and skips that extra check.">Great / Brilliant moves
-        <input type="checkbox" id="chk-special-grades" checked>
+      <label class="field switch sub" hidden>Special move labels
+        <input type="checkbox" id="chk-special-grades" disabled>
       </label>
       <div id="grade-status" class="hint" role="status"></div>
     </section>
 
+    <section class="card atomic-rules" aria-labelledby="atomic-heading">
+      <h2 id="atomic-heading" class="card-title">Atomic rules</h2>
+      <p>Every capture explodes the capturing piece, its target and all adjacent non-pawns — friendly or enemy. Nearby pawns survive.</p>
+      <p>Explode the enemy king or deliver checkmate to win. A move that explodes your own king is illegal.</p>
+      <details><summary>King safety and special moves</summary>
+        <p>Kings cannot capture and may stand next to each other. En passant explodes around the capturing pawn’s landing square. Castling and promotion follow Atomic legality.</p>
+        <p>Blast previews use × for removed pieces and a shield for pawns that survive. Evaluation and grades use Atomic rules; their judgment is experimental.</p>
+      </details>
+    </section>
     <details class="card tips">
       <summary>Tips: premoves and arrows</summary>
       <ul>
@@ -181,11 +190,12 @@
 <footer class="foot">
   <p>Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).
   Engine: <a href="https://github.com/official-stockfish/Stockfish">Stockfish</a>
-  via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, GPLv3.
+  via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, extended for Atomic Chess, GPLv3.
   Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a></p>
 </footer>
 
 <div id="promo" class="promo" hidden></div>
+<script src="atomic.js"></script>
 <script src="bots.js"></script>
 <script src="analysis-core.js"></script>
 <script src="game-history.js"></script>

@@ -7,6 +7,10 @@
 "use strict";
 
 var BADGE_ROOT = (window.SHARPFISH_VARIANT || {}).badgePath || "badges/";
+var ATOMIC = (window.SHARPFISH_VARIANT || {}).slug === "atomic";
+var blastPreview = null;
+var blastFlash = null;
+var blastTimer = null;
 
 // ---------------------------------------------------------------- Engine
 // Avatar next to your name: a drawn person. The engine's avatar comes from
@@ -159,7 +163,8 @@ var boardEl = $("board");
 
 function variantInfo() {
   var v = window.SHARPFISH_VARIANT || {};
-  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode };
+  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode,
+    analysisEnginePath: v.analysisEnginePath || (ATOMIC ? window.ENGINE_FILE : undefined), revision: v.revision };
 }
 function historyRecord() {
   if (!game.historyId) return null;
@@ -170,7 +175,8 @@ function historyRecord() {
     }), headers: {
       White: game.botMatch ? game.matchBots.w.name : game.playerColor === "w" ? "You" : bot.name,
       Black: game.botMatch ? game.matchBots.b.name : game.playerColor === "b" ? "You" : bot.name,
-      Event: variantInfo().title
+      Event: variantInfo().title,
+      Variant: ATOMIC ? "Atomic" : "Standard"
     }, result: game.over ? (/White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2") : "*",
     grades: game.grades || {}, meta: { playerColor: game.playerColor, botMatch: !!game.botMatch,
       bot: botMetadata(bot), botProfiles: (game.botProfiles || []).slice(),
@@ -212,11 +218,12 @@ function refreshPosition() {
   return engine.request([positionCmd(), "d", "go perft 1", "isready"],
     function (l) { return l === "readyok"; }
   ).then(function (lines) {
-    var fen = "", inCheck = false, legal = [];
+    var fen = "", inCheck = false, legal = [], atomicResult = "none";
     lines.forEach(function (l) {
       var m;
       if (l.indexOf("Fen: ") === 0) fen = l.slice(5).trim();
       else if (l.indexOf("Checkers:") === 0) inCheck = l.slice(9).trim().length > 0;
+      else if (l.indexOf("Atomic result: ") === 0) atomicResult = l.slice(15).trim();
       else if ((m = l.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/))) legal.push(m[1]);
     });
     var parts = fen.split(" ");
@@ -227,7 +234,8 @@ function refreshPosition() {
       halfmove: Number(parts[4]) || 0,
       repKey: parts.slice(0, 4).join(" "),
       legal: legal,
-      inCheck: inCheck
+      inCheck: inCheck,
+      atomicResult: atomicResult
     };
   });
 }
@@ -330,7 +338,7 @@ function analyse() {
       if (!m) return;
       var depth = (l.match(/ depth (\d+)/) || [])[1];
       var n = Number(m[2]);
-      var title = "Stock Stockfish · depth " + depth;
+      var title = (ATOMIC ? "Atomic engine" : "Stock Stockfish") + " · depth " + depth;
       if (m[1] === "mate") {
         // "mate 0" = the side to move is already mated
         var whiteWins = n === 0 ? turn === "b" : (n > 0) === (turn === "w");
@@ -353,7 +361,8 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { fen: p.fen, board: p.board, legal: p.legal, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck };
+  return { fen: p.fen, board: p.board, legal: p.legal, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck,
+    atomicResult: p.atomicResult, blast: p.blast || null };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -381,6 +390,8 @@ function playMove(uci) {
   }
   var token = game.token;
   var before = pos;
+  blastPreview = null;
+  var explosion = ATOMIC ? SFAtomic.blast(before.board, uci) : null;
   if (pos.turn === game.playerColor) shapes = []; // your move clears your arrows
   game.san.push(toSan(pos, uci));
   game.moves.push(uci);
@@ -391,15 +402,23 @@ function playMove(uci) {
   refreshPosition().then(function (next) {
     if (token !== game.token) return;
     next.lastMove = uci;
+    next.blast = explosion;
     pos = next;
     game.repKeys.push(next.repKey);
     game.boards.push(snapshot(next, uci));
 
     var i = game.san.length - 1;
-    if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
+    if (ATOMIC && /^(white|black)$/.test(next.atomicResult)) game.san[i] += "#";
+    else if (!next.legal.length) game.san[i] += next.inCheck ? "#" : "";
     else if (next.inCheck) game.san[i] += "+";
 
     checkGameOver();
+    if (explosion && game.view === null) {
+      blastFlash = explosion;
+      clearTimeout(blastTimer);
+      blastTimer = setTimeout(function () { blastFlash = null; if (token === game.token) render(); }, 260);
+    }
+    if (game.over) stopClock();
     if (window.SFSound && game.view === null) SFSound.move(before, uci, next, !!game.over);
     persistGame();
     if (game.over) clearPremoves();
@@ -411,13 +430,18 @@ function playMove(uci) {
 
 function checkGameOver() {
   var winner = pos.turn === "w" ? "Black" : "White";
-  if (!pos.legal.length) {
+  if (ATOMIC && /^(white|black)$/.test(pos.atomicResult)) {
+    winner = pos.atomicResult === "white" ? "White" : "Black";
+    game.over = "Explosion" + (pos.lastMove ? " on " + pos.lastMove.slice(2, 4) : "") + " — " + winner + " wins";
+  } else if (ATOMIC && pos.atomicResult === "draw") {
+    game.over = "Draw — insufficient material";
+  } else if (!pos.legal.length) {
     game.over = pos.inCheck ? "Checkmate — " + winner + " wins" : "Stalemate — draw";
   } else if (pos.halfmove >= 100) {
     game.over = "Draw by the 50-move rule";
   } else if (game.repKeys.filter(function (k) { return k === pos.repKey; }).length >= 3) {
     game.over = "Draw by threefold repetition";
-  } else if (insufficientMaterial(pos.board)) {
+  } else if (!ATOMIC && insufficientMaterial(pos.board)) {
     game.over = "Draw — insufficient material";
   } else {
     game.over = null;
@@ -489,6 +513,8 @@ function maybeEngineTurn() {
 }
 
 function newGame(color, botMatch, silent) {
+  blastPreview = null; blastFlash = null;
+  clearTimeout(blastTimer);
   clearPremoves();
   if (window.SFSound) SFSound.stop();
   var token = ++game.token;
@@ -633,6 +659,7 @@ function canPremove() {
 }
 
 function clearPremoves() {
+  if (typeof ATOMIC !== "undefined" && ATOMIC) blastPreview = null;
   premoves = [];
   selected = null;
   $("promo").hidden = true;
@@ -644,6 +671,7 @@ function premoveBoard(base) {
   premoves.forEach(function (uci) {
     var from = uci.slice(0, 2), to = uci.slice(2, 4), piece = board[from];
     if (!piece || (isWhite(piece) ? "w" : "b") !== game.playerColor) return;
+    if (typeof ATOMIC !== "undefined" && ATOMIC) { board = SFAtomic.project(board, uci); return; }
     if (piece.toUpperCase() === "P" && from[0] !== to[0] && !board[to]) {
       var captured = to[0] + from[1];
       if (board[captured] === (isWhite(piece) ? "p" : "P")) delete board[captured];
@@ -704,6 +732,68 @@ function runPremove() {
 function movesFrom(sq) {
   return canPremove() ? premoveMoves(sq) : pos.legal.filter(function (m) { return m.slice(0, 2) === sq; });
 }
+
+function previewBlast(to) {
+  var move = ATOMIC && selected && canMove() && pos.legal.find(function (m) {
+    return m.slice(0, 2) === selected && m.slice(2, 4) === to;
+  });
+  blastPreview = move ? SFAtomic.blast(pos.board, move) : null;
+  paintBlast();
+}
+
+function paintBlast() {
+  if (!ATOMIC) return;
+  if (!selected || !canMove() || (blastPreview && blastPreview.from !== selected)) blastPreview = null;
+  boardEl.querySelectorAll(".blast-area,.blast-center").forEach(function (el) { el.classList.remove("blast-area", "blast-center"); });
+  boardEl.querySelectorAll(".blast-marker").forEach(function (el) { el.remove(); });
+  if (blastPreview) {
+    blastPreview.area.forEach(function (sq) { squareEl(sq).classList.add("blast-area"); });
+    squareEl(blastPreview.center).classList.add("blast-center");
+    [[blastPreview.removed, "×", "Removed by capture", ""], [blastPreview.immune, "🛡", "Pawn survives", " immune"]].forEach(function (group) {
+      group[0].forEach(function (sq) {
+        var marker = document.createElement("span");
+        marker.className = "blast-marker" + group[3]; marker.textContent = group[1];
+        marker.setAttribute("aria-label", group[2]); squareEl(sq).appendChild(marker);
+      });
+    });
+  }
+  var hint = $("blast-hint");
+  if (hint) hint.textContent = blastPreview ? "Blast on " + blastPreview.center + ": × removed; 🛡 adjacent pawns survive."
+    : "Select a piece to see legal moves. Hover or focus a capture to preview its blast.";
+}
+
+boardEl.addEventListener("pointermove", function (e) {
+  if (!ATOMIC || drawing) return;
+  var sq = squareAt(e.clientX, e.clientY);
+  previewBlast(sq && sq.dataset.sq);
+});
+boardEl.addEventListener("pointerleave", function () { if (!drag) previewBlast(null); });
+boardEl.addEventListener("focusin", function (e) {
+  var sq = e.target.closest(".sq");
+  if (sq) previewBlast(sq.dataset.sq);
+});
+boardEl.addEventListener("keydown", function (e) {
+  var sqEl = e.target.closest(".sq");
+  if (!sqEl) return;
+  var sq = sqEl.dataset.sq;
+  if (/^Arrow/.test(e.key)) {
+    var f = FILES.indexOf(sq[0]), r = +sq[1], direction = game.flipped ? -1 : 1;
+    if (e.key === "ArrowLeft") f -= direction;
+    if (e.key === "ArrowRight") f += direction;
+    if (e.key === "ArrowUp") r += direction;
+    if (e.key === "ArrowDown") r -= direction;
+    var target = f >= 0 && f < 8 && r >= 1 && r <= 8 && squareEl(FILES[f] + r);
+    if (target) { sqEl.tabIndex = -1; target.tabIndex = 0; target.focus(); }
+  } else if (e.key === "Enter" || e.key === " ") {
+    if (selected && sq !== selected && tryMove(selected, sq, sqEl)) { /* move accepted */ }
+    else if (canMove() || canPremove()) {
+      var piece = (canPremove() ? premoveBoard() : pos.board)[sq];
+      selected = piece && (isWhite(piece) ? "w" : "b") === game.playerColor ? sq : null;
+      render(); squareEl(sq).focus();
+    }
+  } else return;
+  e.preventDefault(); e.stopPropagation();
+});
 
 function tryMove(from, to, anchorEl) {
   var queued = canPremove();
@@ -1035,7 +1125,9 @@ function render() {
 
   // While waiting for the engine to confirm a move, show the move already made.
   var board = shown ? shown.board : pos.board;
-  if (!shown && pos.pending && pos.lastMove) {
+  if (!shown && pos.pending && pos.lastMove && ATOMIC) {
+    board = SFAtomic.project(board, pos.lastMove);
+  } else if (!shown && pos.pending && pos.lastMove) {
     board = Object.assign({}, board);
     var m = pos.lastMove, from = m.slice(0, 2), to = m.slice(2, 4), p = board[from];
     var df = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
@@ -1070,13 +1162,17 @@ function render() {
       if (queuedAt.length) cls += " premove";
       if (sq === kingSq) cls += " check";
       if (dests.indexOf(sq) >= 0) cls += " dest" + (board[sq] ? " occupied" : "");
-      html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell">';
+      if (blastPreview && blastPreview.area.indexOf(sq) >= 0) cls += " blast-area";
+      if (blastPreview && blastPreview.center === sq) cls += " blast-center";
+      if (blastFlash && !shown && blastFlash.area.indexOf(sq) >= 0) cls += " blast-flash";
+      html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell" tabindex="' + (sq === (selected || "e2") ? "0" : "-1") + '" aria-label="' + sq + '">';
       if (col === 0) html += '<span class="coord rank">' + rank + "</span>";
       if (row === 7) html += '<span class="coord file">' + FILES[file] + "</span>";
       if (board[sq]) {
         var pc = board[sq];
         html += '<img class="piece" draggable="false" src="' + pieceImg(pc) + '" alt="' +
           (isWhite(pc) ? "white " : "black ") + PIECE_NAMES[pc.toLowerCase()] + '">';
+      }
         var moveIndex = shownPly() - 1;
         var displayedMove = last.length === 2 && last[1] === sq;
         var grade = game.grades && game.grades[moveIndex];
@@ -1089,7 +1185,6 @@ function render() {
           html += '<img class="move-grade-overlay grade-' + gradeKey + '" src="' + BADGE_ROOT + gradeKey + '.png" alt="' +
             grade.label + '" title="' + grade.label + '" aria-label="' + grade.label + '">';
         }
-      }
       if (queuedAt.length) html += '<span class="premove-order">' + queuedAt.join(",") + "</span>";
       html += "</div>";
     }
@@ -1115,6 +1210,8 @@ function render() {
     }
   }
   drawShapes();
+
+  paintBlast();
 
   var youTop = game.playerColor === (flipped ? "w" : "b");
   if (game.botMatch) {
@@ -1179,7 +1276,7 @@ function renderMoves() {
 }
 
 function pgn() {
-  var out = SFAnalysis.snapshotAnalysis({ variant: variantInfo() }) ? '[Variant "' + variantInfo().slug + '"]\n\n' : "";
+  var out = ATOMIC ? '[Variant "Atomic"]\n\n' : SFAnalysis.snapshotAnalysis({ variant: variantInfo() }) ? '[Variant "' + variantInfo().slug + '"]\n\n' : "";
   game.san.forEach(function (s, i) { out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " "; });
   if (game.over) {
     out += /White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2";
@@ -1260,6 +1357,7 @@ if (!window.STOCK_ENGINE_FILE || !SFAnalysis.supportsRecord({ variant: variantIn
 // Great/Brilliant needs extra engine evidence; its own switch (persisted by
 // SFLive) cancels the in-flight grade and regrades with the new setting.
 $("chk-special-grades").checked = window.SFLive ? SFLive.specialMoves() : true;
+if (ATOMIC) $("chk-special-grades").checked = false;
 $("chk-special-grades").disabled = !window.STOCK_ENGINE_FILE || !SFAnalysis.supportsRecord({ variant: variantInfo() });
 $("chk-special-grades").onchange = function () { if (window.SFLive) SFLive.setSpecialMoves(this.checked); render(); };
 $("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(this.checked); render(); };

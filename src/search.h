@@ -391,6 +391,8 @@ class Worker {
 
    private:
     bool iterative_deepening();
+    Value atomic_search_root();
+    Value atomic_negamax(Position&, int, Value, Value, std::vector<Move>&, int);
 
     void do_move(Position& pos, const Move move, StateInfo& st, Stack* const ss);
     void

@@ -145,6 +145,14 @@ function ratingProfile(target, calibration, engineElo) {
 // Both UCI limits apply: a short safety cap can stop a rated search before its
 // node budget. A rating estimate is conditional on that cap and calibration.
 function botSearchConfig(selectedBot, movetime) {
+  if (atomicBots()) {
+    var control = selectedBot.elo === FULL ? FULL : selectedBot.engineElo === undefined ? selectedBot.elo : selectedBot.engineElo;
+    var atomicTime = Math.max(1, Number(movetime) || 2000);
+    var atomicCommands = ["setoption name Skill Level value 20", "setoption name UCI_LimitStrength value " + (control !== FULL)];
+    if (control !== FULL) atomicCommands.push("setoption name UCI_Elo value " + control);
+    return { profile: { status: "uncalibrated-atomic", engineControl: control }, commands: atomicCommands,
+      limits: { nodes: null, movetime: atomicTime }, go: "go movetime " + atomicTime };
+  }
   // Named opponents retain their measured engine configuration after relabeling;
   // custom opponents map a requested rating through the inverse calibration.
   var profile = ratingProfile(selectedBot.elo, null, selectedBot.engineElo);
@@ -217,6 +225,11 @@ function findBot(id) {
 }
 
 function botRating(bot) {
+  if (atomicBots()) {
+    if (bot.elo === FULL) return "Full";
+    var control = bot.engineElo === undefined ? bot.elo : bot.engineElo;
+    return control < 650 ? "Beginner" : control < 1200 ? "Novice" : control < 1900 ? "Intermediate" : "Advanced";
+  }
   if (bot.elo === FULL) return "Full";
   var profile = ratingProfile(bot.elo, null, bot.engineElo);
   return bot.custom && !profile.supported ? "≈" + profile.nearestRatedTarget : String(bot.elo);
@@ -224,9 +237,15 @@ function botRating(bot) {
 
 function botMetadata(bot) {
   if (!bot) return null;
+  if (atomicBots()) return { id: bot.id, name: bot.name, difficulty: botRating(bot),
+    engineControl: bot.elo === FULL ? FULL : bot.engineElo === undefined ? bot.elo : bot.engineElo, version: "atomic-v1" };
   var profile = ratingProfile(bot.elo, null, bot.engineElo);
   return { id: bot.id, name: bot.name, elo: bot.elo, engineElo: profile.engineElo,
     ratingVersion: profile.version, searchNodes: profile.nodes };
+}
+
+function atomicBots() {
+  return typeof window === "object" && (window.SHARPFISH_VARIANT || {}).slug === "atomic";
 }
 
 if (typeof module !== "undefined" && module.exports) {

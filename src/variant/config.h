@@ -31,7 +31,10 @@ namespace Stockfish::Variant {
 
 // What your variant is, shown by "uci" as "id name Stockfish variant (<this>)".
 // Example: "Knights only". "" keeps the default Stockfish name.
-constexpr const char* EngineName = "";
+constexpr const char* EngineName = "Atomic";
+// Atomic captures explode the capturing piece, the target, and adjacent
+// non-pawns.  Kept off in the stock reference build.
+constexpr bool Atomic = true;
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
