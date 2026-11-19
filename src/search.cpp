@@ -815,6 +815,11 @@ Value Search::Worker::search(
         // a shorter mate was found upward in the tree then there is no need to search
         // because we will never beat the current alpha. Equal and opposite logic applies
         // when being mated. In either case, return a fail-high score.
+        // Courier variant: a courier on its last rank walks off the board and
+        // wins next move, unless its side is already checkmated.
+        if (pos.courier_can_exit() && !(ss->inCheck && MoveList<LEGAL>(pos).size() == 0))
+            return mate_in(ss->ply + 1);
+
         alpha = std::max(mated_in(ss->ply), alpha);
         beta  = std::min(mate_in(ss->ply + 1), beta);
         if (alpha >= beta)
@@ -1722,6 +1727,9 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     // Step 2. Check for an immediate draw or maximum ply reached
     if (pos.is_draw(ss->ply) || ss->ply >= MAX_PLY)
         return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos) : VALUE_DRAW;
+
+    if (pos.courier_can_exit() && !(ss->inCheck && MoveList<LEGAL>(pos).size() == 0))
+        return mate_in(ss->ply + 1);
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 

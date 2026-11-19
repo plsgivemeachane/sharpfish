@@ -52,6 +52,7 @@ Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
 Key side, noPawns;
+Key courier[COLOR_NB][SQUARE_NB];
 
 }
 
@@ -138,6 +139,10 @@ void Position::init() {
         Zobrist::castling[cr] = rng.rand<Key>();
 
     Zobrist::side    = rng.rand<Key>();
+
+    for (Color c : {WHITE, BLACK})
+        for (Square s = SQ_A1; s <= SQ_H8; ++s)
+            Zobrist::courier[c][s] = rng.rand<Key>();
     Zobrist::noPawns = rng.rand<Key>();
 
     // Prepare the cuckoo tables
@@ -213,6 +218,23 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
     std::memset(si, 0, sizeof(StateInfo));
     st = si;
 
+    // Courier variant: optional "courier=e2,d7" token anywhere after the board.
+    // Each listed square must hold a pawn; that pawn becomes its side's courier.
+    Bitboard courierSquares = 0;
+    if (auto at = fenStr.find("courier="); at != string::npos)
+    {
+        std::istringstream cs(fenStr.substr(at + 8));
+        string             list;
+        cs >> list;
+        for (usize i = 0; i + 1 < list.size(); i += 3)
+        {
+            char f = list[i], r = list[i + 1];
+            if (f < 'a' || f > 'h' || r < '1' || r > '8')
+                return PositionSetError("Invalid FEN. Invalid courier square.");
+            courierSquares |= make_square(File(f - 'a'), Rank(r - '1'));
+        }
+    }
+
     ss >> std::noskipws;
 
     int numPieces = 0;
@@ -273,7 +295,14 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
     if (rank != RANK_1 || file != FILE_NB)
         return PositionSetError("Invalid FEN. Board state encoding ended but cursor not at end.");
 
-    if (pieces(PAWN) & (Rank1BB | Rank8BB))
+    if (courierSquares & ~pieces(PAWN))
+        return PositionSetError("Invalid FEN. A courier square does not hold a pawn.");
+    for (Color c : {WHITE, BLACK})
+        if (more_than_one(courierSquares & pieces(c)))
+            return PositionSetError("Invalid FEN. More than one courier per side.");
+    st->couriers = courierSquares;
+
+    if (pieces(PAWN) & ~courierSquares & (Rank1BB | Rank8BB))
         return PositionSetError("Unsupported position. Pawns on the first or eighth rank.");
 
     if (count<KING>(WHITE) != 1 || count<KING>(BLACK) != 1)
@@ -397,8 +426,8 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
         {
             st->epSquare = make_square(File(col - 'a'), Rank(row - '1'));
 
-            Bitboard pawns = attacks_bb<PAWN>(st->epSquare, ~sideToMove) & pieces(sideToMove, PAWN);
-            Bitboard target = (pieces(~sideToMove, PAWN) & (st->epSquare + pawn_push(~sideToMove)));
+            Bitboard pawns = attacks_bb<PAWN>(st->epSquare, ~sideToMove) & real_pawns(sideToMove);
+            Bitboard target = (real_pawns(~sideToMove) & (st->epSquare + pawn_push(~sideToMove)));
             Bitboard occ    = pieces() ^ target ^ st->epSquare;
 
             // En passant square will be considered only if
@@ -524,6 +553,12 @@ void Position::set_state() const {
     if (st->epSquare != SQ_NONE)
         st->key ^= Zobrist::enpassant[file_of(st->epSquare)];
 
+    for (Bitboard b = st->couriers; b;)
+    {
+        Square s = pop_lsb(b);
+        st->key ^= Zobrist::courier[color_of(piece_on(s))][s];
+    }
+
     if (sideToMove == BLACK)
         st->key ^= Zobrist::side;
 
@@ -607,6 +642,18 @@ string Position::fen() const {
     ss << (ep_square() == SQ_NONE ? " - " : " " + UCIEngine::square(ep_square()) + " ")
        << st->rule50 << " " << 1 + (gamePly - (sideToMove == BLACK)) / 2;
 
+    if (st->couriers)
+    {
+        ss << " courier=";
+        bool first = true;
+        for (Color c : {WHITE, BLACK})
+            if (Bitboard b = couriers(c))
+            {
+                ss << (first ? "" : ",") << UCIEngine::square(lsb(b));
+                first = false;
+            }
+    }
+
     return ss.str();
 }
 
@@ -648,8 +695,8 @@ Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
     const auto [bishopAttacks, rookAttacks] = both_attacks_bb(s, occupied);
 
     return (rookAttacks & pieces(ROOK, QUEEN)) | (bishopAttacks & pieces(BISHOP, QUEEN))
-         | (attacks_bb<PAWN>(s, BLACK) & pieces(WHITE, PAWN))
-         | (attacks_bb<PAWN>(s, WHITE) & pieces(BLACK, PAWN))
+         | (attacks_bb<PAWN>(s, BLACK) & real_pawns(WHITE))
+         | (attacks_bb<PAWN>(s, WHITE) & real_pawns(BLACK))
          | (attacks_bb<KNIGHT>(s) & pieces(KNIGHT)) | (attacks_bb<KING>(s) & pieces(KING));
 }
 
@@ -657,7 +704,7 @@ bool Position::attackers_to_exist(Square s, Bitboard occupied, Color c) const {
 
     return (attacks_bb<ROOK>(s, occupied) & pieces(c, ROOK, QUEEN))
         || (attacks_bb<BISHOP>(s, occupied) & pieces(c, BISHOP, QUEEN))
-        || (attacks_bb<PAWN>(s, ~c) & pieces(c, PAWN))
+        || (attacks_bb<PAWN>(s, ~c) & real_pawns(c))
         || (attacks_bb<KNIGHT>(s) & pieces(c, KNIGHT)) || (attacks_bb<KING>(s) & pieces(c, KING));
 }
 
@@ -735,8 +782,17 @@ bool Position::pseudo_legal(const Move m) const {
     if (pieces(us) & to)
         return false;
 
+    // Couriers can never be captured, and only step like a king onto empty squares
+    if (st->couriers & to)
+        return false;
+
+    if (st->couriers & from)
+    {
+        if (!(attacks_bb<KING>(from) & to) || !empty(to))
+            return false;
+    }
     // Handle the special case of a pawn move
-    if (type_of(pc) == PAWN)
+    else if (type_of(pc) == PAWN)
     {
         // We have already handled promotion moves, so destination cannot be on the 8th/1st rank
         if ((Rank8BB | Rank1BB) & to)
@@ -779,8 +835,8 @@ bool Position::gives_check(Move m) const {
     Square from = m.from_sq();
     Square to   = m.to_sq();
 
-    // Is there a direct check?
-    if (check_squares(type_of(piece_on(from))) & to)
+    // Is there a direct check? (a courier never attacks anything)
+    if (!(st->couriers & from) && (check_squares(type_of(piece_on(from))) & to))
         return true;
 
     // Is there a discovered check?
@@ -943,8 +999,16 @@ void Position::do_move(Move                      m,
     st->castlingRights &= ~(castlingRightsMask[from] | castlingRightsMask[to]);
     k ^= Zobrist::castling[st->castlingRights];
 
+    // A courier steps like a king: no en passant, no promotion, no rule-50 reset
+    if (st->couriers & from)
+    {
+        st->couriers ^= from | to;
+        k ^= Zobrist::courier[us][from] ^ Zobrist::courier[us][to];
+        st->pawnKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
+    }
+
     // If the moving piece is a pawn do some special extra work
-    if (type_of(pc) == PAWN)
+    else if (type_of(pc) == PAWN)
     {
         // Check if the en passant square needs to be set. Accurate e.p. info is needed
         // for correct zobrist key generation and 3-fold checking.
@@ -1406,6 +1470,10 @@ bool Position::see_ge(Move m, int threshold) const {
 
     assert(piece_on(from) != NO_PIECE);
 
+    // A courier can never be captured, so its steps are always safe
+    if (st->couriers & from)
+        return VALUE_ZERO >= threshold;
+
     int swap = PieceValue[piece_on(to)] - threshold;
     if (swap < 0)
         return false;
@@ -1635,7 +1703,7 @@ bool Position::pos_is_ok() const {
         assert(0 && "pos_is_ok: Kings");
 #endif
 
-    if ((pieces(PAWN) & (Rank1BB | Rank8BB)) || count<PAWN>(WHITE) > 8 || count<PAWN>(BLACK) > 8)
+    if ((pieces(PAWN) & ~st->couriers & (Rank1BB | Rank8BB)) || count<PAWN>(WHITE) > 8 || count<PAWN>(BLACK) > 8)
 #ifdef __EMSCRIPTEN__
         return false;
 #else

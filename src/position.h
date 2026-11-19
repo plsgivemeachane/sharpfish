@@ -54,6 +54,7 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    Bitboard couriers;  // Courier variant: un-capturable pawns that step like a king
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -106,6 +107,12 @@ class Position {
     Piece                               piece_on(Square s) const;
     const std::array<Piece, SQUARE_NB>& piece_array() const;
     Square                              ep_square() const;
+    Bitboard                            couriers() const { return st->couriers; }
+    Bitboard                            couriers(Color c) const { return st->couriers & pieces(c); }
+    // Pawns that really behave like pawns (attack, push, promote)
+    Bitboard                            real_pawns(Color c) const { return pieces(c, PAWN) & ~st->couriers; }
+    // Courier of the side to move stands on its last rank: it can walk off the board and win
+    bool                                courier_can_exit() const;
     bool                                empty(Square s) const;
     template<PieceType Pt>
     int count(Color c) const;
@@ -278,6 +285,10 @@ inline Square Position::square(Color c) const {
 
 inline Square Position::ep_square() const { return st->epSquare; }
 
+inline bool Position::courier_can_exit() const {
+    return couriers(sideToMove) & (sideToMove == WHITE ? Rank8BB : Rank1BB);
+}
+
 inline bool Position::can_castle(CastlingRights cr) const { return st->castlingRights & cr; }
 
 inline bool Position::castling_impeded(CastlingRights cr) const {
@@ -296,8 +307,8 @@ template<PieceType Pt>
 inline Bitboard Position::attacks_by(Color c) const {
 
     if constexpr (Pt == PAWN)
-        return c == WHITE ? pawn_attacks_bb<WHITE>(pieces(WHITE, PAWN))
-                          : pawn_attacks_bb<BLACK>(pieces(BLACK, PAWN));
+        return c == WHITE ? pawn_attacks_bb<WHITE>(real_pawns(WHITE))
+                          : pawn_attacks_bb<BLACK>(real_pawns(BLACK));
     else
     {
         Bitboard threats   = 0;

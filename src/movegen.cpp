@@ -115,10 +115,12 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
     constexpr Direction UpLeft   = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
     const Bitboard emptySquares = ~pos.pieces();
-    const Bitboard enemies      = Type == EVASIONS ? pos.checkers() : pos.pieces(Them);
+    const Bitboard enemies =
+      Type == EVASIONS ? pos.checkers() : pos.pieces(Them) & ~pos.couriers();
 
-    Bitboard pawnsOn7    = pos.pieces(Us, PAWN) & TRank7BB;
-    Bitboard pawnsNotOn7 = pos.pieces(Us, PAWN) & ~TRank7BB;
+    // Couriers are stored as pawns but never move like one
+    Bitboard pawnsOn7    = pos.real_pawns(Us) & TRank7BB;
+    Bitboard pawnsNotOn7 = pos.real_pawns(Us) & ~TRank7BB;
 
     // Single and double pawn pushes, no promotions
     if constexpr (Type != CAPTURES)
@@ -220,6 +222,16 @@ Move* generate_all(const Position& pos, Move* moveList) {
                : Type == NON_EVASIONS ? ~pos.pieces(Us)
                : Type == CAPTURES     ? pos.pieces(~Us)
                                       : ~pos.pieces();  // QUIETS
+        target &= ~pos.couriers();  // couriers can never be captured
+
+        // Courier: one king step onto an empty square, never a capture
+        if constexpr (Type != CAPTURES)
+            if (Bitboard c = pos.couriers(Us))
+            {
+                Square from = lsb(c);
+                moveList    = splat_moves(moveList, from,
+                                          Attacks::attacks_bb<KING>(from) & ~pos.pieces() & target);
+            }
 
         moveList = generate_pawn_moves<Us, Type>(pos, moveList, target);
         moveList = generate_moves<Us, KNIGHT>(pos, moveList, target);
@@ -228,7 +240,8 @@ Move* generate_all(const Position& pos, Move* moveList) {
         moveList = generate_moves<Us, QUEEN>(pos, moveList, target);
     }
 
-    Bitboard b = Attacks::attacks_bb<KING>(ksq) & (Type == EVASIONS ? ~pos.pieces(Us) : target);
+    Bitboard b = Attacks::attacks_bb<KING>(ksq) & ~pos.couriers()
+               & (Type == EVASIONS ? ~pos.pieces(Us) : target);
 
     moveList = splat_moves(moveList, ksq, b);
 
