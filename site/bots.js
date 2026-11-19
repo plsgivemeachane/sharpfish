@@ -1,8 +1,5 @@
-// The bots you can play, grouped by level. Each one is the same engine set to
-// a UCI_Elo (in steps of 50, 0..3150), so this works for every variant.
-//
-// Martin (250) and Stockfish (2800) are fixed: keep their names,
-// Elo and avatars. Every other bot can be renamed, re-rated or re-drawn.
+// Rated bots use UCI_Elo (0..3150). Engine presets always use full strength.
+// Keep roster identities and artwork stable.
 // Avatars: DiceBear 9.x "avataaars" by Pablo Stanley (free for personal and
 // commercial use), saved in avatars/. Martin: Chess.com portrait; see avatars/README.md.
 "use strict";
@@ -38,8 +35,9 @@ var BOT_GROUPS = [
     { id: "dario",  name: "Dario",  elo: 2350 },
     { id: "sasha",  name: "Sasha",  elo: 2500 },
   ] },
+  // Engine presets are unrestricted; a displayed rating must never limit them.
   { name: "Engine", bots: [
-    { id: "stockfish", name: "Stockfish", elo: 2800, fixed: true, avatar: "stockfish-logo.png" },
+    { id: "stockfish", name: "Stockfish", elo: FULL, fixed: true, avatar: "stockfish-logo.png" },
   ] },
 ];
 
