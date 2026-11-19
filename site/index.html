@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sharpfish</title>
+<title>Sharpfish — Courier</title>
 <meta name="description" content="Sharpfish: Stockfish variants, but not dumb. Play them in your browser.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
@@ -63,6 +63,14 @@
         <button id="btn-next" class="btn icon" title="Next move (&rarr;)" aria-label="Next move"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l7-5z" fill="currentColor"/></svg></button>
         <button id="btn-last" class="btn icon" title="Back to the game (End)" aria-label="Back to the game"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
       </div>
+    </section>
+
+    <section class="card rules" aria-labelledby="rules-heading">
+      <h2 id="rules-heading" class="card-title">Courier rules</h2>
+      <p class="rules-text"><img src="pieces/wC.svg" alt="" width="28" height="28"> Each side has one random pawn that is a <strong>Courier</strong>.
+        It steps one square in any direction onto an <em>empty</em> square, never captures and can't be captured, but it can be blocked.
+        Win by checkmate, or by getting your Courier onto the last rank: on your next turn it walks off the board and wins,
+        unless your opponent checkmates you first.</p>
     </section>
 
     <section class="card controls" aria-labelledby="game-heading">

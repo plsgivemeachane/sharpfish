@@ -433,3 +433,8 @@ option { background: #0c2642; color: var(--text); }
 }
 .premove-state:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
 .premove-state .btn { flex: none; font-size: 12px; padding: 6px 8px; }
+
+/* Courier variant rules card */
+.rules { padding: 16px; }
+.rules .rules-text { margin: 10px 0 0; font-size: 14px; line-height: 1.45; color: var(--text, inherit); }
+.rules .rules-text img { float: left; margin: 0 0.5rem 0.2rem 0; }

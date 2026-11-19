@@ -355,7 +355,7 @@
   }
   function snapshotAnalysis(record) {
     var variant = record && record.variant;
-    return !!variant && (["alternating-colors", "scp-096"].includes(variant.slug) || variant.analysisMode === "standard-snapshot");
+    return !!variant && (["alternating-colors", "scp-096", "courier"].includes(variant.slug) || variant.analysisMode === "standard-snapshot");
   }
   function unavailable(message) {
     var error = new Error(message); error.name = "AnalysisUnavailableError"; return error;
@@ -365,7 +365,7 @@
   function analysisFen(record, ply) {
     var snapshot = record.boards && record.boards[ply], fen = snapshot && snapshot.fen;
     if (!fen) throw unavailable("This position has no saved board for ordinary chess analysis.");
-    var fields = String(fen).trim().split(/\s+/), originalRights = fields[2], ep = fields[3];
+    var fields = String(fen).trim().split(/\s+/).slice(0, 6), originalRights = fields[2], ep = fields[3];
     if (record.variant && record.variant.slug === "scp-096") {
       fields[0] = fields[0].replace(/\*/g, "1").replace(/[1-8]+/g, function (run) {
         return String(Array.from(run).reduce(function (sum, digit) { return sum + Number(digit); }, 0));

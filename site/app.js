@@ -78,7 +78,7 @@ function Engine(file) {
 
 // ---------------------------------------------------------------- Helpers
 var FILES = "abcdefgh";
-var PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+var PIECE_NAMES = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king", c: "courier" };
 
 function pieceImg(p) { // p is a FEN letter, e.g. "N" or "q"
   var color = p === p.toUpperCase() ? "w" : "b";
@@ -95,6 +95,33 @@ function parseBoard(fen) { // -> { e4: "P", ... }
     }
   });
   return board;
+}
+
+// ---------------------------------------------------------------- Courier
+// Each side has one random pawn that is a Courier ("C"/"c" on this page): it
+// steps like a king onto empty squares, never captures and can't be captured.
+// The engine tracks it through the FEN field "courier=e2,d7". A courier that
+// stands on its last rank on its own turn walks off the board and wins.
+var START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+function randomCourierFen() {
+  var w = FILES[Math.floor(Math.random() * 8)], b = FILES[Math.floor(Math.random() * 8)];
+  return START_FEN + " courier=" + w + "2," + b + "7";
+}
+function courierSquares(fen) {
+  var m = String(fen).match(/courier=(\S+)/);
+  return m ? m[1].split(",") : [];
+}
+function markCouriers(board, fen) {
+  courierSquares(fen).forEach(function (sq) {
+    if (board[sq] === "P") board[sq] = "C";
+    else if (board[sq] === "p") board[sq] = "c";
+  });
+  return board;
+}
+// Square of the side to move's courier if it can walk off the board now.
+function courierExit(p) {
+  var lastRank = p.turn === "w" ? "8" : "1", own = p.turn === "w" ? "C" : "c";
+  return Object.keys(p.board).find(function (sq) { return p.board[sq] === own && sq[1] === lastRank; }) || null;
 }
 
 function isWhite(p) { return p && p === p.toUpperCase(); }
@@ -172,7 +199,7 @@ function historyRecord() {
       Black: game.botMatch ? game.matchBots.b.name : game.playerColor === "b" ? "You" : bot.name,
       Event: variantInfo().title
     }, result: game.over ? (/White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2") : "*",
-    grades: game.grades || {}, meta: { playerColor: game.playerColor, botMatch: !!game.botMatch,
+    grades: game.grades || {}, meta: { courierFen: game.startFen, playerColor: game.playerColor, botMatch: !!game.botMatch,
       bot: botMetadata(bot), botProfiles: (game.botProfiles || []).slice(),
       matchBots: game.matchBots ? { w: botMetadata(game.matchBots.w), b: botMetadata(game.matchBots.b) } : null }
   };
@@ -205,7 +232,7 @@ window.SFAppHooks.onGradeStatus = function (text) { $("grade-status").textConten
 // ---------------------------------------------------------------- Engine I/O
 function positionCmd(ply) { // ply: how many moves to include (default: all)
   var moves = ply == null ? game.moves : game.moves.slice(0, ply);
-  return "position startpos" + (moves.length ? " moves " + moves.join(" ") : "");
+  return "position fen " + (game.startFen || START_FEN) + (moves.length ? " moves " + moves.join(" ") : "");
 }
 
 function refreshPosition() {
@@ -222,7 +249,7 @@ function refreshPosition() {
     var parts = fen.split(" ");
     return {
       fen: fen,
-      board: parseBoard(fen),
+      board: markCouriers(parseBoard(fen), fen),
       turn: parts[1],
       halfmove: Number(parts[4]) || 0,
       repKey: parts.slice(0, 4).join(" "),
@@ -411,8 +438,13 @@ function playMove(uci) {
 
 function checkGameOver() {
   var winner = pos.turn === "w" ? "Black" : "White";
-  if (!pos.legal.length) {
-    game.over = pos.inCheck ? "Checkmate — " + winner + " wins" : "Stalemate — draw";
+  if (!pos.legal.length && pos.inCheck) {
+    game.over = "Checkmate — " + winner + " wins";
+  } else if (courierExit(pos)) {
+    // Walking off the board is always possible, so it ends the game at once.
+    game.over = "Courier escaped — " + (pos.turn === "w" ? "White" : "Black") + " wins";
+  } else if (!pos.legal.length) {
+    game.over = "Stalemate — draw";
   } else if (pos.halfmove >= 100) {
     game.over = "Draw by the 50-move rule";
   } else if (game.repKeys.filter(function (k) { return k === pos.repKey; }).length >= 3) {
@@ -496,6 +528,7 @@ function newGame(color, botMatch, silent) {
   if (thinking) engine.stop();
   thinking = false;
   game.moves = []; game.san = []; game.over = null;
+  game.startFen = randomCourierFen();
   game.botProfiles = [];
   game.historyId = null; game.historyCreatedAt = null; game.historyRevision = 0; game.grades = {};
   updateHistoryLinks();
@@ -674,6 +707,7 @@ function premoveMoves(from) {
     var allowed = type === "N" ? dx * ay === 2 :
       type === "B" ? dx === ay : type === "R" ? dx === 0 || dy === 0 :
       type === "Q" ? dx === ay || dx === 0 || dy === 0 :
+      type === "C" ? Math.max(dx, ay) === 1 && !board[to] :
       type === "K" ? Math.max(dx, ay) === 1 ||
         (from === (isWhite(piece) ? "e1" : "e8") && dy === 0 && dx === 2) :
       type === "P" && ((dy === direction && dx <= 1) ||
