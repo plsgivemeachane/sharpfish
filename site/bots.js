@@ -190,8 +190,9 @@ var BOT_GROUPS = [
     { id: "dario",  name: "Dario",  elo: 2200, previousElo: 2350, engineElo: 2350 },
     { id: "sasha",  name: "Sasha",  elo: 2350, previousElo: 2500, engineElo: 2500 },
   ] },
+  // Engine presets are unrestricted; a displayed rating must never limit them.
   { name: "Engine", bots: [
-    { id: "stockfish", name: "Stockfish", elo: 2850, previousElo: 2800, engineElo: 2800, fixed: true, avatar: "stockfish-logo.png" },
+    { id: "stockfish", name: "Stockfish", elo: FULL, engineElo: FULL, fixed: true, avatar: "stockfish-logo.png" },
   ] },
 ];
 
@@ -210,6 +211,9 @@ function customBot(elo) {
 }
 
 function findBot(id) {
+  if (id === "stockfish-full") {
+    return { id: id, name: "Stockfish", elo: FULL, avatar: "stockfish-logo.png" };
+  }
   for (var i = 0; i < BOT_GROUPS.length; i++)
     for (var j = 0; j < BOT_GROUPS[i].bots.length; j++)
       if (BOT_GROUPS[i].bots[j].id === id) return BOT_GROUPS[i].bots[j];

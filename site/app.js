@@ -1181,6 +1181,8 @@ $("game-mode").onchange = syncGameMode;
 window.addEventListener("pageshow", syncGameMode);
 syncGameMode();
 ["white-bot", "black-bot"].forEach(function (id) {
+  var fullBot = findBot("stockfish-full");
+  $(id).add(new Option(fullBot.name + " · " + botRating(fullBot), fullBot.id));
   BOT_GROUPS.forEach(function (group) {
     group.bots.forEach(function (b) {
       var option = document.createElement("option");
@@ -1189,9 +1191,8 @@ syncGameMode();
       $(id).appendChild(option);
     });
   });
+  $(id).value = fullBot.id;
 });
-$("white-bot").value = "martin";
-$("black-bot").value = "stockfish";
 $("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
 $("btn-new-black").onclick = function () { newGame("b"); };
