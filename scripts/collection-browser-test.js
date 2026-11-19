@@ -4,6 +4,7 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const calibratedBots = require("../site/bots.js");
+const manifest = require("../variants.json");
 const { chromium } = require(path.resolve(process.argv[2], "node_modules/playwright"));
 const base = process.argv[3] || "http://localhost:8096";
 
@@ -23,7 +24,7 @@ const base = process.argv[3] || "http://localhost:8096";
     });
     await page.goto(base);
     const links = await page.locator("a.variant").evaluateAll(elements => elements.map(a => a.getAttribute("href")));
-    assert.equal(links.length, 4);
+    assert.deepEqual(links, manifest.variants.map(({ slug }) => `variants/${slug}/`));
     assert(links.includes("variants/sufferfish/"));
     assert(links.includes("variants/classic/"));
     assert(!links.includes("variants/elo-ladder/"));
@@ -64,13 +65,14 @@ const base = process.argv[3] || "http://localhost:8096";
       }));
       assert(roster.master.every(elo => elo <= 2600));
       assert.deepEqual(roster.removed, [null, null, null, null]);
-      const classic = link === "variants/classic/";
-      const rating = classic ? calibratedBots.botRating(calibratedBots.findBot("stockfish")) : "2800";
+      const courier = link === "variants/courier/";
+      const calibrated = link === "variants/classic/" || courier;
+      const rating = calibrated ? calibratedBots.botRating(calibratedBots.findBot("stockfish")) : "2800";
       assert.equal(roster.engineRating, rating);
-      assert.deepEqual(roster.engineCommands, classic
+      assert.deepEqual(roster.engineCommands, calibrated
         ? calibratedBots.botSearchConfig(calibratedBots.findBot("stockfish")).commands
         : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value 2800"]);
-      assert.deepEqual(roster.fullCommands, classic
+      assert.deepEqual(roster.fullCommands, calibrated
         ? calibratedBots.botSearchConfig(calibratedBots.customBot(null)).commands
         : ["setoption name UCI_LimitStrength value false"]);
       assert.equal(await page.locator('.bot[data-id="stockfish"]').getAttribute("aria-label"), "Stockfish (" + rating + ")");
@@ -80,9 +82,15 @@ const base = process.argv[3] || "http://localhost:8096";
       await page.locator(`[data-sq="${move.slice(2, 4)}"]`).click();
       await page.waitForFunction(() => game.moves.length >= 2 && pos && !pos.pending, null, { timeout: 30000 });
       assert(await page.evaluate(() => !!evalEngine));
-      if (link === "variants/scp-096/") {
+      if (link === "variants/scp-096/" || courier) {
         assert(await page.evaluate(() => evalEngine.worker instanceof Worker && new URL(window.STOCK_ENGINE_FILE, location.href).pathname.includes("/stock-engine/")));
         assert(await page.evaluate(() => evalEngine.worker !== engine.worker));
+      }
+      if (courier) {
+        assert.deepEqual(await page.evaluate(() => [variantInfo().slug, variantInfo().supported, variantInfo().analysisMode]),
+          ["courier", true, "standard-snapshot"]);
+        assert.equal(await page.locator('#board [src$="/wC.svg"]').count(), 1);
+        assert.equal(await page.locator('#board [src$="/bC.svg"]').count(), 1);
       }
       await page.locator("#chk-eval").check();
       await page.waitForFunction(() => document.getElementById("eval-label").textContent !== "");

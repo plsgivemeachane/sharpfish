@@ -24,6 +24,12 @@
       "slug": "sufferfish",
       "title": "Sufferfish",
       "description": "Plays near-perfect chess but avoids captures: picks the best quiet move unless a capture is clearly better."
+    },
+    {
+      "branch": "courier",
+      "slug": "courier",
+      "title": "Courier",
+      "description": "Each side gets a random, untouchable pawn that steps like a king. Win by checkmate or by walking your Courier off the far edge."
     }
   ]
 }
