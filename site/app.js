@@ -108,7 +108,8 @@ function toSan(pos, uci) {
   var type = piece.toUpperCase();
   var dx = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
 
-  if (type === "K" && Math.abs(dx) === 2) return dx > 0 ? "O-O" : "O-O-O";
+  var castle = SF960.castle(pos.board, uci);
+  if (castle) return castle.san;
 
   var capture = !!pos.board[to] || (type === "P" && dx !== 0);
   if (type === "P") {
@@ -159,18 +160,18 @@ var boardEl = $("board");
 
 function variantInfo() {
   var v = window.SHARPFISH_VARIANT || {};
-  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode };
+  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, chess960: true, analysisMode: v.analysisMode };
 }
 function historyRecord() {
   if (!game.historyId) return null;
   return {
     id: game.historyId, createdAt: game.historyCreatedAt, updatedAt: Date.now(), revision: game.historyRevision,
-    variant: variantInfo(), startFen: null, moves: game.moves.slice(), san: game.san.slice(), boards: game.boards.map(function (b) {
+    variant: variantInfo(), startFen: game.startFen, moves: game.moves.slice(), san: game.san.slice(), boards: game.boards.map(function (b) {
       return Object.assign({}, b);
     }), headers: {
       White: game.botMatch ? game.matchBots.w.name : game.playerColor === "w" ? "You" : bot.name,
       Black: game.botMatch ? game.matchBots.b.name : game.playerColor === "b" ? "You" : bot.name,
-      Event: variantInfo().title
+      Event: variantInfo().title, Variant: "Chess960"
     }, result: game.over ? (/White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2") : "*",
     grades: game.grades || {}, meta: { playerColor: game.playerColor, botMatch: !!game.botMatch,
       bot: botMetadata(bot), botProfiles: (game.botProfiles || []).slice(),
@@ -205,7 +206,7 @@ window.SFAppHooks.onGradeStatus = function (text) { $("grade-status").textConten
 // ---------------------------------------------------------------- Engine I/O
 function positionCmd(ply) { // ply: how many moves to include (default: all)
   var moves = ply == null ? game.moves : game.moves.slice(0, ply);
-  return "position startpos" + (moves.length ? " moves " + moves.join(" ") : "");
+  return "position fen " + game.startFen + (moves.length ? " moves " + moves.join(" ") : "");
 }
 
 function refreshPosition() {
@@ -489,6 +490,11 @@ function maybeEngineTurn() {
 }
 
 function newGame(color, botMatch, silent) {
+  var input = $("chess960-position");
+  if (!input.checkValidity()) { input.reportValidity(); return; }
+  game.position960 = input.value === "" ? SF960.random() : Number(input.value);
+  game.startFen = SF960.start(game.position960);
+  $("chess960-current").textContent = "Position #" + game.position960;
   clearPremoves();
   if (window.SFSound) SFSound.stop();
   var token = ++game.token;
@@ -509,7 +515,7 @@ function newGame(color, botMatch, silent) {
   resetClock();
   selected = null;
   $("engine-line").innerHTML = "&nbsp;";
-  engine.request(["ucinewgame", "isready"], function (l) { return l === "readyok"; });
+  engine.request(["setoption name UCI_Chess960 value true", "ucinewgame", "isready"], function (l) { return l === "readyok"; });
   refreshPosition().then(function (p) {
     if (token !== game.token) return;
     pos = p;
@@ -642,22 +648,9 @@ function clearPremoves() {
 function premoveBoard(base) {
   var board = Object.assign({}, base || pos.board);
   premoves.forEach(function (uci) {
-    var from = uci.slice(0, 2), to = uci.slice(2, 4), piece = board[from];
+    var from = uci.slice(0, 2), piece = board[from];
     if (!piece || (isWhite(piece) ? "w" : "b") !== game.playerColor) return;
-    if (piece.toUpperCase() === "P" && from[0] !== to[0] && !board[to]) {
-      var captured = to[0] + from[1];
-      if (board[captured] === (isWhite(piece) ? "p" : "P")) delete board[captured];
-    }
-    delete board[from];
-    board[to] = uci[4] ? (isWhite(piece) ? uci[4].toUpperCase() : uci[4]) : piece;
-    if (piece.toUpperCase() === "K" && Math.abs(FILES.indexOf(to[0]) - FILES.indexOf(from[0])) === 2) {
-      var rookFrom = (to[0] === "g" ? "h" : "a") + from[1];
-      var rookTo = (to[0] === "g" ? "f" : "d") + from[1];
-      if (board[rookFrom] === (isWhite(piece) ? "R" : "r")) {
-        board[rookTo] = board[rookFrom];
-        delete board[rookFrom];
-      }
-    }
+    board = SF960.apply(board, uci);
   });
   return board;
 }
@@ -675,7 +668,8 @@ function premoveMoves(from) {
       type === "B" ? dx === ay : type === "R" ? dx === 0 || dy === 0 :
       type === "Q" ? dx === ay || dx === 0 || dy === 0 :
       type === "K" ? Math.max(dx, ay) === 1 ||
-        (from === (isWhite(piece) ? "e1" : "e8") && dy === 0 && dx === 2) :
+        (dy === 0 && board[to] === (isWhite(piece) ? "R" : "r") &&
+          (pos.fen.split(" ")[2] || "").includes(isWhite(piece) ? to[0].toUpperCase() : to[0])) :
       type === "P" && ((dy === direction && dx <= 1) ||
         (dx === 0 && dy === direction * 2 && Number(from[1]) === (isWhite(piece) ? 2 : 7)));
     if (!allowed) continue;
@@ -1036,17 +1030,7 @@ function render() {
   // While waiting for the engine to confirm a move, show the move already made.
   var board = shown ? shown.board : pos.board;
   if (!shown && pos.pending && pos.lastMove) {
-    board = Object.assign({}, board);
-    var m = pos.lastMove, from = m.slice(0, 2), to = m.slice(2, 4), p = board[from];
-    var df = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
-    delete board[from];
-    board[to] = m[4] ? (isWhite(p) ? m[4].toUpperCase() : m[4]) : p;
-    if (p.toUpperCase() === "K" && Math.abs(df) === 2) { // castling: move the rook too
-      var rFrom = (df > 0 ? "h" : "a") + to[1], rTo = (df > 0 ? "f" : "d") + to[1];
-      board[rTo] = board[rFrom];
-      delete board[rFrom];
-    }
-    if (p.toUpperCase() === "P" && df !== 0 && !pos.board[to]) delete board[to[0] + from[1]]; // en passant
+    board = SF960.apply(board, pos.lastMove);
   }
 
   // Keep the final queue projection visible even while a played move is
@@ -1179,7 +1163,7 @@ function renderMoves() {
 }
 
 function pgn() {
-  var out = SFAnalysis.snapshotAnalysis({ variant: variantInfo() }) ? '[Variant "' + variantInfo().slug + '"]\n\n' : "";
+  var out = '[Variant "Chess960"]\n[SetUp "1"]\n[FEN "' + game.startFen + '"]\n\n';
   game.san.forEach(function (s, i) { out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " "; });
   if (game.over) {
     out += /White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2";
@@ -1274,7 +1258,7 @@ $("chk-grade").onchange = function () { if (window.SFLive) window.SFLive.toggle(
   if (window.STOCK_ENGINE_FILE) {
     evalEngine = new Engine(window.STOCK_ENGINE_FILE);
     evalEngine.worker.onerror = function () { $("evalbar").classList.add("off"); evalEngine = null; };
-    evalEngine.request(["uci"], function (l) { return l === "uciok"; });
+    evalEngine.request(["uci", "setoption name UCI_Chess960 value true"], function (l) { return l === "uciok"; });
   } else {
     $("evalbar").classList.add("off");
   }

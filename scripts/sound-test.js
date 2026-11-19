@@ -49,11 +49,11 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(s.created, 0, "loading the page does not initialize or play audio");
   s.api.play("move"); await flush(); assert.equal(s.played.length, 0);
   s.unlock(); await flush();
-  const before = { board: { e2: "P", d5: "p", e1: "K", a7: "P", a8: "r" } };
+  const before = { board: { e2: "P", d5: "p", e1: "K", f1: "R", h1: "R", a7: "P", a8: "r" } };
   for (const [move, after, finished, name] of [
     ["e2e4", {}, false, "move"], ["e2d5", {}, false, "capture"],
     ["e2d3", {}, false, "capture"], // en passant has an empty destination
-    ["e1g1", {}, false, "castle"], ["e1c1", {}, false, "castle"],
+    ["e1h1", {}, false, "castle"], ["e1f1", {}, false, "castle"], ["e1g1", {}, false, "castle"], ["e1c1", {}, false, "castle"],
     ["a7a8q", {}, false, "promotion"], ["a7a8q", { inCheck: true }, false, "check"],
     ["e2e4", { inCheck: true }, true, "end"], ["e2e4", {}, true, "end"],
     ["e2e4", { ate: ["Bd5"] }, false, "capture"]

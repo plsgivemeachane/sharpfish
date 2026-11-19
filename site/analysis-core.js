@@ -45,7 +45,8 @@
     if (squares.filter(function (sq) { return board[sq] === "K"; }).length !== 1 || squares.filter(function (sq) { return board[sq] === "k"; }).length !== 1) fail("FEN must contain exactly one king per side");
     var wk = squares.filter(function (sq) { return board[sq] === "K"; })[0], bk = squares.filter(function (sq) { return board[sq] === "k"; })[0];
     if (Math.abs(FILES.indexOf(wk[0]) - FILES.indexOf(bk[0])) <= 1 && Math.abs(+wk[1] - +bk[1]) <= 1) fail("FEN kings may not be adjacent");
-    if (p[2] !== "-" && (!/^[KQkq]+$/.test(p[2]) || /(.).*\1/.test(p[2]))) fail("Invalid FEN castling rights");
+    var chess960 = /[A-Ha-h]/.test(p[2] || "");
+    if (p[2] !== "-" && ((!chess960 && !/^[KQkq]+$/.test(p[2])) || (chess960 && !/^[A-Ha-hKQkq]+$/.test(p[2])) || /(.).*\1/.test(p[2]))) fail("Invalid FEN castling rights");
     if (p[3] !== "-" && !/^[a-h][36]$/.test(p[3])) fail("Invalid FEN en-passant square");
     if (p.length >= 5 && (!/^\d+$/.test(p[4]) || +p[4] < 0)) fail("Invalid FEN halfmove clock");
     if (p.length >= 6 && (!/^\d+$/.test(p[5]) || +p[5] < 1)) fail("Invalid FEN fullmove number");
@@ -53,6 +54,11 @@
     if (+p[4] > 100000 || +p[5] > 100000) fail("FEN move clock is too large");
     var rights = { K: ["e1", "K", "h1", "R"], Q: ["e1", "K", "a1", "R"], k: ["e8", "k", "h8", "r"], q: ["e8", "k", "a8", "r"] };
     if (p[2] !== "-") p[2].split("").forEach(function (right) {
+      if (chess960 && /[A-Ha-h]/.test(right)) {
+        var color = right === right.toUpperCase() ? "w" : "b", rank = color === "w" ? "1" : "8", file = right.toLowerCase();
+        if (board[file + rank] !== (color === "w" ? "R" : "r") || (color === "w" ? wk : bk)[1] !== rank) fail("FEN castling rights require the rook");
+        return;
+      }
       var required = rights[right];
       if (board[required[0]] !== required[1] || board[required[2]] !== required[3]) fail("FEN castling rights require the king and rook");
     });
@@ -61,7 +67,7 @@
     }
     if (attacked(board, p[1] === "w" ? bk : wk, p[1] === "w")) fail("FEN side not to move is in check");
     p[4] = p[4] || "0"; p[5] = p[5] || "1";
-    return { fen: p.join(" "), board: board, turn: p[1], halfmove: +(p[4] || 0), fullmove: +(p[5] || 1), castling: p[2], ep: p[3] };
+    return { fen: p.join(" "), board: board, turn: p[1], halfmove: +(p[4] || 0), fullmove: +(p[5] || 1), castling: p[2], ep: p[3], chess960: chess960 };
   }
   function boardFromFen(fen) { return parseBoard(fen).board; }
   function sanCore(pos, uci) {
@@ -70,7 +76,7 @@
     if (!piece) return "";
     var type = piece.toUpperCase();
     var dx = FILES.indexOf(to[0]) - FILES.indexOf(from[0]);
-    if (type === "K" && Math.abs(dx) === 2) return dx > 0 ? "O-O" : "O-O-O";
+    if (type === "K" && (Math.abs(dx) === 2 || (pos.board[to] === (piece === "K" ? "R" : "r")))) return FILES.indexOf(to[0]) > FILES.indexOf(from[0]) ? "O-O" : "O-O-O";
     var capture = !!pos.board[to] || (type === "P" && dx !== 0);
     if (type === "P") return (capture ? from[0] + "x" : "") + to + (promo ? "=" + promo.toUpperCase() : "");
     var san = type;
@@ -130,7 +136,7 @@
     if (data.tags.SetUp === "1" && !data.tags.FEN) fail("SetUp tag requires FEN");
     if (data.tags.SetUp && data.tags.SetUp !== "0" && data.tags.SetUp !== "1") fail("Invalid SetUp tag");
     if (data.tags.SetUp === "0" && data.tags.FEN) fail("FEN conflicts with SetUp tag");
-    if (data.tags.Variant && data.tags.Variant.toLowerCase() !== "standard") fail("Unsupported PGN variant");
+    if (data.tags.Variant && !["standard", "chess960", "fischerandom"].includes(data.tags.Variant.toLowerCase())) fail("Unsupported PGN variant");
     var start = data.tags.FEN ? parseBoard(data.tags.FEN).fen : null;
     return { headers: data.tags, tokens: main, result: result, variationCount: variations, startFen: start };
   }
@@ -351,7 +357,7 @@
   }
   function supportsRecord(record) {
     var variant = record && record.variant;
-    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish"].includes(variant.slug) || variant.supported !== false);
+    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish", "chess960"].includes(variant.slug) || variant.supported !== false);
   }
   function snapshotAnalysis(record) {
     var variant = record && record.variant;
@@ -450,7 +456,8 @@
     }
     async function position(record, ply, token, extra, timeout) {
       assertActive(token);
-      var lines = await request([positionCommand(record, ply, extra), "d", "go perft 1", "isready"], function (line) { return line === "readyok"; }, token, timeout);
+      var chess960 = !!(record && record.variant && (record.variant.chess960 || record.variant.slug === "chess960")) || !!(record && record.headers && /^(chess960|fischerandom)$/i.test(record.headers.Variant || "")) || !!(record && record.startFen && /[A-Ha-h]/.test(String(record.startFen).split(/\s+/)[2] || ""));
+      var lines = await request(["setoption name UCI_Chess960 value " + (chess960 ? "true" : "false"), positionCommand(record, ply, extra), "d", "go perft 1", "isready"], function (line) { return line === "readyok"; }, token, timeout);
       var fen = "", check = false, legal = [];
       lines.forEach(function (line) {
         if (line.indexOf("Fen: ") === 0) fen = line.slice(5).trim();
@@ -459,7 +466,7 @@
       });
       if (!fen) throw new Error("Engine did not return a position");
       var parsed = parseBoard(fen);
-      return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check };
+      return { fen: fen, board: parsed.board, turn: parsed.turn, legal: legal, inCheck: check, chess960: chess960 };
     }
     async function recordPosition(record, ply, token, timeout) {
       if (snapshotAnalysis(record)) return position(record, ply, token, null, timeout);

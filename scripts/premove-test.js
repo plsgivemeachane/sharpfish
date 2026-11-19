@@ -38,6 +38,7 @@ const names = [
 ];
 const context = {
   console,
+  SF960: require("../site/chess960.js"),
   FILES: "abcdefgh",
   premoves: [],
   selected: null,
@@ -100,7 +101,7 @@ test("projects castling rook movement and a promoted piece's next move", () => {
   reset({ pos: { turn: "w", legal: [], pending: false, board: {
     e1: "K", h1: "R", e7: "P"
   } } });
-  context.premoves.push("e1g1");
+  context.premoves.push("e1h1");
   let board = context.premoveBoard();
   assert.equal(board.e1, undefined);
   assert.equal(board.g1, "K");

@@ -559,7 +559,7 @@
   function pgnText() {
     if (!state.record) return "";
     var rec = state.record, headers = Object.assign({}, rec.headers || {}), out = "";
-    if (SFAnalysis.snapshotAnalysis(rec)) headers.Variant = rec.variant.slug;
+    if (rec.variant && (SFAnalysis.snapshotAnalysis(rec) || rec.variant.chess960)) headers.Variant = rec.variant.chess960 ? "Chess960" : rec.variant.slug;
     if (rec.startFen) { headers.SetUp = "1"; headers.FEN = rec.startFen; }
     Object.keys(headers).forEach(function (key) { out += "[" + key + " " + JSON.stringify(String(headers[key])) + "]\n"; });
     if (out) out += "\n";

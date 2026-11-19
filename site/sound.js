@@ -59,8 +59,9 @@
   function move(before, uci, after, finished) {
     if (!before || !after || !before.board || !uci) return;
     var from = uci.slice(0, 2), to = uci.slice(2, 4), piece = (before.board[from] || "").toUpperCase();
+    var chess960Castle = piece === "K" && before.board[to] === (before.board[from] === "K" ? "R" : "r");
     var name = finished ? "end" : after.inCheck ? "check" : uci.length === 5 ? "promotion" :
-      piece === "K" && Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2 ? "castle" :
+      piece === "K" && (Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2 || chess960Castle) ? "castle" :
       before.board[to] || (piece === "P" && from[0] !== to[0]) || (after.ate && after.ate.length) ? "capture" : "move";
     play(name);
   }

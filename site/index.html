@@ -10,13 +10,15 @@
 <link rel="stylesheet" href="badges.css">
 <!-- Written by make-web.sh: sets window.ENGINE_FILE to the built engine -->
 <script src="engine-file.js"></script>
+<script>window.SHARPFISH_VARIANT = Object.assign({}, window.SHARPFISH_VARIANT, {slug: "chess960", title: "Chess960", chess960: true});</script>
+<script src="chess960.js"></script>
 </head>
 <body>
 <header class="top">
   <div class="brand">
     <img src="favicon.svg" alt="" width="30" height="30">
     <span class="site-name">Sharpfish</span>
-    <span class="tagline">It knows. It adapts.</span>
+    <span class="tagline">Chess960 · Fischer Random</span>
   </div>
 </header>
 
@@ -72,6 +74,11 @@
           <select id="game-mode"><option value="human">Play a bot</option><option value="bots">Bot vs bot</option></select>
         </label>
       </div>
+      <label class="field">Starting position (0–959)
+        <input id="chess960-position" type="number" min="0" max="959" step="1" placeholder="Random each game">
+      </label>
+      <p id="chess960-current" class="hint" aria-live="polite"></p>
+      <p class="hint">Bot ratings are Classic estimates; Chess960 strength has not been calibrated. Leave blank for a random position. To castle, move your king onto your rook. King finishes on c/g; rook on d/f.</p>
       <div class="row split">
         <button id="btn-new-white" class="btn primary"><span class="side-dot w" aria-hidden="true"></span>Play White</button>
         <button id="btn-new-black" class="btn"><span class="side-dot b" aria-hidden="true"></span>Play Black</button>
@@ -181,8 +188,8 @@
 <footer class="foot">
   <p>Sounds: <a href="https://kenney.nl/assets/casino-audio">Kenney</a> (<a href="sounds/License.txt">CC0</a>).
   Engine: <a href="https://github.com/official-stockfish/Stockfish">Stockfish</a>
-  via <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>, GPLv3.
-  Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/nmrugg/stockfish.js">Source code</a></p>
+  via <a href="https://github.com/plsgivemeachane/sharpfish/tree/chess960">Stockfish.js</a>, GPLv3.
+  Pieces: <a href="https://github.com/lichess-org/lila/issues/5647">Staunty by sadsnake1</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>). Avatars: <a href="https://www.dicebear.com/styles/avataaars/">DiceBear Avataaars by Pablo Stanley</a> (free for personal and commercial use). Martin portrait: <a href="https://www.chess.com/member/martin-bot">Chess.com</a>. <a id="source-link" href="https://github.com/plsgivemeachane/sharpfish/tree/chess960">Source code</a></p>
 </footer>
 
 <div id="promo" class="promo" hidden></div>
