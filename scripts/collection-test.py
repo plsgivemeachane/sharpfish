@@ -108,6 +108,15 @@ class CollectionTest(unittest.TestCase):
         self.assertIn('"slug": "one"', selector)
         self.assertIn('"supported": false', selector)
 
+    def test_chess960_export_keeps_analysis_identity(self):
+        collection.add(argparse.Namespace(branch='fixture', slug='chess960',
+                                         title='Chess960', description='Fischer Random'))
+        self.build()
+        selector = (self.root / 'deploy/site/variants/chess960/engine-file.js').read_text()
+        self.assertIn('"chess960": true', selector)
+        self.assertIn('"supported": true', selector)
+        self.assertIn('"analysisMode": "standard-line"', selector)
+
     def test_failed_build_preserves_previous_output(self):
         self.build()
         before = (self.root / 'deploy/site/build-info.json').read_bytes()

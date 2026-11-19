@@ -156,10 +156,11 @@ def build():
                                               '\"assets/' + entry['commit'] + '/' + engine_dir + '/')
                 content += '\nwindow.SHARPFISH_VARIANT = ' + json.dumps(dict(
                     slug=entry['slug'], title=entry['title'],
+                    chess960=entry['slug'] == 'chess960',
                     path='/variants/' + entry['slug'] + '/',
                     badgePath='assets/' + entry['commit'] + '/badges/',
                     soundPath='assets/' + entry['commit'] + '/sounds/',
-                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish', 'courier'),
+                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish', 'courier', 'chess960'),
                     analysisMode='standard-snapshot' if entry['slug'] in ('alternating-colors', 'scp-096', 'courier') else 'standard-line',
                     revision=entry['commit'])) + ';\n'
                 selector.write_text(content)

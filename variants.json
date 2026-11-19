@@ -8,6 +8,12 @@
       "description": "Classic chess with opponents from beginner to full strength, game history, and PGN analysis."
     },
     {
+      "branch": "chess960",
+      "slug": "chess960",
+      "title": "Chess960",
+      "description": "Fischer Random chess: 960 starting positions, standard chess rules, and castling with the king finishing on c or g."
+    },
+    {
       "branch": "alternating-colors",
       "slug": "alternating-colors",
       "title": "Alternating colors",
