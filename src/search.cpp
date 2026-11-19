@@ -82,6 +82,58 @@ constexpr u64 NODES_LIMIT_OUTPUT = 10'000'000;
 constexpr int SEARCHEDLIST_CAPACITY = 32;
 using SearchedList                  = ValueList<Move, SEARCHEDLIST_CAPACITY>;
 
+Value courier_pending_escape(Position& pos, int ply) {
+    const Color runner = ~pos.side_to_move();
+    if (!(pos.couriers(runner) & rank_bb(relative_rank(runner, RANK_8))))
+        return VALUE_NONE;
+
+    const MoveList<LEGAL> replies(pos);
+    if (!replies.size())
+        return pos.checkers() ? mated_in(ply) : VALUE_DRAW;
+    if (pos.courier_can_exit())
+        return VALUE_NONE;
+
+    for (const Move reply : replies)
+    {
+        if (!pos.gives_check(reply))
+            continue;
+
+        StateInfo answer;
+        pos.do_move(reply, answer);
+        const bool checkmate = MoveList<LEGAL>(pos).size() == 0;
+        pos.undo_move(reply);
+        if (checkmate)
+            return VALUE_NONE;
+    }
+    return mated_in(ply + 2);
+}
+
+Value courier_approach_win(Position& pos, int ply) {
+    const Color side = pos.side_to_move();
+    const Bitboard courier = pos.couriers(side) & rank_bb(relative_rank(side, RANK_7));
+    if (!courier)
+        return VALUE_NONE;
+
+    const Square from = lsb(courier);
+    Bitboard exits = Attacks::attacks_bb<KING>(from) & rank_bb(relative_rank(side, RANK_8))
+                   & ~pos.pieces();
+    while (exits)
+    {
+        const Move advance(from, pop_lsb(exits));
+        if (!pos.pseudo_legal(advance) || !pos.legal(advance))
+            continue;
+
+        StateInfo arrival;
+        pos.do_move(advance, arrival);
+        const Value reply = pos.is_draw(ply + 1) ? VALUE_DRAW
+                                               : courier_pending_escape(pos, ply + 1);
+        pos.undo_move(advance);
+        if (is_valid(reply) && is_loss(reply))
+            return -reply;
+    }
+    return VALUE_NONE;
+}
+
 // (*Scalers):
 // The values with Scaler asterisks have proven non-linear scaling.
 // They are optimized to time controls of 180 + 1.8 and longer,
@@ -806,8 +858,7 @@ Value Search::Worker::search(
     if (!rootNode)
     {
         // Step 2. Check for aborted search or immediate draw
-        if (threads.stop.load(std::memory_order_relaxed) || pos.is_draw(ss->ply)
-            || ss->ply >= MAX_PLY)
+        if (threads.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
             return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos) : value_draw(nodes);
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
@@ -819,6 +870,18 @@ Value Search::Worker::search(
         // wins next move, unless its side is already checkmated.
         if (pos.courier_can_exit() && !(ss->inCheck && MoveList<LEGAL>(pos).size() == 0))
             return mate_in(ss->ply + 1);
+
+        if (pos.is_draw(ss->ply))
+            return value_draw(nodes);
+
+        if (!ss->excludedMove)
+        {
+            if (Value pending = courier_pending_escape(pos, ss->ply); is_valid(pending))
+                return pending;
+
+            if (Value escape = courier_approach_win(pos, ss->ply); is_valid(escape))
+                return escape;
+        }
 
         alpha = std::max(mated_in(ss->ply), alpha);
         beta  = std::min(mate_in(ss->ply + 1), beta);
@@ -1725,11 +1788,20 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         selDepth = ss->ply + 1;
 
     // Step 2. Check for an immediate draw or maximum ply reached
-    if (pos.is_draw(ss->ply) || ss->ply >= MAX_PLY)
-        return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos) : VALUE_DRAW;
+    if (ss->ply >= MAX_PLY)
+        return !ss->inCheck ? evaluate(pos) : VALUE_DRAW;
 
     if (pos.courier_can_exit() && !(ss->inCheck && MoveList<LEGAL>(pos).size() == 0))
         return mate_in(ss->ply + 1);
+
+    if (pos.is_draw(ss->ply))
+        return VALUE_DRAW;
+
+    if (Value pending = courier_pending_escape(pos, ss->ply); is_valid(pending))
+        return pending;
+
+    if (Value escape = courier_approach_win(pos, ss->ply); is_valid(escape))
+        return escape;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 

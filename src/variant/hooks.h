@@ -48,16 +48,25 @@ constexpr int cp_to_internal(int cp) { return cp * 304 / 100; }
 // Called for every evaluated position when EnableEvalHook = true, so keep it
 // fast. Positive = good for the side to move.
 inline int eval_bonus_cp(const Position& pos) {
-    (void) pos;
-    int bonus = 0;
+    constexpr int ProgressCp[RANK_NB] = {0, 70, 190, 330, 510, 750, 1100, 2200};
+    auto race_score = [&](Color side) {
+        const Bitboard courier = pos.couriers(side);
+        if (!courier)
+            return 0;
 
-    // Example: +15 cp for each own knight on the four centre squares.
-    // Color    us      = pos.side_to_move();
-    // Bitboard centre  = square_bb(SQ_D4) | square_bb(SQ_E4) | square_bb(SQ_D5) | square_bb(SQ_E5);
-    // bonus += 15 * popcount(pos.pieces(us, KNIGHT) & centre);
-    // bonus -= 15 * popcount(pos.pieces(~us, KNIGHT) & centre);
+        const Square square = lsb(courier);
+        const Rank   rank   = relative_rank(side, square);
+        if (rank == RANK_8)
+            return ProgressCp[rank];
 
-    return bonus;
+        const Rank nextRank = relative_rank(side, Rank(rank + 1));
+        const Bitboard forward = Attacks::attacks_bb<KING>(square) & rank_bb(nextRank);
+        const int room = popcount(forward & ~pos.pieces());
+        return ProgressCp[rank] + room * (rank == RANK_7 ? 350 : 20);
+    };
+
+    const Color us = pos.side_to_move();
+    return race_score(us) - race_score(~us);
 }
 
 

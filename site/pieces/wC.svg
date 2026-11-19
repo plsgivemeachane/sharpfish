@@ -18,8 +18,33 @@
   <path d="m24.307 12.266c-3.2223 0.17414-7.5215 4.9545-2.3141 9.956-3.5618-3.8182-0.53726-9.3138 2.3141-9.956z"/>
   <path d="m18.393 37.624c-3.9839 2.3053-5.6462 6.1402-5.6462 6.1402-0.01037 0-0.54754-4.1751 3.9564-6.654 4.5039-2.4789 4.8215-6.1507 5.8602-8.8927-0.63708 3.7031-0.18656 7.1012-4.1704 9.4065z"/>
  </g>
- <g id="courier-badge">
-  <circle cx="40" cy="10" r="8.5" fill="#f5c542" stroke="#1d1d1d" stroke-width="1.6"/>
-  <text x="40" y="14.4" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="12.5" fill="#1d1d1d">C</text>
+ <g id="courier-medallion" transform="matrix(0.19 0 0 0.19 27.14 -1.46)">
+  <defs>
+   <linearGradient id="wc-rim" x1="0" y1="11" x2="0" y2="117" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#e6dcc4"/><stop offset=".72" stop-color="#8a7b5c"/><stop offset=".9" stop-color="#e6dcc4"/><stop offset="1" stop-color="#8a7b5c"/></linearGradient>
+   <linearGradient id="wc-lip" x1="0" y1="17.5" x2="0" y2="110.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8a7b5c"/><stop offset=".55" stop-color="#e6dcc4"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+   <radialGradient id="wc-face" cx="64" cy="50" r="52" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fbf6ea"/><stop offset=".55" stop-color="#fbf6ea" stop-opacity=".92"/><stop offset="1" stop-color="#cbbf9f"/></radialGradient>
+   <linearGradient id="wc-gloss" x1="0" y1="21" x2="0" y2="47" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+   <linearGradient id="wc-glyph" x1="0" y1="33" x2="0" y2="95" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#24344c"/><stop offset=".55" stop-color="#24344c"/><stop offset="1" stop-color="#0d1828"/></linearGradient>
+   <filter id="wc-cast" x="-10" y="-10" width="148" height="148" filterUnits="userSpaceOnUse"><feGaussianBlur stdDeviation="2.2"/></filter>
+   <filter id="wc-lift" x="0" y="0" width="128" height="128" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="0" stdDeviation="2.6" flood-color="#ffffff" flood-opacity="0.5"/><feDropShadow dx="0" dy="2.2" stdDeviation=".8" flood-color="#6d5f42" flood-opacity="0.55"/></filter>
+   <clipPath id="wc-face-clip"><circle cx="64" cy="64" r="43"/></clipPath>
+   <clipPath id="wc-facet"><path d="M64 0H128V128H64Z"/></clipPath>
+  </defs>
+  <circle cx="64" cy="68" r="54" fill="#000" fill-opacity=".45" filter="url(#wc-cast)"/>
+  <circle cx="64" cy="64" r="56" fill="#000" fill-opacity=".5"/>
+  <circle cx="64" cy="64" r="53" fill="url(#wc-rim)"/>
+  <circle cx="64" cy="64" r="52.4" fill="none" stroke="#3b3324" stroke-opacity=".7" stroke-width="1.2"/>
+  <circle cx="64" cy="64" r="46.5" fill="url(#wc-lip)"/>
+  <circle cx="64" cy="64" r="43" fill="url(#wc-face)"/>
+  <circle cx="64" cy="64" r="42.2" fill="none" stroke="#000" stroke-opacity=".32" stroke-width="1.6"/>
+  <path d="M26 52C30 30 46 22 64 22C82 22 98 30 102 52C86 44 42 44 26 52Z" fill="url(#wc-gloss)" clip-path="url(#wc-face-clip)"/>
+  <path d="M16.45 48.55A50 50 0 0 1 48.55 16.45" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="2.2" stroke-linecap="round"/>
+  <g filter="url(#wc-lift)">
+   <path id="wc-envelope" d="M36 42H92A5 5 0 0 1 97 47V82A5 5 0 0 1 92 87H36A5 5 0 0 1 31 82V47A5 5 0 0 1 36 42Z" fill="url(#wc-glyph)"/>
+   <path d="M36 42H92A5 5 0 0 1 97 47V82A5 5 0 0 1 92 87H36A5 5 0 0 1 31 82V47A5 5 0 0 1 36 42Z" fill="#000" fill-opacity="0.22" clip-path="url(#wc-facet)"/>
+   <path d="M35.5 46.5L64 69.5L92.5 46.5" fill="none" stroke="#fbf6ea" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+   <circle cx="64" cy="69.5" r="11.5" fill="url(#wc-glyph)" stroke="#fbf6ea" stroke-width="3.6"/>
+   <path d="M64 63.2L65.9 67.6L70.6 68L67 71.1L68.1 75.7L64 73.2L59.9 75.7L61 71.1L57.4 68L62.1 67.6Z" fill="#fbf6ea"/>
+  </g>
  </g>
 </svg>

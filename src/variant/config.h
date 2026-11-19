@@ -51,7 +51,7 @@ constexpr int PieceValueTweakCp[5] = {0, 0, 0, 0, 0};
 constexpr int NnueScalePercent = 100;
 
 // Turn on Variant::eval_bonus_cp() in hooks.h (your hand-written eval terms).
-constexpr bool EnableEvalHook = false;
+constexpr bool EnableEvalHook = true;
 
 // -----------------------------------------------------------------------------
 //  3. MOVE RATING (root move bias)

@@ -186,7 +186,7 @@ var boardEl = $("board");
 
 function variantInfo() {
   var v = window.SHARPFISH_VARIANT || {};
-  return { slug: v.slug || "classic", title: v.title || "Classic", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode };
+  return { slug: v.slug || "courier", title: v.title || "Courier", path: v.path || location.pathname, supported: v.supported !== false, analysisMode: v.analysisMode || "standard-snapshot" };
 }
 function historyRecord() {
   if (!game.historyId) return null;
