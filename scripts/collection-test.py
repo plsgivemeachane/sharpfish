@@ -87,6 +87,47 @@ class CollectionTest(unittest.TestCase):
         self.assertEqual(len(list((output / 'variants').iterdir())), 5)
         self.assertIn('variants/variant-5/', (output / 'index.html').read_text())
 
+    def test_atomic_analysis_engine_metadata_is_versioned_and_explicit(self):
+        manifest = json.loads((self.root / 'variants.json').read_text())
+        manifest['variants'].append(dict(branch='fixture', slug='atomic',
+                                         title='Atomic Chess',
+                                         description='Every capture explodes nearby pieces.'))
+        (self.root / 'variants.json').write_text(json.dumps(manifest))
+        self.build()
+        target = self.root / 'deploy/site/variants/atomic'
+        selector = (target / 'engine-file.js').read_text()
+        commit = self.git('rev-parse', 'HEAD')
+        self.assertIn('"slug": "atomic"', selector)
+        self.assertIn('"analysisMode": "atomic"', selector)
+        self.assertIn('"analysisEnginePath": "/variants/atomic/assets/' + commit + '/engine/mock.js"', selector)
+        self.assertIn('"evaluation": true', selector)
+        self.assertIn('"grading": true', selector)
+        self.assertIn('"alternatives": true', selector)
+        self.assertIn('"greatBrilliant": false', selector)
+        self.assertIn('"accuracy": false', selector)
+        self.assertIn('"estimatedElo": false', selector)
+        self.assertTrue((target / 'assets' / commit / 'engine/mock.wasm').is_file())
+        for slug in ('one', 'atomic'):
+            content = (self.root / 'deploy/site/variants' / slug / 'engine-file.js').read_text()
+            self.assertIn('window.SHARPFISH_ANALYSIS_ENGINES = {"atomic": "/variants/atomic/assets/' + commit + '/engine/mock.js"}', content)
+
+    def test_cross_variant_registry_includes_separate_standard_engine(self):
+        stock = self.root / 'site/stock-engine'
+        stock.mkdir()
+        (stock / 'stockfish-stock.js').write_text('standard engine')
+        self.git('add', 'site/stock-engine')
+        self.git('commit', '-qm', 'standard analysis fixture')
+        manifest = json.loads((self.root / 'variants.json').read_text())
+        manifest['variants'] = [dict(branch='fixture', slug=slug, title=slug, description='Test')
+                                for slug in ('classic', 'atomic')]
+        (self.root / 'variants.json').write_text(json.dumps(manifest))
+        self.build()
+        commit = self.git('rev-parse', 'HEAD')
+        for slug in ('classic', 'atomic'):
+            content = (self.root / 'deploy/site/variants' / slug / 'engine-file.js').read_text()
+            self.assertIn('"standard": "/variants/classic/assets/' + commit + '/stock-engine/stockfish-stock.js"', content)
+            self.assertIn('"atomic": "/variants/atomic/assets/' + commit + '/engine/mock.js"', content)
+
     def test_analysis_page_links_assets_and_variant_identity(self):
         (self.root / 'site/analysis.html').write_text(
             '<html><link href="analysis.css"><body><a id="source-link" href="old">Source</a>'
@@ -116,6 +157,14 @@ class CollectionTest(unittest.TestCase):
         self.assertIn('"chess960": true', selector)
         self.assertIn('"supported": true', selector)
         self.assertIn('"analysisMode": "standard-line"', selector)
+
+    def test_remorse_export_uses_standard_snapshots(self):
+        collection.add(argparse.Namespace(branch='fixture', slug='remorse',
+                                         title='Remorse Chess', description='Guilt and recovery'))
+        self.build()
+        selector = (self.root / 'deploy/site/variants/remorse/engine-file.js').read_text()
+        self.assertIn('"supported": true', selector)
+        self.assertIn('"analysisMode": "standard-snapshot"', selector)
 
     def test_failed_build_preserves_previous_output(self):
         self.build()

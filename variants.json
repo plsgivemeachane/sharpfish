@@ -36,6 +36,18 @@
       "slug": "courier",
       "title": "Courier",
       "description": "Each side gets a random, untouchable pawn that steps like a king. Win by checkmate or by walking your Courier off the far edge."
+    },
+    {
+      "branch": "atomic",
+      "slug": "atomic",
+      "title": "Atomic Chess",
+      "description": "Every capture explodes nearby pieces. Blow up the enemy king to win."
+    },
+    {
+      "branch": "remorse",
+      "slug": "remorse",
+      "title": "Remorse Chess",
+      "description": "Capturing pieces become guilty: they cannot capture or give check until they recover beside a friendly bishop."
     }
   ]
 }

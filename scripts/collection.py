@@ -121,6 +121,7 @@ def build():
         staging = Path(temp) / 'deploy'
         site = staging / 'site'
         site.mkdir(parents=True)
+        analysis_engines = {}
         for entry in entries:
             print(f'\n== Building {entry["slug"]} at {entry["commit"][:12]} ==', flush=True)
             snapshot = Path(temp) / 'snapshot'
@@ -151,17 +152,30 @@ def build():
             selector = target / 'engine-file.js'
             if selector.exists():
                 content = selector.read_text()
+                engine_match = re.search(r'window\.ENGINE_FILE\s*=\s*"([^"]+\.js)"', content)
+                if not engine_match:
+                    raise ValueError(f'{selector}: expected window.ENGINE_FILE')
+                engine_name = Path(engine_match.group(1)).name
                 for engine_dir in ('engine', 'stock-engine'):
                     content = content.replace('\"' + engine_dir + '/',
                                               '\"assets/' + entry['commit'] + '/' + engine_dir + '/')
+                is_atomic = entry['slug'] == 'atomic'
+                if is_atomic:
+                    analysis_engines['atomic'] = '/variants/atomic/assets/' + entry['commit'] + '/engine/' + engine_name
+                if entry['slug'] == 'classic' and (versioned / 'stock-engine/stockfish-stock.js').is_file():
+                    analysis_engines['standard'] = '/variants/classic/assets/' + entry['commit'] + '/stock-engine/stockfish-stock.js'
                 content += '\nwindow.SHARPFISH_VARIANT = ' + json.dumps(dict(
                     slug=entry['slug'], title=entry['title'],
                     chess960=entry['slug'] == 'chess960',
                     path='/variants/' + entry['slug'] + '/',
                     badgePath='assets/' + entry['commit'] + '/badges/',
                     soundPath='assets/' + entry['commit'] + '/sounds/',
-                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish', 'courier', 'chess960'),
-                    analysisMode='standard-snapshot' if entry['slug'] in ('alternating-colors', 'scp-096', 'courier') else 'standard-line',
+                    supported=entry['slug'] in ('classic', 'elo-ladder', 'alternating-colors', 'scp-096', 'sufferfish', 'courier', 'chess960', 'atomic', 'remorse'),
+                    analysisMode='atomic' if is_atomic else ('standard-snapshot' if entry['slug'] in ('alternating-colors', 'scp-096', 'courier', 'remorse') else 'standard-line'),
+                    analysisEnginePath=('/variants/atomic/assets/' + entry['commit'] + '/engine/' + engine_name) if is_atomic else None,
+                    analysisFeatures=({'evaluation': True, 'grading': True, 'alternatives': True,
+                                       'greatBrilliant': False, 'accuracy': False,
+                                       'estimatedElo': False} if is_atomic else None),
                     revision=entry['commit'])) + ';\n'
                 selector.write_text(content)
             for page_name in ('index.html', 'analysis.html'):
@@ -170,6 +184,11 @@ def build():
                                 data['source_url'] + '/tree/' + entry['commit'], entry['commit'])
             shutil.rmtree(snapshot)
             archive.unlink()
+        for entry in entries:
+            selector = site / 'variants' / entry['slug'] / 'engine-file.js'
+            if selector.exists():
+                with selector.open('a') as output:
+                    output.write('\nwindow.SHARPFISH_ANALYSIS_ENGINES = ' + json.dumps(analysis_engines) + ';\n')
         homepage(site, data)
         (site / 'build-info.json').write_text(json.dumps(dict(
             built_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),

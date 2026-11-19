@@ -66,23 +66,25 @@ const base = process.argv[3] || "http://localhost:8096";
       assert(roster.master.every(elo => elo <= 2600));
       assert.deepEqual(roster.removed, [null, null, null, null]);
       const courier = link === "variants/courier/";
-      const calibrated = link === "variants/classic/" || courier;
-      const rating = calibrated ? calibratedBots.botRating(calibratedBots.findBot("stockfish")) : "2800";
+      const atomic = link === "variants/atomic/";
+      const remorse = link === "variants/remorse/";
+      const rating = "Full";
+      const fullCommands = ["setoption name Skill Level value 20", "setoption name UCI_LimitStrength value false"];
       assert.equal(roster.engineRating, rating);
-      assert.deepEqual(roster.engineCommands, calibrated
-        ? calibratedBots.botSearchConfig(calibratedBots.findBot("stockfish")).commands
-        : ["setoption name UCI_LimitStrength value true", "setoption name UCI_Elo value 2800"]);
-      assert.deepEqual(roster.fullCommands, calibrated
-        ? calibratedBots.botSearchConfig(calibratedBots.customBot(null)).commands
-        : ["setoption name UCI_LimitStrength value false"]);
+      assert.deepEqual(roster.engineCommands, fullCommands);
+      assert.deepEqual(roster.fullCommands, fullCommands);
+      assert(await page.evaluate(() => ["white-bot", "black-bot"].every(id => findBot(document.getElementById(id).value).elo === FULL)));
       assert.equal(await page.locator('.bot[data-id="stockfish"]').getAttribute("aria-label"), "Stockfish (" + rating + ")");
+      if (atomic) {
+        assert.deepEqual(await page.evaluate(() => [variantInfo().slug, variantInfo().analysisMode]), ["atomic", "atomic"]);
+      }
       const move = await page.evaluate(() => pos.legal.find(m => m.length === 4));
       assert(move, "expected a legal opening move");
       await page.locator(`[data-sq="${move.slice(0, 2)}"]`).click();
       await page.locator(`[data-sq="${move.slice(2, 4)}"]`).click();
       await page.waitForFunction(() => game.moves.length >= 2 && pos && !pos.pending, null, { timeout: 30000 });
       assert(await page.evaluate(() => !!evalEngine));
-      if (link === "variants/scp-096/" || courier) {
+      if (link === "variants/scp-096/" || courier || remorse) {
         assert(await page.evaluate(() => evalEngine.worker instanceof Worker && new URL(window.STOCK_ENGINE_FILE, location.href).pathname.includes("/stock-engine/")));
         assert(await page.evaluate(() => evalEngine.worker !== engine.worker));
       }
