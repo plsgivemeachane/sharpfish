@@ -24,6 +24,13 @@ const {chromium} = require(process.argv[2] + '/node_modules/playwright');
     assert.match(await page.evaluate(() => pos.fen), /BBQNNRKR/);
     await page.setViewportSize({width:390, height:844});
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile overflow');
+    const setup = await page.evaluate(() => {
+      const input = document.getElementById('chess960-position');
+      const r = input.getBoundingClientRect(), card = input.closest('.setup960').getBoundingClientRect();
+      return {w: r.width, h: r.height, fill: r.width / card.width, label: input.labels[0] && input.labels[0].textContent};
+    });
+    assert(setup.w >= 200 && setup.h >= 44 && setup.fill > 0.85, 'starting-position input must be full-width and touch-sized: ' + JSON.stringify(setup));
+    assert.equal(setup.label, 'Starting position');
     await page.setViewportSize({width:1280, height:900});
     await page.locator('#btn-new-black').click();
     await page.waitForFunction(() => game.playerColor === 'b' && game.moves.length === 1 && !pos.pending && !thinking);

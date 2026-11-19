@@ -334,6 +334,53 @@ select:hover { border-color: rgba(140, 200, 240, 0.45); }
 option { background: #0c2642; color: var(--text); }
 .mode-select select { min-height: 32px; font-size: 13px; max-width: none; }
 
+/* ---------- Chess960 starting position ---------- */
+.setup960 {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border-radius: var(--radius-sm);
+  background: var(--inset); border: 1px solid var(--border);
+}
+.setup960-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.setup960-label { font-size: 14px; font-weight: 600; }
+.setup960-current {
+  padding: 2px 10px; border-radius: 999px; white-space: nowrap;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--accent-hi); background: rgba(52, 191, 211, 0.12); border: 1px solid rgba(52, 191, 211, 0.3);
+}
+.setup960-current:empty { display: none; }
+.setup960-input { position: relative; }
+.setup960-input input {
+  width: 100%; min-height: 44px; padding: 8px 64px 8px 12px;
+  font-size: 16px; /* 16px stops iOS zooming on focus */ font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  -moz-appearance: textfield; appearance: textfield;
+  transition: border-color 0.15s;
+}
+.setup960-input input::-webkit-outer-spin-button,
+.setup960-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.setup960-input input::placeholder { color: var(--faint); opacity: 1; }
+.setup960-input input:hover { border-color: rgba(140, 200, 240, 0.45); }
+.setup960-input input:focus-visible { border-color: var(--accent-hi); }
+.setup960-input input:user-invalid { border-color: #e2706b; }
+.setup960-range {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--faint); pointer-events: none; font-variant-numeric: tabular-nums;
+}
+.setup960-help { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.notes960 {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 4px;
+  color: var(--muted); font-size: 12px; line-height: 1.5;
+}
+.notes960 li { position: relative; padding-left: 14px; }
+.notes960 li::before {
+  content: ""; position: absolute; left: 2px; top: 0.6em; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--border-strong);
+}
+.notes960 strong { color: var(--text); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .setup960-input input { transition: none; } }
+
 /* Checkboxes rendered as switches; still native inputs for forms, keyboard and tests. */
 .field.switch { cursor: pointer; }
 .field.switch input[type="checkbox"] {

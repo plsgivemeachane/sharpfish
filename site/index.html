@@ -74,11 +74,21 @@
           <select id="game-mode"><option value="human">Play a bot</option><option value="bots">Bot vs bot</option></select>
         </label>
       </div>
-      <label class="field">Starting position (0–959)
-        <input id="chess960-position" type="number" min="0" max="959" step="1" placeholder="Random each game">
-      </label>
-      <p id="chess960-current" class="hint" aria-live="polite"></p>
-      <p class="hint">Bot ratings are Classic estimates; Chess960 strength has not been calibrated. Leave blank for a random position. To castle, move your king onto your rook. King finishes on c/g; rook on d/f.</p>
+      <div class="setup960" role="group" aria-labelledby="setup960-label">
+        <div class="setup960-head">
+          <label id="setup960-label" class="setup960-label" for="chess960-position">Starting position</label>
+          <span id="chess960-current" class="setup960-current" aria-live="polite"></span>
+        </div>
+        <div class="setup960-input">
+          <input id="chess960-position" type="number" inputmode="numeric" min="0" max="959" step="1" placeholder="Random each game" aria-describedby="chess960-help">
+          <span class="setup960-range" aria-hidden="true">0–959</span>
+        </div>
+        <p id="chess960-help" class="setup960-help">Enter a number from 0 to 959, or leave blank for a random setup.</p>
+      </div>
+      <ul class="notes960">
+        <li><strong>Castling:</strong> move your king onto your rook. The king lands on c/g, the rook on d/f.</li>
+        <li>Bot ratings are Classic estimates, not calibrated for Chess960.</li>
+      </ul>
       <div class="row split">
         <button id="btn-new-white" class="btn primary"><span class="side-dot w" aria-hidden="true"></span>Play White</button>
         <button id="btn-new-black" class="btn"><span class="side-dot b" aria-hidden="true"></span>Play Black</button>
