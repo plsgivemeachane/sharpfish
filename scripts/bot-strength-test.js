@@ -58,7 +58,7 @@ async function main() {
     assert.equal(steps, 64);
   });
 
-  await test("all 21 named labels and raw controls agree with the measured report", () => {
+  await test("rated named labels and raw controls agree with the measured report", () => {
     const report = require("../calibration/2026-11-17/report.json");
     assert.equal(report.bots.length, 21);
     assert.equal(report.measurement.games, 2400);
@@ -67,6 +67,11 @@ async function main() {
     assert.equal(bots.BOT_CALIBRATION.version, report.version);
     for (const measured of report.bots) {
       const bot = bots.findBot(measured.id), profile = bots.botSearchConfig(bot).profile;
+      // The historical Engine measurement is no longer a rated preset.
+      if (bot.id === "stockfish") {
+        assert.equal(profile.status, "unrestricted");
+        continue;
+      }
       assert.equal(bot.elo, measured.displayElo);
       assert.equal(bot.previousElo, measured.previousElo);
       assert.equal(profile.engineElo, measured.engineElo);
