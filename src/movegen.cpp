@@ -170,7 +170,7 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
             assert(rank_of(pos.ep_square()) == relative_rank(Us, RANK_6));
 
             // An en passant capture cannot resolve a discovered check
-            if (Type == EVASIONS && (target & (pos.ep_square() + Up)))
+            if (!Variant::EnableRemorse && Type == EVASIONS && (target & (pos.ep_square() + Up)))
                 return moveList;
 
             b1 = pawnsNotOn7 & Attacks::attacks_bb<PAWN>(pos.ep_square(), Them);
@@ -280,7 +280,8 @@ Move* generate<LEGAL>(const Position& pos, Move* moveList) {
     moveList =
       pos.checkers() ? generate<EVASIONS>(pos, moveList) : generate<NON_EVASIONS>(pos, moveList);
     while (cur != moveList)
-        if ((((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT)
+        if (((Variant::EnableRemorse || (pinned & cur->from_sq()) || cur->from_sq() == ksq
+              || cur->type_of() == EN_PASSANT)
              && !pos.legal(*cur))
             || (Variant::HasRuleFilter && !Variant::move_allowed(pos, *cur)))
             *cur = *(--moveList);

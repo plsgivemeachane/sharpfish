@@ -8,6 +8,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="badges.css">
+<link rel="stylesheet" href="remorse.css">
 <!-- Written by make-web.sh: sets window.ENGINE_FILE to the built engine -->
 <script src="engine-file.js"></script>
 </head>
@@ -37,18 +38,22 @@
       <div class="player-tag" id="tag-bottom"></div>
       <div id="clock-bottom" class="clock" role="timer" aria-label="Your clock" hidden></div>
     </div>
+    <ul id="remorse-key" class="remorse-key" aria-label="Remorse board markers" hidden>
+      <li><span class="remorse-mark" aria-hidden="true"></span><span><b>Guilty</b>: can move, cannot capture</span></li>
+      <li><span class="remorse-mark ready" aria-hidden="true"></span><span><b>Ready to recover</b>: clears after its side’s turn if still beside a friendly bishop. Bishops recover on their own.</span></li>
+      <li><span class="remorse-range-mark" aria-hidden="true"></span><span><b>Bishop range</b>: tap a guilty piece to see its recovery squares</span></li>
+    </ul>
   </section>
 
   <aside class="panel panel-game" aria-label="Game">
     <div class="card status-card">
-      <div id="status" class="status">Starting…</div>
+      <div id="status" class="status" role="status">Starting…</div>
       <div id="engine-line" class="engine-line">&nbsp;</div>
       <div id="premove-state" class="premove-state" hidden>
         <span id="premove-count" role="status"></span>
         <button id="btn-cancel-premoves" class="btn btn-sm" type="button">Cancel premoves</button>
       </div>
     </div>
-
     <section class="card moves-panel" aria-label="Moves">
       <div class="moves-card">
         <table class="moves" aria-label="Moves">
@@ -64,6 +69,16 @@
         <button id="btn-last" class="btn icon" title="Back to the game (End)" aria-label="Back to the game"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg></button>
       </div>
     </section>
+
+    <details id="remorse-rules" class="card remorse-rules" hidden>
+      <summary>How to play Remorse Chess</summary>
+      <div class="remorse-rules-body">
+        <p>A capture makes the piece guilty. It can still move, but it can’t capture or give check.</p>
+        <p>To recover, a guilty piece must start and end a later turn beside a friendly bishop. All eight neighboring squares count. A guilty bishop recovers on its own at the end of its next turn.</p>
+        <p>For example, a rook that captures beside a bishop on move 10 can capture again on move 12 if it starts and ends move 11 in bishop range.</p>
+        <p class="hint">Checkmate wins. The eval bar and move grades use ordinary Stockfish.</p>
+      </div>
+    </details>
 
     <section class="card controls" aria-labelledby="game-heading">
       <div class="card-head">

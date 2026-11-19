@@ -29,6 +29,8 @@
 #ifndef VARIANT_HOOKS_H_INCLUDED
 #define VARIANT_HOOKS_H_INCLUDED
 
+#include <algorithm>
+#include <cstdlib>
 #include <random>
 
 #include "../bitboard.h"
@@ -108,6 +110,49 @@ constexpr bool HasPieceTweak = PieceValueTweakCp[0] || PieceValueTweakCp[1] || P
 constexpr bool HasRuleFilter = !AllowCastling || !AllowEnPassant || !AllowUnderpromotion
                             || !AllowPawnDoubleStep || EnableCustomRules;
 
+// NNUE sees the board but not guilt. Discount restricted pieces by role and
+// by how soon they can recover, while leaving tactics to the search.
+inline int remorse_eval_cp(const Position& pos) {
+    Bitboard guilty = pos.guilty();
+    if (!guilty)
+        return 0;
+
+    constexpr int GuiltCostCp[] = {0, 36, 115, 70, 175, 275, 125};
+    const Bitboard ready = pos.remorse_ready();
+    int cp = 0;
+    while (guilty)
+    {
+        const Square sq = pop_lsb(guilty);
+        const Piece pc = pos.piece_on(sq);
+        const Color side = color_of(pc);
+        int percent = 100;
+        if (ready & square_bb(sq))
+            percent = side == pos.side_to_move() ? 42 : 55;
+        else
+        {
+            // A bishop two squares away offers a nearer route to recovery than
+            // one across the board. No discount without a nearby friendly bishop.
+            Bitboard bishops = pos.pieces(side, BISHOP);
+            while (bishops)
+            {
+                const Square bishop = pop_lsb(bishops);
+                const int distance = std::max(std::abs(file_of(sq) - file_of(bishop)),
+                                              std::abs(rank_of(sq) - rank_of(bishop)));
+                if (distance == 2)
+                {
+                    percent = 72;
+                    break;
+                }
+                if (distance == 3)
+                    percent = 90;
+            }
+        }
+        const int cost = GuiltCostCp[type_of(pc)] * percent / 100;
+        cp += side == pos.side_to_move() ? -cost : cost;
+    }
+    return cp;
+}
+
 // Total eval adjustment in internal units, side-to-move point of view.
 inline int eval_adjust(const Position& pos) {
     int cp = 0;
@@ -122,6 +167,9 @@ inline int eval_adjust(const Position& pos) {
 
     if constexpr (EnableEvalHook)
         cp += eval_bonus_cp(pos);
+
+    if constexpr (EnableRemorse)
+        cp += remorse_eval_cp(pos);
 
     return cp_to_internal(cp);
 }

@@ -82,6 +82,31 @@ For evaluation changes, compare the `eval` command before and after:
   | node site/engine/stockfish-*-lite-single.js | grep "Final evaluation"
 ```
 
+## Remorse Chess
+
+The Remorse engine keeps guilt in its position state. A capture makes the
+capturing piece guilty, and a guilty piece can still move to empty squares but
+cannot capture or give check. At the end of an owner's turn, a piece that was
+already guilty recovers if it began and ended the turn within one square of a
+friendly bishop. Bishops satisfy this condition themselves. Checkmate is still
+the win condition, and kings cannot be adjacent.
+
+The UCI `d` command prints the ordinary `Fen:` for stock evaluation, plus
+`Remorse guilty:`, `Remorse ready:`, and `Remorse FEN:`. The last one appends
+`guilt=<hex>` to FEN for restoring variant state with `position fen`. The mask
+uses a1 as the least significant bit and h8 as the most significant. A FEN
+without this field starts with no guilty pieces. To preserve repetition
+history, replay the moves from the initial position rather than loading only
+the final snapshot.
+
+The playing bot discounts guilty pieces according to their role and how close
+they are to recovery. The ordinary NNUE remains the positional baseline; the
+site’s stock engine does not apply the guilt adjustment.
+
+`./make-web.sh test` checks the Remorse WASM rules. The browser regression runs
+as `node scripts/remorse-browser-test.js /path/to/playwright-tools http://localhost:8080`
+against the site served by `./make-web.sh serve`.
+
 ## Engine strength
 
 The native engine's extended `UCI_Elo` control accepts 0..3190 and rounds to steps of 50 before choosing the policy below (for example, 1320 becomes 1300). It is an engine handicap control, not a measured human rating:

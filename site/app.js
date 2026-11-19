@@ -212,11 +212,13 @@ function refreshPosition() {
   return engine.request([positionCmd(), "d", "go perft 1", "isready"],
     function (l) { return l === "readyok"; }
   ).then(function (lines) {
-    var fen = "", inCheck = false, legal = [];
+    var fen = "", inCheck = false, legal = [], guilty = [], ready = [];
     lines.forEach(function (l) {
       var m;
       if (l.indexOf("Fen: ") === 0) fen = l.slice(5).trim();
       else if (l.indexOf("Checkers:") === 0) inCheck = l.slice(9).trim().length > 0;
+      else if (l.indexOf("Remorse guilty:") === 0) guilty = l.slice(15).trim().split(/\s+/).filter(Boolean);
+      else if (l.indexOf("Remorse ready:") === 0) ready = l.slice(14).trim().split(/\s+/).filter(Boolean);
       else if ((m = l.match(/^([a-h][1-8][a-h][1-8][qrbn]?): \d+$/))) legal.push(m[1]);
     });
     var parts = fen.split(" ");
@@ -225,9 +227,11 @@ function refreshPosition() {
       board: parseBoard(fen),
       turn: parts[1],
       halfmove: Number(parts[4]) || 0,
-      repKey: parts.slice(0, 4).join(" "),
+      repKey: parts.slice(0, 4).join(" ") + (guilty.length ? "|" + guilty.slice().sort().join(",") : ""),
       legal: legal,
-      inCheck: inCheck
+      inCheck: inCheck,
+      guilty: guilty,
+      ready: ready
     };
   });
 }
@@ -285,10 +289,6 @@ function engineMove() {
 }
 
 // ---------------------------------------------------------------- Eval bar
-// Driven by the stock Stockfish build in site/stock-engine/, not your variant,
-// so it shows how plain Stockfish rates the game. Your variant may only remove
-// moves, so every position it reaches is a normal chess position stock
-// Stockfish can judge (it just does not know about your rule changes).
 var EVAL_TIME_MS = 2000;
 var evalEngine = null;
 var evalKey = null;     // position being analysed
@@ -353,7 +353,8 @@ function toggleEval() {
 
 // ---------------------------------------------------------------- Game flow
 function snapshot(p, lastMove) {
-  return { fen: p.fen, board: p.board, legal: p.legal, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck };
+  return { fen: p.fen, board: p.board, legal: p.legal, lastMove: lastMove, turn: p.turn, inCheck: p.inCheck,
+    guilty: (p.guilty || []).slice(), ready: (p.ready || []).slice() };
 }
 
 // Review: step through earlier positions without changing the game.
@@ -417,7 +418,7 @@ function checkGameOver() {
     game.over = "Draw by the 50-move rule";
   } else if (game.repKeys.filter(function (k) { return k === pos.repKey; }).length >= 3) {
     game.over = "Draw by threefold repetition";
-  } else if (insufficientMaterial(pos.board)) {
+  } else if (variantInfo().slug === "remorse" ? Object.keys(pos.board).length === 2 : insufficientMaterial(pos.board)) {
     game.over = "Draw — insufficient material";
   } else {
     game.over = null;
@@ -1028,6 +1029,21 @@ function render() {
   var shown = game.view === null ? null : game.boards[game.view];
   if (shown) last = shown.lastMove ? [shown.lastMove.slice(0, 2), shown.lastMove.slice(2, 4)] : [];
   var src = shown || (pos.pending ? null : pos);
+  var guiltySquares = src && src.guilty || [];
+  var readySquares = src && src.ready || [];
+  var selectedPiece = !shown && src && selected && src.board[selected];
+  var remorse = variantInfo().slug === "remorse";
+  var selectedGuilty = selectedPiece && guiltySquares.indexOf(selected) >= 0;
+  function neighbors(a, b) {
+    return a !== b && Math.abs(a.charCodeAt(0) - b.charCodeAt(0)) <= 1 && Math.abs(a[1] - b[1]) <= 1;
+  }
+  var rangeBishops = [];
+  if (remorse && selectedPiece) {
+    if (selectedPiece.toLowerCase() === "b") rangeBishops = [selected];
+    else if (selectedGuilty) rangeBishops = Object.keys(src.board).filter(function (sq) {
+      return src.board[sq] === (isWhite(selectedPiece) ? "B" : "b");
+    });
+  }
   if (src && src.inCheck) {
     var k = src.turn === "w" ? "K" : "k";
     kingSq = Object.keys(src.board).find(function (s) { return src.board[s] === k; });
@@ -1069,14 +1085,25 @@ function render() {
       }, []) : [];
       if (queuedAt.length) cls += " premove";
       if (sq === kingSq) cls += " check";
+      var guilty = !projecting && guiltySquares.indexOf(sq) >= 0;
+      var ready = guilty && readySquares.indexOf(sq) >= 0;
+      var inRange = !projecting && rangeBishops.some(function (bishop) { return neighbors(bishop, sq); });
+      if (guilty) cls += " remorse-guilty";
+      if (ready) cls += " remorse-ready";
+      if (inRange) cls += " remorse-range";
       if (dests.indexOf(sq) >= 0) cls += " dest" + (board[sq] ? " occupied" : "");
-      html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell">';
+      var pc = board[sq];
+      var label = pc ? (isWhite(pc) ? "white " : "black ") + PIECE_NAMES[pc.toLowerCase()] +
+        (guilty ? ", guilty: cannot capture" : "") + (ready ? ", ready to recover" : "") : "";
+      var squareLabel = remorse ? ' aria-label="' + sq + (label ? ", " + label : "") +
+        (inRange ? ", in friendly bishop range" : "") + '"' : "";
+      html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell"' + squareLabel + '>';
+      if (inRange) html += '<span class="remorse-range-mark" aria-hidden="true"></span>';
       if (col === 0) html += '<span class="coord rank">' + rank + "</span>";
       if (row === 7) html += '<span class="coord file">' + FILES[file] + "</span>";
-      if (board[sq]) {
-        var pc = board[sq];
-        html += '<img class="piece" draggable="false" src="' + pieceImg(pc) + '" alt="' +
-          (isWhite(pc) ? "white " : "black ") + PIECE_NAMES[pc.toLowerCase()] + '">';
+      if (pc) {
+        html += '<img class="piece" draggable="false" src="' + pieceImg(pc) + '" alt="' + label + '">';
+        if (guilty) html += '<span class="remorse-mark' + (ready ? ' ready' : '') + '" aria-hidden="true"></span>';
         var moveIndex = shownPly() - 1;
         var displayedMove = last.length === 2 && last[1] === sq;
         var grade = game.grades && game.grades[moveIndex];
@@ -1131,11 +1158,19 @@ function render() {
   else if (thinking) status = game.botMatch ? game.matchBots[pos.turn].name + " is thinking…" : "Engine is thinking…";
   else if (!game.botMatch && pos.turn === game.playerColor) status = "Your move" + (pos.inCheck ? " — check!" : "");
   else status = "Waiting…";
-  if (game.view !== null) status = "Reviewing move " + game.view + " of " + game.moves.length +
+  if (shown) status = "Reviewing move " + game.view + " of " + game.moves.length +
     (thinking ? " · engine is thinking" : "") + " — press End to return";
+  if (remorse && guiltySquares.length) {
+    if (selectedGuilty && !projecting) {
+      status += " · Guilty: cannot capture";
+      if (readySquares.indexOf(selected) >= 0) status += " · Ready to recover";
+    } else {
+      status += " · " + guiltySquares.length + " guilty piece" + (guiltySquares.length === 1 ? "" : "s");
+    }
+  }
   $("premove-state").hidden = !premoves.length;
   $("premove-count").textContent = premoves.length + (premoves.length === 1 ? " premove queued" : " premoves queued");
-  $("status").textContent = status;
+  if ($("status").textContent !== status) $("status").textContent = status;
   $("status").classList.toggle("reviewing", game.view !== null);
 
   renderMoves();
@@ -1180,7 +1215,13 @@ function renderMoves() {
 
 function pgn() {
   var out = SFAnalysis.snapshotAnalysis({ variant: variantInfo() }) ? '[Variant "' + variantInfo().slug + '"]\n\n' : "";
-  game.san.forEach(function (s, i) { out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " "; });
+  game.san.forEach(function (s, i) {
+    out += (i % 2 === 0 ? (i / 2 + 1) + ". " : "") + s + " ";
+    if (variantInfo().slug === "remorse") {
+      var guilty = game.boards[i + 1] && game.boards[i + 1].guilty || [];
+      out += "{Remorse " + game.moves[i] + "; guilty: " + (guilty.join(" ") || "none") + "} ";
+    }
+  });
   if (game.over) {
     out += /White wins/.test(game.over) ? "1-0" : /Black wins/.test(game.over) ? "0-1" : "1/2-1/2";
   }
@@ -1205,9 +1246,8 @@ syncGameMode();
       $(id).appendChild(option);
     });
   });
+  $(id).value = "stockfish";
 });
-$("white-bot").value = "stockfish";
-$("black-bot").value = "stockfish";
 $("btn-bot-match").onclick = function () { newGame("w", true); };
 $("btn-new-white").onclick = function () { newGame("w"); };
 $("btn-new-black").onclick = function () { newGame("b"); };
@@ -1251,6 +1291,7 @@ boardEl.addEventListener("pointerdown", function (e) {
   viewPly(Infinity);
 }, true);
 $("chk-eval").onchange = toggleEval;
+if (variantInfo().slug === "remorse") $("remorse-rules").hidden = $("remorse-key").hidden = false;
 if (window.SFSound) SFSound.bindToggle($("chk-sound"));
 $("chk-grade").checked = window.SFLive ? window.SFLive.init() : false;
 if (!window.STOCK_ENGINE_FILE || !SFAnalysis.supportsRecord({ variant: variantInfo() })) {

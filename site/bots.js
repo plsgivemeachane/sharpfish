@@ -211,6 +211,7 @@ function customBot(elo) {
 }
 
 function findBot(id) {
+  if (id === "stockfish-full") id = "stockfish";
   for (var i = 0; i < BOT_GROUPS.length; i++)
     for (var j = 0; j < BOT_GROUPS[i].bots.length; j++)
       if (BOT_GROUPS[i].bots[j].id === id) return BOT_GROUPS[i].bots[j];

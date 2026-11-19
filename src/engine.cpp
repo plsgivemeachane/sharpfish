@@ -345,7 +345,7 @@ void Engine::save_network(const std::optional<std::filesystem::path>& file) {
 void Engine::trace_eval() const {
     StateListPtr trace_states(new std::deque<StateInfo>(1));
     Position     p;
-    p.set(pos.fen(), options["UCI_Chess960"], &trace_states->back());
+    p.set(pos.variant_fen(), options["UCI_Chess960"], &trace_states->back());
 
     verify_network();
 
@@ -355,7 +355,7 @@ void Engine::trace_eval() const {
 const OptionsMap& Engine::get_options() const { return options; }
 OptionsMap&       Engine::get_options() { return options; }
 
-std::string Engine::fen() const { return pos.fen(); }
+std::string Engine::fen() const { return pos.variant_fen(); }
 
 std::optional<PositionSetError> Engine::flip() { return pos.flip(); }
 

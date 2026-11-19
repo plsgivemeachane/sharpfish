@@ -54,6 +54,7 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    Bitboard guilt;
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -95,6 +96,9 @@ class Position {
     std::optional<PositionSetError> set(const std::string& fenStr, bool isChess960, StateInfo* si);
     std::optional<PositionSetError> set(const std::string& code, Color c, StateInfo* si);
     std::string                     fen() const;
+    std::string                     variant_fen() const;
+    Bitboard                        guilty() const;
+    Bitboard                        remorse_ready() const;
 
     // Position representation
     Bitboard pieces() const;  // All pieces
@@ -195,6 +199,10 @@ class Position {
     Key  compute_material_key() const;
     void set_state() const;
     void set_check_info() const;
+    bool remorse_legal(Move move) const;
+    bool remorse_gives_check(Move move) const;
+    Bitboard remorse_after(Move move, Bitboard bishopsAfter) const;
+    bool remorse_ep_legal() const;
 
     // Other helpers
     template<bool ComputeRay = true>
@@ -453,6 +461,7 @@ inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable
 }
 
 inline StateInfo* Position::state() const { return st; }
+inline Bitboard Position::guilty() const { return st->guilt; }
 
 }  // namespace Stockfish
 

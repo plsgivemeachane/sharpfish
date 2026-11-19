@@ -68,7 +68,7 @@ Value Eval::evaluate(const Eval::NNUE::Network&     network,
     int v        = nnue + (nnue * i64(material) + optimism * i64(7675)) / 91000;
 
     // Fork tuning: piece value tweaks and custom eval terms (src/variant/)
-    if constexpr (Variant::HasPieceTweak || Variant::EnableEvalHook)
+    if constexpr (Variant::HasPieceTweak || Variant::EnableEvalHook || Variant::EnableRemorse)
         v += Variant::eval_adjust(pos);
 
     // Damp down the evaluation linearly when shuffling

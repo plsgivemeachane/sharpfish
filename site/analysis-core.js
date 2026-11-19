@@ -351,11 +351,11 @@
   }
   function supportsRecord(record) {
     var variant = record && record.variant;
-    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish"].includes(variant.slug) || variant.supported !== false);
+    return !!record && (!variant || ["classic", "elo-ladder", "alternating-colors", "scp-096", "sufferfish", "remorse"].includes(variant.slug) || variant.supported !== false);
   }
   function snapshotAnalysis(record) {
     var variant = record && record.variant;
-    return !!variant && (["alternating-colors", "scp-096"].includes(variant.slug) || variant.analysisMode === "standard-snapshot");
+    return !!variant && (["alternating-colors", "scp-096", "remorse"].includes(variant.slug) || variant.analysisMode === "standard-snapshot");
   }
   function unavailable(message) {
     var error = new Error(message); error.name = "AnalysisUnavailableError"; return error;
@@ -366,6 +366,12 @@
     var snapshot = record.boards && record.boards[ply], fen = snapshot && snapshot.fen;
     if (!fen) throw unavailable("This position has no saved board for ordinary chess analysis.");
     var fields = String(fen).trim().split(/\s+/), originalRights = fields[2], ep = fields[3];
+    if (record.variant && record.variant.slug === "remorse" && ep === "-") {
+      var move = snapshot.lastMove || (record.moves || [])[ply - 1];
+      var doublePush = typeof move === "string" && move[0] === move[2]
+        && (fields[1] === "b" ? move[1] === "2" && move[3] === "4" : move[1] === "7" && move[3] === "5");
+      if (doublePush) ep = move[0] + (move[1] === "2" ? "3" : "6");
+    }
     if (record.variant && record.variant.slug === "scp-096") {
       fields[0] = fields[0].replace(/\*/g, "1").replace(/[1-8]+/g, function (run) {
         return String(Array.from(run).reduce(function (sum, digit) { return sum + Number(digit); }, 0));
@@ -391,7 +397,11 @@
   }
   function historyKey(record, ply) {
     var key = (record.startFen || START_FEN) + "|" + record.moves.slice(0, ply).join(" ");
-    if (snapshotAnalysis(record)) key += "|standard-snapshot-v1|" + ((record.boards && record.boards[ply - 1] || {}).fen || "missing");
+    if (snapshotAnalysis(record)) {
+      var snapshot = record.boards && record.boards[ply - 1] || {};
+      key += "|standard-snapshot-v1|" + (snapshot.fen || "missing");
+      if (record.variant && record.variant.slug === "remorse") key += "|guilty:" + (snapshot.guilty || []).slice().sort().join(",") + "|ready:" + (snapshot.ready || []).slice().sort().join(",");
+    }
     return key;
   }
   function isValidGrade(grade, record, index, engine, specialMoves, movetime) {

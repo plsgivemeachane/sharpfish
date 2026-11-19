@@ -129,7 +129,9 @@
   // Grade, evaluation and toggle updates patch overlays in place, so a piece
   // that is sliding keeps sliding and no motion is invented.
   function renderBoard() {
-    var rec = state.record, key = (rec ? rec.id : "start") + "|" + state.ply + "|" + (state.flipped ? "b" : "w") + "|" + (state.alternative ? state.alternative.move : "played");
+    var rec = state.record, snap = state.alternative ? state.alternative.position : rec && rec.boards && rec.boards[state.ply];
+    var remorseState = snap && (snap.guilty || []).slice().sort().join(",") + "/" + (snap.ready || []).slice().sort().join(",");
+    var key = (rec ? rec.id : "start") + "|" + state.ply + "|" + (state.flipped ? "b" : "w") + "|" + (state.alternative ? state.alternative.move : "played") + "|" + remorseState;
     if (key === state.shownKey) { updateOverlay(); drawShapes(); return; }
     var board = boardAt(rec, state.ply), el = $("board");
     var animate = state.shownBoard && !reduceMotion() && state.shownRecordId === (rec && rec.id) && state.shownFlipped === state.flipped;
@@ -141,15 +143,23 @@
     for (var row = 0; row < 8; row++) for (var col = 0; col < 8; col++) {
       var file = state.flipped ? 7 - col : col, rank = state.flipped ? row + 1 : 8 - row, sq = FILES[file] + rank;
       var cell = document.createElement("div");
-      cell.className = "sq " + ((file + rank) % 2 ? "dark" : "light") + (last.indexOf(sq) >= 0 ? " last" : "") + (sq === check ? " check" : "");
+      var guilty = snap && (snap.guilty || []).indexOf(sq) >= 0;
+      var ready = snap && (snap.ready || []).indexOf(sq) >= 0;
+      cell.className = "sq " + ((file + rank) % 2 ? "dark" : "light") + (last.indexOf(sq) >= 0 ? " last" : "") + (sq === check ? " check" : "") + (guilty ? " remorse-guilty" : "") + (ready ? " remorse-ready" : "");
       cell.dataset.sq = sq; cell.setAttribute("role", "gridcell");
       if (col === 0) { var r = document.createElement("span"); r.className = "coord rank"; r.textContent = rank; cell.appendChild(r); }
       if (row === 7) { var f = document.createElement("span"); f.className = "coord file"; f.textContent = FILES[file]; cell.appendChild(f); }
       var piece = board[sq];
       if (piece) {
         var img = document.createElement("img"); img.className = "piece"; img.draggable = false; img.src = pieceAsset(piece);
-        img.alt = piece === "*" ? "SCP-096" : (isWhite(piece) ? "White " : "Black ") + (PIECE_NAMES[piece.toUpperCase()] || "piece");
+        img.alt = piece === "*" ? "SCP-096" : (isWhite(piece) ? "White " : "Black ") + (PIECE_NAMES[piece.toUpperCase()] || "piece") + (guilty ? ", guilty" + (ready ? ", ready to recover" : "") : "");
         cell.setAttribute("aria-label", sq + ", " + img.alt); cell.appendChild(img);
+        if (guilty) {
+          var mark = document.createElement("span");
+          mark.className = "remorse-mark" + (ready ? " ready" : "");
+          mark.setAttribute("aria-hidden", "true");
+          cell.appendChild(mark);
+        }
       } else cell.setAttribute("aria-label", sq);
       el.appendChild(cell);
     }
@@ -308,7 +318,14 @@
     $("next").disabled = $("last").disabled = !rec || state.ply >= n;
     $("copy").disabled = !rec;
     var supported = isSupported(rec);
-    $("analysis-context").hidden = !rec || !SFAnalysis.snapshotAnalysis(rec);
+    var remorse = rec && rec.variant && rec.variant.slug === "remorse";
+    $("remorse-key").hidden = !remorse || !!state.alternative;
+    var context = $("analysis-context");
+    context.hidden = !rec || !SFAnalysis.snapshotAnalysis(rec);
+    context.textContent = remorse ? (state.alternative ?
+      "This alternative follows ordinary chess, so it has no guilt markers." :
+      "Evaluation and grades follow ordinary chess and ignore guilt.") :
+      "Ordinary chess analysis: SCP and custom move restrictions are ignored.";
     $("grade-toggle").disabled = $("eval-toggle").disabled = $("special-toggle").disabled = !!rec && !supported;
     $("analysis-time").disabled = !!rec && !supported;
     var alternativeButton = $("alternative-move");

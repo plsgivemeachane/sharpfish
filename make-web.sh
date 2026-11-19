@@ -61,12 +61,14 @@ cp "src/$ENGINE_JS" "src/$ENGINE_WASM" site/engine/
 cat > site/engine-file.js <<EOF2
 window.ENGINE_FILE = "engine/$ENGINE_JS";
 window.STOCK_ENGINE_FILE = "stock-engine/stockfish-stock.js";
+window.SHARPFISH_VARIANT = { slug: "remorse", title: "Remorse Chess", analysisMode: "standard-snapshot" };
 EOF2
 echo ">> Engine copied to site/engine/$ENGINE_JS (+ .wasm, $(du -h "site/engine/$ENGINE_WASM" | cut -f1))"
 
 # 5. Optional extras
 if [ "$CMD" = "test" ]; then
     node scripts/smoke-test.js "site/engine/$ENGINE_JS"
+    node scripts/remorse-engine-test.js "site/engine/$ENGINE_JS"
 elif [ "$CMD" = "serve" ]; then
     echo ">> Serving site/ on http://localhost:8080 (Ctrl+C to stop)"
     cd site && exec python3 -m http.server 8080

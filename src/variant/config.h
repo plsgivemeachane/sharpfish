@@ -31,7 +31,7 @@ namespace Stockfish::Variant {
 
 // What your variant is, shown by "uci" as "id name Stockfish variant (<this>)".
 // Example: "Knights only". "" keeps the default Stockfish name.
-constexpr const char* EngineName = "";
+constexpr const char* EngineName = "Remorse Chess";
 
 // -----------------------------------------------------------------------------
 //  1. PIECE VALUES
@@ -87,7 +87,8 @@ constexpr bool EnableCustomRules = false;
 // -----------------------------------------------------------------------------
 // Null-move pruning is a big speed-up, but it is unsound in some variants
 // (e.g. when passing would be good). Turn it off if your rules need that.
-constexpr bool EnableNullMove = true;
+constexpr bool EnableNullMove = false;
+constexpr bool EnableRemorse = true;
 
 }  // namespace Stockfish::Variant
 

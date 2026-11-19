@@ -41,6 +41,7 @@
 #include "types.h"
 #include "uci.h"
 #include "ucioption.h"
+#include "variant/config.h"
 
 namespace Stockfish {
 
@@ -345,7 +346,9 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
             rootMoves.emplace_back(m);
 
 #ifndef __NO_SYZYGY__
-    Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
+    Tablebases::Config tbConfig = Variant::EnableRemorse
+                                   ? Tablebases::Config{}
+                                   : Tablebases::rank_root_moves(options, pos, rootMoves);
 #endif
 
     // After ownership transfer 'states' becomes empty, so if we stop the search
@@ -370,7 +373,7 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
             th->worker->nmpMinPly                                                = 0;
             th->worker->rootDepth                                                = 0;
             th->worker->rootMoves                                                = rootMoves;
-            th->worker->rootPos.set(pos.fen(), pos.is_chess960(), &th->worker->rootState);
+            th->worker->rootPos.set(pos.variant_fen(), pos.is_chess960(), &th->worker->rootState);
             th->worker->rootState = setupStates->back();
 #ifndef __NO_SYZYGY__
             th->worker->tbConfig  = tbConfig;

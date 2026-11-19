@@ -22,6 +22,7 @@
 #include <array>
 #include <cassert>
 #include <cctype>
+#include <charconv>
 #include <cstddef>
 #include <cstring>
 #include <initializer_list>
@@ -51,6 +52,7 @@ namespace Zobrist {
 Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
+Key guilt[SQUARE_NB];
 Key side, noPawns;
 
 }
@@ -61,6 +63,20 @@ constexpr std::string_view PieceToChar(" PNBRQK  pnbrqk");
 
 static constexpr Piece Pieces[] = {W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,
                                    B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING};
+
+Bitboard bishop_range(Bitboard bishops) {
+    Bitboard range = bishops;
+    while (bishops)
+        range |= attacks_bb<KING>(pop_lsb(bishops));
+    return range;
+}
+
+Key guilt_key(Bitboard squares) {
+    Key key = 0;
+    while (squares)
+        key ^= Zobrist::guilt[pop_lsb(squares)];
+    return key;
+}
 }  // namespace
 
 
@@ -87,8 +103,20 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
     for (Bitboard b = pos.checkers(); b;)
         os << UCIEngine::square(pop_lsb(b)) << " ";
 
+    if constexpr (Variant::EnableRemorse)
+    {
+        os << "\nRemorse guilty: ";
+        for (Bitboard squares = pos.guilty(); squares;)
+            os << UCIEngine::square(pop_lsb(squares)) << ' ';
+        os << "\nRemorse ready: ";
+        for (Bitboard squares = pos.remorse_ready(); squares;)
+            os << UCIEngine::square(pop_lsb(squares)) << ' ';
+        os << "\nRemorse FEN: " << pos.variant_fen();
+    }
+
 #ifndef __NO_SYZYGY__
-    if (Tablebases::MaxCardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
+    if (!Variant::EnableRemorse && Tablebases::MaxCardinality >= popcount(pos.pieces())
+        && !pos.can_castle(ANY_CASTLING))
     {
         StateInfo st;
 
@@ -139,6 +167,10 @@ void Position::init() {
 
     Zobrist::side    = rng.rand<Key>();
     Zobrist::noPawns = rng.rand<Key>();
+
+    if constexpr (Variant::EnableRemorse)
+        for (auto& key : Zobrist::guilt)
+            key = rng.rand<Key>();
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -417,11 +449,28 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
             return PositionSetError("Invalid FEN. Invalid en-passant square.");
     }
 
-    if (!enpassant || !legalEP)
+    if (!enpassant || (!Variant::EnableRemorse && !legalEP))
         st->epSquare = SQ_NONE;
 
     // 5-6. Halfmove clock and fullmove number
     ss >> std::skipws >> st->rule50 >> gamePly;
+
+    if constexpr (Variant::EnableRemorse)
+    {
+        string field;
+        if (ss >> field)
+        {
+            if (field.compare(0, 6, "guilt=") != 0)
+                return PositionSetError("Invalid Remorse FEN. Expected guilt=<hex>.");
+
+            auto end = field.data() + field.size();
+            auto [ptr, error] = std::from_chars(field.data() + 6, end, st->guilt, 16);
+            if (error != std::errc{} || ptr != end || (st->guilt & ~pieces()) || (ss >> field))
+                return PositionSetError("Invalid Remorse FEN guilt mask.");
+        }
+        if (st->epSquare != SQ_NONE && !remorse_ep_legal())
+            st->epSquare = SQ_NONE;
+    }
 
     // Normally values larger than 99 would be pointless but we do support ignoring 50 move rule for TB purposes.
     // Limit at 2**15 as it's used multiplicatively with position evaluation during search.
@@ -495,6 +544,11 @@ void Position::set_state() const {
     st->pawnKey                                   = Zobrist::noPawns;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
+    if constexpr (Variant::EnableRemorse)
+    {
+        st->checkersBB &= ~guilty();
+        st->key ^= guilt_key(guilty());
+    }
 
     set_check_info();
 
@@ -624,6 +678,8 @@ void Position::update_slider_blockers(Color c) const {
     Bitboard snipers = ((attacks_bb<ROOK>(ksq) & pieces(QUEEN, ROOK))
                         | (attacks_bb<BISHOP>(ksq) & pieces(QUEEN, BISHOP)))
                      & pieces(~c);
+    if constexpr (Variant::EnableRemorse)
+        snipers &= ~guilty();
     Bitboard occupancy = pieces() ^ snipers;
 
     while (snipers)
@@ -655,10 +711,144 @@ Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
 
 bool Position::attackers_to_exist(Square s, Bitboard occupied, Color c) const {
 
+    if constexpr (Variant::EnableRemorse)
+        return (attackers_to(s, occupied) & pieces(c) & ~guilty())
+            || (attacks_bb<KING>(s) & pieces(c, KING));
+
     return (attacks_bb<ROOK>(s, occupied) & pieces(c, ROOK, QUEEN))
         || (attacks_bb<BISHOP>(s, occupied) & pieces(c, BISHOP, QUEEN))
         || (attacks_bb<PAWN>(s, ~c) & pieces(c, PAWN))
         || (attacks_bb<KNIGHT>(s) & pieces(c, KNIGHT)) || (attacks_bb<KING>(s) & pieces(c, KING));
+}
+
+std::string Position::variant_fen() const {
+    if constexpr (Variant::EnableRemorse)
+    {
+        std::ostringstream output;
+        output << fen() << " guilt=" << std::hex << guilty();
+        return output.str();
+    }
+    return fen();
+}
+
+Bitboard Position::remorse_ready() const {
+    return guilty() & ((pieces(WHITE) & bishop_range(pieces(WHITE, BISHOP)))
+                     | (pieces(BLACK) & bishop_range(pieces(BLACK, BISHOP))));
+}
+
+Bitboard Position::remorse_after(Move move, Bitboard bishopsAfter) const {
+    const Color us = sideToMove;
+    const Square from = move.from_sq(), target = move.to_sq();
+    const bool castle = move.type_of() == CASTLING;
+    const bool takes = capture(move);
+    Bitboard guilt = guilty();
+    if (!guilt)
+        return takes ? square_bb(target) : 0;
+    Bitboard ready = guilt & pieces(us) & bishop_range(pieces(us, BISHOP));
+
+    Bitboard origins = square_bb(from);
+    Square destination = target;
+    Square rookDestination = SQ_NONE;
+    if (castle)
+    {
+        origins |= target;
+        destination = relative_square(us, target > from ? SQ_G1 : SQ_C1);
+        rookDestination = relative_square(us, target > from ? SQ_F1 : SQ_D1);
+    }
+
+    Bitboard movedGuilt = (guilt & from) ? square_bb(destination) : 0;
+    Bitboard movedReady = (ready & from) ? square_bb(destination) : 0;
+    if (castle && (guilt & target))
+        movedGuilt |= rookDestination;
+    if (castle && (ready & target))
+        movedReady |= rookDestination;
+
+    guilt = (guilt & ~origins) | movedGuilt;
+    ready = (ready & ~origins) | movedReady;
+    if (takes)
+    {
+        const Square captured = move.type_of() == EN_PASSANT ? target - pawn_push(us) : target;
+        guilt &= ~square_bb(captured);
+        ready &= ~square_bb(destination);
+        guilt |= destination;
+    }
+    return guilt & ~(ready & bishop_range(bishopsAfter));
+}
+
+bool Position::remorse_legal(Move move) const {
+    const Color us = sideToMove;
+    const Square from = move.from_sq(), target = move.to_sq();
+    Square king = square<KING>(us);
+    const Bitboard attackers = pieces(~us) & (~guilty() | pieces(KING));
+    Bitboard occupancy = pieces() & ~square_bb(from);
+
+    if (move.type_of() == CASTLING)
+    {
+        if (checkers())
+            return false;
+        const Square kingTo = relative_square(us, target > from ? SQ_G1 : SQ_C1);
+        const Square rookTo = relative_square(us, target > from ? SQ_F1 : SQ_D1);
+        const Direction step = kingTo > from ? EAST : WEST;
+        for (Square transit = from; transit != kingTo; transit += step)
+            if (attackers_to(transit, occupancy) & attackers)
+                return false;
+        occupancy = (occupancy & ~square_bb(target)) | kingTo | rookTo;
+        return !(attackers_to(kingTo, occupancy) & attackers);
+    }
+
+    if (capture(move) && ((guilty() & from) || (pieces(~us, KING) & target)))
+        return false;
+
+    const Square removed = move.type_of() == EN_PASSANT ? target - pawn_push(us) : target;
+    occupancy = (occupancy & ~square_bb(removed)) | target;
+    if (from == king)
+        king = target;
+    return !(attackers_to(king, occupancy) & attackers & ~square_bb(removed));
+}
+
+bool Position::remorse_ep_legal() const {
+    assert(ep_square() != SQ_NONE);
+    Bitboard pawns = attacks_bb<PAWN>(ep_square(), ~sideToMove) & pieces(sideToMove, PAWN);
+    while (pawns)
+        if (remorse_legal(Move::make<EN_PASSANT>(pop_lsb(pawns), ep_square())))
+            return true;
+    return false;
+}
+
+bool Position::remorse_gives_check(Move move) const {
+    const Color us = sideToMove;
+    const Square from = move.from_sq(), target = move.to_sq(), king = square<KING>(~us);
+    Square destination = target;
+    Square rookDestination = SQ_NONE;
+    Bitboard origins = square_bb(from);
+    Bitboard bishops = pieces(us, BISHOP) & ~origins;
+    const PieceType moved = move.type_of() == PROMOTION ? move.promotion_type()
+                                                       : type_of(piece_on(from));
+    Bitboard occupancy = pieces();
+    if (move.type_of() == CASTLING)
+    {
+        origins |= target;
+        destination = relative_square(us, target > from ? SQ_G1 : SQ_C1);
+        rookDestination = relative_square(us, target > from ? SQ_F1 : SQ_D1);
+    }
+    if (move.type_of() == EN_PASSANT)
+        occupancy &= ~square_bb(target - pawn_push(us));
+    occupancy = (occupancy & ~origins) | destination;
+    if (rookDestination != SQ_NONE)
+        occupancy |= rookDestination;
+    if (moved == BISHOP)
+        bishops |= destination;
+
+    const Bitboard guiltAfter = remorse_after(move, bishops);
+    if (attackers_to(king, occupancy) & pieces(us) & ~origins & ~guiltAfter)
+        return true;
+    if (rookDestination != SQ_NONE && !(guiltAfter & rookDestination)
+        && (attacks_bb<ROOK>(king, occupancy) & rookDestination))
+        return true;
+
+    return !(guiltAfter & destination)
+        && ((moved == PAWN ? attacks_bb<PAWN>(destination, us)
+                           : attacks_bb(moved, destination, occupancy)) & king);
 }
 
 // Tests whether a pseudo-legal move is legal
@@ -677,6 +867,9 @@ bool Position::legal(Move m) const {
     if constexpr (Variant::HasRuleFilter)
         if (!Variant::move_allowed(*this, m))
             return false;
+
+    if constexpr (Variant::EnableRemorse)
+        return remorse_legal(m);
 
     // Castling moves generation does not check if the castling path is clear of
     // enemy attacks, it is delayed at a later time: now!
@@ -776,6 +969,9 @@ bool Position::gives_check(Move m) const {
     assert(m.is_ok());
     assert(color_of(moved_piece(m)) == sideToMove);
 
+    if constexpr (Variant::EnableRemorse)
+        return remorse_gives_check(m);
+
     Square from = m.from_sq();
     Square to   = m.to_sq();
 
@@ -860,6 +1056,16 @@ void Position::do_move(Move                      m,
     Square to       = m.to_sq();
     Piece  pc       = piece_on(from);
     Piece  captured = m.type_of() == EN_PASSANT ? make_piece(them, PAWN) : piece_on(to);
+
+    if constexpr (Variant::EnableRemorse)
+    {
+        Bitboard bishops = pieces(us, BISHOP) & ~square_bb(from);
+        if (type_of(pc) == BISHOP || (m.type_of() == PROMOTION && m.promotion_type() == BISHOP))
+            bishops |= to;
+        const Bitboard before = st->guilt;
+        st->guilt = remorse_after(m, bishops);
+        k ^= guilt_key(before ^ st->guilt);
+    }
 
     dp.pc     = pc;
     dp.from   = from;
@@ -954,7 +1160,9 @@ void Position::do_move(Move                      m,
             Bitboard pawns    = attacks_bb<PAWN>(epSquare, us) & pieces(them, PAWN);
 
             // If there are no pawns attacking the ep square, ep is not possible.
-            if (pawns)
+            if (Variant::EnableRemorse)
+                st->epSquare = pawns ? epSquare : SQ_NONE;
+            else if (pawns)
             {
                 Square   ksq         = square<KING>(them);
                 Bitboard notBlockers = ~st->previous->blockersForKing[them];
@@ -1012,7 +1220,7 @@ void Position::do_move(Move                      m,
             st->minorPieceKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
     }
 
-    if (tt)
+    if (tt && !Variant::EnableRemorse)
         prefetch(tt->first_entry(adjust_key50(k)));
     // Update the key with the final value
     st->key = k;
@@ -1054,6 +1262,21 @@ void Position::do_move(Move                      m,
     st->checkersBB = givesCheck ? attackers_to(square<KING>(them)) & pieces(us) : 0;
 
     sideToMove = ~sideToMove;
+
+    if constexpr (Variant::EnableRemorse)
+    {
+        st->checkersBB = attackers_to(square<KING>(them)) & pieces(us) & ~guilty();
+        assert(givesCheck == bool(st->checkersBB));
+        if (st->epSquare != SQ_NONE)
+        {
+            if (remorse_ep_legal())
+                st->key ^= Zobrist::enpassant[file_of(st->epSquare)];
+            else
+                st->epSquare = SQ_NONE;
+        }
+        if (tt)
+            prefetch(tt->first_entry(adjust_key50(st->key)));
+    }
 
     // Update king attacks used for fast check detection
     set_check_info();
@@ -1398,6 +1621,9 @@ bool Position::see_ge(Move m, int threshold) const {
 
     assert(m.is_ok());
 
+    if constexpr (Variant::EnableRemorse)
+        return true;
+
     // Only deal with normal moves, assume others pass a simple SEE
     if (m.type_of() != NORMAL)
         return VALUE_ZERO >= threshold;
@@ -1534,6 +1760,9 @@ bool Position::has_repeated() const {
 // This function accurately matches the outcome of is_draw() over all legal moves.
 bool Position::upcoming_repetition(int ply) const {
 
+    if constexpr (Variant::EnableRemorse)
+        return false;
+
     int end = std::min(st->rule50, st->pliesFromNull);
 
     if (end < 3)
@@ -1607,6 +1836,16 @@ std::optional<PositionSetError> Position::flip() {
     std::getline(ss, token);  // Half and full moves
     f += token;
 
+    if constexpr (Variant::EnableRemorse)
+    {
+        Bitboard flipped = 0;
+        for (Bitboard squares = guilty(); squares;)
+            flipped |= flip_rank(pop_lsb(squares));
+        std::ostringstream suffix;
+        suffix << " guilt=" << std::hex << flipped;
+        f += suffix.str();
+    }
+
     return set(f, is_chess960(), st);
 }
 
@@ -1643,7 +1882,12 @@ bool Position::pos_is_ok() const {
 #endif
 
 
-    if (ep_square() != SQ_NONE)
+    if constexpr (Variant::EnableRemorse)
+    {
+        assert(!(guilty() & ~pieces()));
+        assert(ep_square() == SQ_NONE || remorse_ep_legal());
+    }
+    else if (ep_square() != SQ_NONE)
     {
         Square ksq = square<KING>(sideToMove);
 
